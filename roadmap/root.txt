@@ -1,0 +1,18 @@
+MVP1 codex shell warpper
+workspace选择 footer
+提示词编辑器 一键以提示词启动codex
+历史session选择 reedit/resume with prompt
+on going session management
+接入简单的git状态管理 支持快速查看git当前修改并**接入** diff 工具(TortoiseGitMerge.exe用于测试)
+
+MVP2 topic
+topic 拆分 每一件事(可以理解成每一个分支) 的信息/进度/坑持久化
+快速捞 快速恢复 新起session
+(要不要做) 同workspace的多task并行? 同时在一个物理仓库执行 topic A的信息收集与topic B的编码; 或topic A的编码与topic B的bugfix
+支持筛选式diff
+可能要与Task结合(技术原因) 同一仓库能跑多个只读topic(允许写文档但不允许改代码 只能写自己topic的文档) 要跑多个可写topic 会有些困难? 
+topic 的嵌套 如
+
+MVP3 task
+Task/Recipe 提示词模板 不同具体任务(如信息收集/方案撰写..) 的具体约束和差异化暴露
+铺量

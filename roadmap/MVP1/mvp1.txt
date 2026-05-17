@@ -1,0 +1,20 @@
+目标 形成能够显著提高个人工作效率的基础应用
+验证诸多操作是否成立(如以提示词拉起/git 展示/历史session信息收集/multi session management)
+
+整体以多页签形式展示 每个页签提供独立的若干功能 彼此之间允许有少量联动
+tab 0 提示词编辑器 提供一个按钮'Launch' 支持拖入文件自动在编辑窗口转为文件路径文本
+tab 1 历史session 选择 以list形式展示'当前workspace的历史session' 提供resume/reedit init prompt()/search
+tab 2 On going session list, 拉到前台, 在session历史中显示
+tab 3 仿照vs或rider的git插件 预览当前diff文件 点击打开diff工具 commit 
+
+workspace选择 footer 摘要信息 不可编辑 按键选择路径
+配置文件 
+	历史session条目
+	codex 参数(--search 权限参数等)
+提供两层配置 global(写在%appdata%之类的路径) 和workspace(写在.HaloCreek) workspace覆盖global
+
+scope
+tab1 历史session先依赖'当前版本codex session文件格式' 先快速当前可用 不防御codex未来session的格式变更或隐藏化 要保证'历史session解析'模块接口设计足够好 保留未来炸了之后重新修复的可能性
+tab2 不深入 尝试一下tmux 自己只维护至多一个window 通过tmux标识符来进行识别 前后台切换等等 如果做不到就先搁置
+tab3 只进行简单的list展示和接入 不做stash 不做add 先尝试接小乌龟的commit窗口 可能已经足够了
+配置文件只支持分层json 不做配置编辑器
