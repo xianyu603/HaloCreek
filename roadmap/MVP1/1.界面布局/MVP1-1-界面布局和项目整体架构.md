@@ -62,7 +62,7 @@ HaloCreek/
 │     └─ WorkspaceFooterViewModel.cs
 ├─ Models/
 │  ├─ WorkspaceInfo.cs
-│  ├─ SessionInfo.cs
+│  ├─ HistorySessionInfo.cs
 │  ├─ OngoingSessionInfo.cs
 │  ├─ GitChangeInfo.cs
 │  └─ AppConfig.cs
@@ -124,7 +124,7 @@ public sealed class ConfigService
 - Prompt Launch 能力抽成 `Services/SessionLaunchService`。该服务负责把提示词、workspace 和固定启动参数转换成一次 Codex 启动请求，并通过 `ProcessRunner` 执行。该边界不需要像历史 session 读取那样再做 reader 层隔离，Codex 启动命令相对稳定，阶段 3 先保持一层服务封装。
 - 历史 session 的业务入口固定为 `Services/SessionHistory/SessionHistoryService`。该服务负责历史 session 列表所需信息、搜索、排序、过滤、映射和后续操作准备。
 - 历史 session 原始数据读取固定隔离在 `Services/SessionHistory/ISessionHistoryReader` / `CodexSessionHistoryReader` 后面。该层知道文件路径和当前接入来源的文件格式，并把不稳定的原始格式转换成稳定的中间数据。
-- UI 只消费稳定模型，例如 `SessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`，不直接解析外部文件或进程输出。
+- UI 只消费稳定模型，例如 `HistorySessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`，不直接解析外部文件或进程输出。
 - MVP1 只使用 Avalonia 原生控件和 Fluent 主题，不引入第三方 UI 控件库。
 - 窗口设置合理最小尺寸，tab 内使用 `Grid` / `DockPanel` 保证基本缩放体验。本项目不做复杂响应式布局。
 - 阶段 1 不新增单元测试项目。服务层出现真实解析、文件系统、进程或 Git 逻辑后，再优先为服务层补测试。
@@ -135,9 +135,9 @@ public sealed class ConfigService
 - [x] **1-1-T02 Tab 视图占位**：新增 `Views/Tabs/PromptEditorView.axaml`、`HistorySessionsView.axaml`、`OngoingSessionsView.axaml`、`GitView.axaml`，并在 `MainWindow.axaml` 中以静态 XAML 组合到 4 个 tab。审阅重点是 tab 命名、占位区域和主窗口组合方式。
 - [x] **1-1-T03 Tab ViewModel 占位**：新增 4 个 tab 对应 ViewModel，并让每个 tab ViewModel 暴露统一的 `SetWorkspace(WorkspaceInfo workspace)` 入口。审阅重点是页面状态按 ViewModel 独立持有，`MainWindowViewModel` 不承载 tab 业务状态。
 - [x] **1-1-T04 Footer 组件占位**：新增 `WorkspaceFooterView` 和 `WorkspaceFooterViewModel`，提供 workspace 路径、状态文本和 workspace 选择命令绑定字段。审阅重点是 Footer 职责独立，后续阶段可直接接入真实 workspace 切换。
-- [ ] **1-1-T05 基础模型占位**：在 `Models` 下新增 `WorkspaceInfo`、`SessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式。
+- [x] **1-1-T05 基础模型占位**：在 `Models` 下新增 `WorkspaceInfo`、`HistorySessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式。
 - [ ] **1-1-T06 平铺服务边界占位**：新增 `WorkspaceService`、`OngoingSessionService`、`GitService`、`ConfigService`、`DragDropService`、`SessionLaunchService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据。
-- [ ] **1-1-T07 历史 session 读取边界占位**：新增 `Services/SessionHistory/SessionHistoryService`、`ISessionHistoryReader`、`MockHistorySessionReader`、`CodexSessionHistoryReader`。审阅重点是原始数据读取和格式解析被隔离在 reader 层，ViewModel 只消费 `SessionInfo`。
+- [ ] **1-1-T07 历史 session 读取边界占位**：新增 `Services/SessionHistory/SessionHistoryService`、`ISessionHistoryReader`、`MockHistorySessionReader`、`CodexSessionHistoryReader`。审阅重点是原始数据读取和格式解析被隔离在 reader 层，ViewModel 只消费 `HistorySessionInfo`。
 - [ ] **1-1-T08 基础设施占位**：新增 `Infrastructure/ProcessRunner` 和 `FileSystem`，供后续 session launch、Git、文件读取等服务复用。审阅重点是只建立边界，不在阶段 1 实现复杂业务逻辑。
 - [ ] **1-1-T09 应用启动组装**：在 `App.OnFrameworkInitializationCompleted()` 中创建服务、创建各 ViewModel、注入依赖、组装 `MainWindowViewModel`，并设置 `MainWindow.DataContext`。审阅重点是 App 只做依赖组装，不手动拼装 View。
 - [ ] **1-1-T10 构建与人工验收**：完成阶段 1-1 后执行项目构建，并人工检查窗口能启动、4 个 tab 可切换、Footer 字段可显示。审阅重点是骨架可运行，且没有引入真实业务逻辑或额外 UI 控件库。
