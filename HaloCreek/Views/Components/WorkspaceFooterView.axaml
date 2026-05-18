@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HaloCreek.ViewModels.Components"
+             x:Class="HaloCreek.Views.Components.WorkspaceFooterView"
+             x:DataType="vm:WorkspaceFooterViewModel">
+    <Border BorderBrush="#CBD5E1"
+            BorderThickness="0,1,0,0"
+            Background="#F8FAFC"
+            Padding="12,8">
+        <Grid ColumnDefinitions="*,Auto,Auto"
+              ColumnSpacing="16">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding WorkspacePath}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"/>
+            <TextBlock Grid.Column="1"
+                       Text="{Binding StatusText}"
+                       VerticalAlignment="Center"
+                       Foreground="#475569"/>
+            <Button Grid.Column="2"
+                    Content="Select Workspace"
+                    Command="{Binding ChooseWorkspaceCommand}"/>
+        </Grid>
+    </Border>
+</UserControl>

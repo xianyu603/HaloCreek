@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HaloCreek.Views.Tabs.PromptEditorView">
+    <Grid RowDefinitions="*,Auto"
+          Margin="20"
+          RowSpacing="16">
+        <TextBox Grid.Row="0"
+                 DragDrop.AllowDrop="True"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 PlaceholderText="Type a prompt or drop files here"
+                 VerticalContentAlignment="Top"/>
+
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8">
+            <Button Content="Launch"
+                    IsEnabled="False"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

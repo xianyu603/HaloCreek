@@ -1,20 +1,41 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:HaloCreek.ViewModels"
+        xmlns:tabs="using:HaloCreek.Views.Tabs"
+        xmlns:components="using:HaloCreek.Views.Components"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1120" d:DesignHeight="760"
         x:Class="HaloCreek.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="HaloCreek">
+        Title="HaloCreek"
+        Width="1120"
+        Height="760"
+        MinWidth="960"
+        MinHeight="640">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Grid RowDefinitions="*,Auto">
+        <TabControl Grid.Row="0">
+            <TabItem Header="Prompt Editor">
+                <tabs:PromptEditorView/>
+            </TabItem>
+            <TabItem Header="History Sessions">
+                <tabs:HistorySessionsView/>
+            </TabItem>
+            <TabItem Header="Ongoing Sessions">
+                <tabs:OngoingSessionsView/>
+            </TabItem>
+            <TabItem Header="Git">
+                <tabs:GitView/>
+            </TabItem>
+        </TabControl>
+
+        <components:WorkspaceFooterView Grid.Row="1" DataContext="{Binding WorkspaceFooter}"/>
+    </Grid>
 
 </Window>
