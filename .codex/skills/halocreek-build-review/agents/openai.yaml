@@ -1,0 +1,4 @@
+interface:
+  display_name: "HaloCreek Build Review"
+  short_description: "Build and launch HaloCreek for review."
+  default_prompt: "Build HaloCreek with Windows dotnet.exe, report validation results, and launch the desktop window for review."
