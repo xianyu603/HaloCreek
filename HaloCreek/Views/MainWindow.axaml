@@ -22,16 +22,16 @@
     <Grid RowDefinitions="*,Auto">
         <TabControl Grid.Row="0">
             <TabItem Header="Prompt Editor">
-                <tabs:PromptEditorView/>
+                <tabs:PromptEditorView DataContext="{Binding PromptEditor}"/>
             </TabItem>
             <TabItem Header="History Sessions">
-                <tabs:HistorySessionsView/>
+                <tabs:HistorySessionsView DataContext="{Binding HistorySessions}"/>
             </TabItem>
             <TabItem Header="Ongoing Sessions">
-                <tabs:OngoingSessionsView/>
+                <tabs:OngoingSessionsView DataContext="{Binding OngoingSessions}"/>
             </TabItem>
             <TabItem Header="Git">
-                <tabs:GitView/>
+                <tabs:GitView DataContext="{Binding Git}"/>
             </TabItem>
         </TabControl>
 

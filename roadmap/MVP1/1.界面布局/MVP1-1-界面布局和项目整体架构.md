@@ -133,7 +133,7 @@ public sealed class ConfigService
 
 - [x] **1-1-T01 主窗口布局骨架**：将 `MainWindow` 调整为 `Grid` 上下两行布局，上方承载 `TabControl`，下方承载 Footer，并设置合理最小窗口尺寸。审阅重点是主布局稳定、缩放不破坏基本结构。
 - [x] **1-1-T02 Tab 视图占位**：新增 `Views/Tabs/PromptEditorView.axaml`、`HistorySessionsView.axaml`、`OngoingSessionsView.axaml`、`GitView.axaml`，并在 `MainWindow.axaml` 中以静态 XAML 组合到 4 个 tab。审阅重点是 tab 命名、占位区域和主窗口组合方式。
-- [ ] **1-1-T03 Tab ViewModel 占位**：新增 4 个 tab 对应 ViewModel，并让每个 tab ViewModel 暴露统一的 `SetWorkspace(WorkspaceInfo workspace)` 入口。审阅重点是页面状态按 ViewModel 独立持有，`MainWindowViewModel` 不承载 tab 业务状态。
+- [x] **1-1-T03 Tab ViewModel 占位**：新增 4 个 tab 对应 ViewModel，并让每个 tab ViewModel 暴露统一的 `SetWorkspace(WorkspaceInfo workspace)` 入口。审阅重点是页面状态按 ViewModel 独立持有，`MainWindowViewModel` 不承载 tab 业务状态。
 - [x] **1-1-T04 Footer 组件占位**：新增 `WorkspaceFooterView` 和 `WorkspaceFooterViewModel`，提供 workspace 路径、状态文本和 workspace 选择命令绑定字段。审阅重点是 Footer 职责独立，后续阶段可直接接入真实 workspace 切换。
 - [ ] **1-1-T05 基础模型占位**：在 `Models` 下新增 `WorkspaceInfo`、`SessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式。
 - [ ] **1-1-T06 平铺服务边界占位**：新增 `WorkspaceService`、`OngoingSessionService`、`GitService`、`ConfigService`、`DragDropService`、`SessionLaunchService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据。
