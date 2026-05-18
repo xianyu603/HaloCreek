@@ -8,10 +8,11 @@
 - 为 4 个核心页签预留独立视图与 ViewModel。
 - 敲定 MVP1 期间可持续演进的工程目录结构。
 - 明确主要技术决策，避免后续阶段频繁重排 UI 和模块边界。
+- 固化跨页面服务、外部格式读取、占位实现和应用启动组装的边界。
 
 ## 主界面布局
 
-主窗口建议采用上下结构：
+主窗口采用上下结构：
 
 ```text
 MainWindow
@@ -37,7 +38,7 @@ MainWindow
 - 右侧提供 workspace 选择按钮。
 - MVP1 阶段 2 再接入真实 workspace 切换；阶段 1 只保留布局和绑定字段。
 
-## 建议工程结构
+## 工程结构
 
 ```text
 HaloCreek/
@@ -63,40 +64,68 @@ HaloCreek/
 │  ├─ WorkspaceInfo.cs
 │  ├─ SessionInfo.cs
 │  ├─ OngoingSessionInfo.cs
-│  └─ GitChangeInfo.cs
+│  ├─ GitChangeInfo.cs
+│  └─ AppConfig.cs
 ├─ Services/
 │  ├─ WorkspaceService.cs
-│  ├─ SessionHistoryService.cs
 │  ├─ OngoingSessionService.cs
 │  ├─ GitService.cs
-│  └─ ConfigService.cs
+│  ├─ ConfigService.cs
+│  ├─ DragDropService.cs
+│  └─ SessionHistory/
+│  │  ├─ SessionHistoryService.cs
+│  │  ├─ ISessionHistoryReader.cs
+│  │  ├─ MockHistorySessionReader.cs
+│  │  └─ CodexSessionHistoryReader.cs
 └─ Infrastructure/
    ├─ ProcessRunner.cs
    └─ FileSystem.cs
 ```
 
-阶段 1 不必一次创建全部服务实现，但建议先按这个边界组织文件，后续阶段逐步填充。
+阶段 1 按这个边界组织文件。真实业务实现可以逐步填充，但上层接口、ViewModel 依赖关系和服务分层需要从一开始保持正式形态。
 
-## 主要技术决策点
+`Services/` 默认保持平铺，只有内部文件会继续增长、且需要隔离外部数据读取边界的模块才拆子目录。阶段 1 只将历史 session 相关文件放入 `Services/SessionHistory/`，其他服务仍直接放在 `Services/` 下。
 
-| 问题 | 可选方案 | 建议 |
-| --- | --- | --- |
-| 主窗口使用什么布局容器？ | `Grid` 上下两行；`DockPanel`；嵌套 `StackPanel` | 使用 `Grid`：第一行 `*` 放 `TabControl`，第二行 `Auto` 放 Footer。结构稳定，后续 footer 高度变化不会影响主内容逻辑。 |
-| 页签使用 Avalonia 原生 `TabControl` 还是自定义导航？ | 原生 `TabControl`；左侧导航 + ContentControl；自定义按钮栏 | MVP1 使用原生 `TabControl`。实现成本低，足够验证多页签工作流；后续需要更复杂导航时再替换。 |
-| 每个 tab 是否拆成独立 View/UserControl？ | 全部写在 `MainWindow.axaml`；每个 tab 一个 `UserControl`；只拆 ViewModel | 每个 tab 拆成独立 `UserControl + ViewModel`。阶段 3-6 可以独立推进，避免 `MainWindow` 变成大文件。 |
-| ViewModel 如何组织？ | 一个 `MainWindowViewModel` 管所有状态；每个 tab 独立 VM；引入完整 DI 容器 | 使用每个 tab 独立 VM，`MainWindowViewModel` 只负责组合。暂不引入 DI 容器，先手动组装，等服务复杂后再评估。 |
-| Footer 的状态归属在哪里？ | 放在 `MainWindowViewModel`；独立 `WorkspaceFooterViewModel`；每个 tab 各自显示 | 独立 `WorkspaceFooterViewModel`，由 `MainWindowViewModel` 持有。workspace 是跨 tab 状态，独立后更容易在阶段 2 接入切换逻辑。 |
-| workspace 状态如何流向各 tab？ | tab 直接读全局变量；Main VM 分发；事件总线；服务查询 | MVP1 使用 Main VM 持有当前 workspace，并在创建/切换时传给各 tab VM。暂不使用事件总线，降低隐式依赖。 |
-| 设计期/占位数据怎么处理？ | 不做占位；写死在 XAML；ViewModel 提供 mock 数据 | 阶段 1 使用 ViewModel 内的 mock 数据，方便直接看布局效果。阶段 7 Config 化前可以继续硬编码。 |
-| 命令绑定用什么方式？ | code-behind 事件；CommunityToolkit `RelayCommand`；ReactiveUI | 使用 CommunityToolkit `RelayCommand`。项目已引用 `CommunityToolkit.Mvvm`，和现有 MVVM 方向一致。 |
-| 文件拖入能力放在哪里？ | MainWindow 统一处理；PromptEditorView 自己处理；独立 DragDropService | 阶段 3 在 `PromptEditorView` 内处理拖入即可。拖入只影响提示词编辑器，不需要提前抽公共服务。 |
-| 历史 session 解析模块现在是否做格式防御？ | 完整兼容抽象；只支持当前 Codex 格式；直接 UI 里解析文件 | 只支持当前 Codex session 格式，但解析逻辑必须放在 `SessionHistoryService`，UI 只消费 `SessionInfo`。未来格式变化时只替换服务。 |
-| ongoing session 是否现在接 tmux？ | 阶段 1 就接；阶段 5 再接；完全跳过 | 阶段 1 只保留列表布局和模型字段，阶段 5 再验证 tmux。避免布局阶段被外部进程控制复杂度拖住。 |
-| Git tab 是否现在接真实 git？ | 阶段 1 就跑 git；只做占位列表；直接调用 TortoiseGit | 阶段 1 只做占位列表与按钮。阶段 6 再接 `GitService` 和 TortoiseGitMerge/commit。 |
-| 配置系统是否现在实现？ | 先实现 global/workspace config；硬编码到阶段 7；先写接口不实现 | 阶段 1 可以预留 `ConfigService` 文件边界，但真实读取写入延后到阶段 7。当前阶段先硬编码默认值。 |
-| 是否引入第三方 UI 控件库？ | 只用 Avalonia + Fluent；引入完整控件库；自绘控件 | MVP1 只用 Avalonia 原生控件和 Fluent 主题。当前界面偏工具型，原生控件足够，减少依赖风险。 |
-| 是否做响应式布局？ | 固定窗口；简单最小尺寸；完整自适应 | 设置合理最小窗口尺寸，tab 内使用 `Grid`/`DockPanel` 支持基本拉伸。MVP1 不做复杂响应式。 |
-| 工程是否立即加入单元测试项目？ | 阶段 1 加测试项目；后续需要时加；不测试 | 阶段 1 暂不加测试项目。等 `SessionHistoryService`、`GitService` 等有真实逻辑后，再优先给服务层补测试。 |
+应用启动和组件组装集中放在 `App.OnFrameworkInitializationCompleted()`。本阶段不引入完整 DI 容器，由该入口创建服务、创建各 tab ViewModel、创建 `WorkspaceFooterViewModel`，最后组装 `MainWindowViewModel`。
+
+占位数据由服务层或底层 reader 的 mock 实现返回，不写入 XAML，也不直接写在 ViewModel 里。ViewModel 始终依赖正式服务接口和正式数据模型，后续替换真实实现时不改变 ViewModel 的调用方式。例如：
+
+```text
+HistorySessionsViewModel
+└─ Services/SessionHistory/SessionHistoryService
+   └─ Services/SessionHistory/ISessionHistoryReader
+      └─ MockHistorySessionReader / FileSessionHistoryReader
+```
+
+`ConfigService` 在阶段 1 使用正式方法签名返回默认配置：
+
+```csharp
+public sealed class ConfigService
+{
+    public AppConfig LoadEffectiveConfig(WorkspaceInfo? workspace)
+    {
+        return AppConfig.DefaultForMvp1;
+    }
+}
+```
+
+## 主要技术结论
+
+- 主窗口使用 `Grid` 上下两行布局：第一行 `*` 放 `TabControl`，第二行 `Auto` 放 Footer。该结构固定为主窗口基础布局。
+- 页签使用 Avalonia 原生 `TabControl`。MVP1 的多页工作流直接建立在原生控件上。
+- 每个 tab 拆成独立 `UserControl + ViewModel`。`MainWindow.axaml` 只负责承载主布局和组合各 tab。
+- ViewModel 按页面拆分，`MainWindowViewModel` 只负责组合和跨页面状态分发，不承载各 tab 的业务状态。
+- Footer 使用独立 `WorkspaceFooterViewModel`，由 `MainWindowViewModel` 持有。workspace 摘要、状态文本和 workspace 选择入口统一归 Footer 组件管理。
+- workspace 状态由 `MainWindowViewModel` 持有，并在创建或切换时传递给各 tab ViewModel。项目不使用全局变量或事件总线传递 workspace。
+- 占位数据通过正式服务边界提供。服务可以临时返回 mock 数据，但 ViewModel、View 和模型结构保持与真实实现一致。
+- 命令绑定使用 CommunityToolkit `RelayCommand`。项目继续沿用 `CommunityToolkit.Mvvm` 的 MVVM 写法。
+- 文件拖入能力抽成 `Services/DragDropService`。Prompt Editor、History Sessions、Ongoing Sessions 等页面需要处理文件或路径拖入时复用同一服务。
+- 历史 session 的业务入口固定为 `Services/SessionHistory/SessionHistoryService`。该服务负责历史 session 列表所需信息、搜索、排序、过滤、映射和后续操作准备。
+- 历史 session 原始数据读取固定隔离在 `Services/SessionHistory/ISessionHistoryReader` / `CodexSessionHistoryReader` 后面。该层知道文件路径和当前接入来源的文件格式，并把不稳定的原始格式转换成稳定的中间数据。
+- UI 只消费稳定模型，例如 `SessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`，不直接解析外部文件或进程输出。
+- MVP1 只使用 Avalonia 原生控件和 Fluent 主题，不引入第三方 UI 控件库。
+- 窗口设置合理最小尺寸，tab 内使用 `Grid` / `DockPanel` 保证基本缩放体验。本项目不做复杂响应式布局。
+- 阶段 1 不新增单元测试项目。服务层出现真实解析、文件系统、进程或 Git 逻辑后，再优先为服务层补测试。
 
 ## 阶段 1 交付物
 
@@ -104,13 +133,15 @@ HaloCreek/
 - 4 个 tab 的 View/UserControl 和 ViewModel 占位。
 - Footer 的 View/UserControl 和 ViewModel 占位。
 - `Models` 目录补充 MVP1 需要的基础数据模型占位。
-- 不接真实 Codex、tmux、git、配置读写逻辑。
+- `Services` 目录补充 workspace、ongoing、git、config、drag-drop 的平铺服务边界，并将历史 session 相关文件放入 `Services/SessionHistory/`。
+- `Services/SessionHistory/ISessionHistoryReader` / `FileSessionHistoryReader` 边界占位，用于隔离历史 session 原始数据来源和文件格式。
+- `App.OnFrameworkInitializationCompleted()` 完成服务和 ViewModel 的集中组装。
 
 ## 后续阶段衔接
 
 - 阶段 2：实现 workspace 选择，Footer 显示真实当前 workspace。
 - 阶段 3：实现 Prompt Editor 的编辑、拖入文件路径、Launch。
 - 阶段 4：实现当前 workspace 的历史 session 解析与操作。
-- 阶段 5：验证 ongoing session/tmux 管理。
-- 阶段 6：实现 git diff 列表和外部 diff/commit 工具接入。
-- 阶段 7：把硬编码参数收敛到 global/workspace 分层 JSON 配置。
+- 阶段 5：实现 ongoing session 管理页面的真实数据来源和操作。
+- 阶段 6：实现 Git 页面的真实 diff 列表和提交相关操作。
+- 阶段 7：把硬编码参数收敛到 global/workspace 分层配置。
