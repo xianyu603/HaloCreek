@@ -78,13 +78,14 @@ HaloCreek/
 │  │  ├─ MockHistorySessionReader.cs
 │  │  └─ CodexSessionHistoryReader.cs
 └─ Infrastructure/
-   ├─ ProcessRunner.cs
-   └─ FileSystem.cs
+   └─ 按需添加 ProcessRunner、FileSystem 等跨服务底层适配
 ```
 
 阶段 1 按这个边界组织文件。真实业务实现可以逐步填充，但上层接口、ViewModel 依赖关系和服务分层需要从一开始保持正式形态。
 
 `Services/` 默认保持平铺，只有内部文件会继续增长、且需要隔离外部数据读取边界的模块才拆子目录。阶段 1 只将历史 session 相关文件放入 `Services/SessionHistory/`，其他服务仍直接放在 `Services/` 下。
+
+`Infrastructure/` 目录作为后续底层适配边界保留，但阶段 1 不提前新增无逻辑占位文件。等 `SessionLifecycleService`、`GitService` 或文件读取能力接入真实实现时，再按需要添加 `ProcessRunner`、`FileSystem` 等实现。
 
 窗口和页面布局由 XAML 静态声明；`App.OnFrameworkInitializationCompleted()` 只负责创建服务、创建 ViewModel、注入依赖，并把组装好的 `MainWindowViewModel` 设置为 `MainWindow.DataContext`。View 不在 App 中手动拼装。
 
@@ -138,9 +139,8 @@ public sealed class ConfigService
 - [x] **1-1-T05 基础模型占位**：在 `Models` 下新增 `WorkspaceInfo`、`HistorySessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式。
 - [x] **1-1-T06 平铺服务边界占位**：新增 `WorkspaceService`、`SessionLifecycleService`、`GitService`、`ConfigService`、`DragDropService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据。
 - [x] **1-1-T07 历史 session 读取边界占位**：新增 `Services/SessionHistory/SessionHistoryService`、`ISessionHistoryReader`、`MockHistorySessionReader`、`CodexSessionHistoryReader`。审阅重点是原始数据读取和格式解析被隔离在 reader 层，ViewModel 只消费 `HistorySessionInfo`。
-- [ ] **1-1-T08 基础设施占位**：新增 `Infrastructure/ProcessRunner` 和 `FileSystem`，供后续 session launch、Git、文件读取等服务复用。审阅重点是只建立边界，不在阶段 1 实现复杂业务逻辑。
-- [ ] **1-1-T09 应用启动组装**：在 `App.OnFrameworkInitializationCompleted()` 中创建服务、创建各 ViewModel、注入依赖、组装 `MainWindowViewModel`，并设置 `MainWindow.DataContext`。审阅重点是 App 只做依赖组装，不手动拼装 View。
-- [ ] **1-1-T10 构建与人工验收**：完成阶段 1-1 后执行项目构建，并人工检查窗口能启动、4 个 tab 可切换、Footer 字段可显示。审阅重点是骨架可运行，且没有引入真实业务逻辑或额外 UI 控件库。
+- [ ] **1-1-T08 应用启动组装**：在 `App.OnFrameworkInitializationCompleted()` 中创建服务、创建各 ViewModel、注入依赖、组装 `MainWindowViewModel`，并设置 `MainWindow.DataContext`。审阅重点是 App 只做依赖组装，不手动拼装 View。
+- [ ] **1-1-T09 构建与人工验收**：完成阶段 1-1 后执行项目构建，并人工检查窗口能启动、4 个 tab 可切换、Footer 字段可显示。审阅重点是骨架可运行，且没有引入真实业务逻辑或额外 UI 控件库。
 
 ## 6. 阶段 1 交付物
 
