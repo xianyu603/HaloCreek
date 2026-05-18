@@ -1,6 +1,6 @@
 # MVP1 阶段 1：界面布局方案
 
-## 目标
+## 1. 目标
 
 本阶段只完成界面与工程骨架决策，不实现各功能的真实业务逻辑。
 
@@ -10,7 +10,7 @@
 - 明确主要技术决策，避免后续阶段频繁重排 UI 和模块边界。
 - 固化跨页面服务、外部格式读取、占位实现和应用启动组装的边界。
 
-## 主界面布局
+## 2. 主界面布局
 
 主窗口采用上下结构：
 
@@ -24,21 +24,21 @@ MainWindow
 └─ Footer：当前 workspace 摘要 + workspace 选择按钮 + 状态提示
 ```
 
-### Tab 规划
+### 2.1 Tab 规划
 
 - `Prompt Editor`：提示词编辑区、文件拖入区域、Launch 按钮。
 - `History Sessions`：当前 workspace 的历史 session 列表、搜索、resume、reedit init prompt。
 - `Ongoing Sessions`：正在运行的 session 列表、拉到前台、跳转到历史记录。
 - `Git`：当前 diff 文件列表、打开 diff 工具、commit 入口。
 
-### Footer 规划
+### 2.2 Footer 规划
 
 - 左侧显示当前 workspace 路径。
 - 中间显示简短状态，如 `Ready`、`Loading sessions...`、`Launching...`。
 - 右侧提供 workspace 选择按钮。
 - MVP1 阶段 2 再接入真实 workspace 切换；阶段 1 只保留布局和绑定字段。
 
-## 工程结构
+## 3. 工程结构
 
 ```text
 HaloCreek/
@@ -110,7 +110,7 @@ public sealed class ConfigService
 }
 ```
 
-## 主要技术结论
+## 4. 主要技术结论
 
 - 主窗口使用 `Grid` 上下两行布局：第一行 `*` 放 `TabControl`，第二行 `Auto` 放 Footer。该结构固定为主窗口基础布局。
 - 页签使用 Avalonia 原生 `TabControl`。MVP1 的多页工作流直接建立在原生控件上。
@@ -129,7 +129,20 @@ public sealed class ConfigService
 - 窗口设置合理最小尺寸，tab 内使用 `Grid` / `DockPanel` 保证基本缩放体验。本项目不做复杂响应式布局。
 - 阶段 1 不新增单元测试项目。服务层出现真实解析、文件系统、进程或 Git 逻辑后，再优先为服务层补测试。
 
-## 阶段 1 交付物
+## 5. 任务拆分
+
+- [ ] **1-1-T01 主窗口布局骨架**：将 `MainWindow` 调整为 `Grid` 上下两行布局，上方承载 `TabControl`，下方承载 Footer，并设置合理最小窗口尺寸。审阅重点是主布局稳定、缩放不破坏基本结构。
+- [ ] **1-1-T02 Tab 视图占位**：新增 `Views/Tabs/PromptEditorView.axaml`、`HistorySessionsView.axaml`、`OngoingSessionsView.axaml`、`GitView.axaml`，并在 `MainWindow.axaml` 中以静态 XAML 组合到 4 个 tab。审阅重点是 tab 命名、占位区域和主窗口组合方式。
+- [ ] **1-1-T03 Tab ViewModel 占位**：新增 4 个 tab 对应 ViewModel，并让每个 tab ViewModel 暴露统一的 `SetWorkspace(WorkspaceInfo workspace)` 入口。审阅重点是页面状态按 ViewModel 独立持有，`MainWindowViewModel` 不承载 tab 业务状态。
+- [ ] **1-1-T04 Footer 组件占位**：新增 `WorkspaceFooterView` 和 `WorkspaceFooterViewModel`，提供 workspace 路径、状态文本和 workspace 选择命令绑定字段。审阅重点是 Footer 职责独立，后续阶段可直接接入真实 workspace 切换。
+- [ ] **1-1-T05 基础模型占位**：在 `Models` 下新增 `WorkspaceInfo`、`SessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式。
+- [ ] **1-1-T06 平铺服务边界占位**：新增 `WorkspaceService`、`OngoingSessionService`、`GitService`、`ConfigService`、`DragDropService`、`SessionLaunchService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据。
+- [ ] **1-1-T07 历史 session 读取边界占位**：新增 `Services/SessionHistory/SessionHistoryService`、`ISessionHistoryReader`、`MockHistorySessionReader`、`CodexSessionHistoryReader`。审阅重点是原始数据读取和格式解析被隔离在 reader 层，ViewModel 只消费 `SessionInfo`。
+- [ ] **1-1-T08 基础设施占位**：新增 `Infrastructure/ProcessRunner` 和 `FileSystem`，供后续 session launch、Git、文件读取等服务复用。审阅重点是只建立边界，不在阶段 1 实现复杂业务逻辑。
+- [ ] **1-1-T09 应用启动组装**：在 `App.OnFrameworkInitializationCompleted()` 中创建服务、创建各 ViewModel、注入依赖、组装 `MainWindowViewModel`，并设置 `MainWindow.DataContext`。审阅重点是 App 只做依赖组装，不手动拼装 View。
+- [ ] **1-1-T10 构建与人工验收**：完成阶段 1-1 后执行项目构建，并人工检查窗口能启动、4 个 tab 可切换、Footer 字段可显示。审阅重点是骨架可运行，且没有引入真实业务逻辑或额外 UI 控件库。
+
+## 6. 阶段 1 交付物
 
 - `MainWindow` 改为稳定的 `TabControl + Footer` 布局。
 - 4 个 tab 的 View/UserControl 和 ViewModel 占位。
@@ -139,7 +152,7 @@ public sealed class ConfigService
 - `Services/SessionHistory/ISessionHistoryReader` / `MockHistorySessionReader` / `CodexSessionHistoryReader` 边界占位，用于隔离历史 session 原始数据来源和文件格式。
 - `App.OnFrameworkInitializationCompleted()` 完成服务和 ViewModel 的集中组装，并设置 `MainWindow.DataContext`。窗口和页面布局仍由 XAML 静态声明。
 
-## 后续阶段衔接
+## 7. 后续阶段衔接
 
 - 阶段 2：实现 workspace 选择，Footer 显示真实当前 workspace。
 - 阶段 3：实现 Prompt Editor 的编辑、拖入文件路径、Launch。
