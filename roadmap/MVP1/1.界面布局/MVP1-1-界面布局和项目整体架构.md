@@ -68,11 +68,10 @@ HaloCreek/
 │  └─ AppConfig.cs
 ├─ Services/
 │  ├─ WorkspaceService.cs
-│  ├─ OngoingSessionService.cs
 │  ├─ GitService.cs
 │  ├─ ConfigService.cs
 │  ├─ DragDropService.cs
-│  ├─ SessionLaunchService.cs
+│  ├─ SessionLifecycleService.cs
 │  └─ SessionHistory/
 │  │  ├─ SessionHistoryService.cs
 │  │  ├─ ISessionHistoryReader.cs
@@ -121,7 +120,8 @@ public sealed class ConfigService
 - 占位数据通过正式服务边界提供。服务可以临时返回 mock 数据，但 ViewModel、View 和模型结构保持与真实实现一致。
 - 命令绑定使用 CommunityToolkit `RelayCommand`。项目继续沿用 `CommunityToolkit.Mvvm` 的 MVVM 写法。
 - 文件拖入能力抽成 `Services/DragDropService`。Prompt Editor、History Sessions、Ongoing Sessions 等页面需要处理文件或路径拖入时复用同一服务。
-- Prompt Launch 能力抽成 `Services/SessionLaunchService`。该服务负责把提示词、workspace 和固定启动参数转换成一次 Codex 启动请求，并通过 `ProcessRunner` 执行。该边界不需要像历史 session 读取那样再做 reader 层隔离，Codex 启动命令相对稳定，阶段 3 先保持一层服务封装。
+- Codex session 生命周期能力抽成 `Services/SessionLifecycleService`。该服务负责启动 session、列出正在运行的 session、拉到前台等同一能力域内的操作。阶段 3 先接入 launch，阶段 5 再补充 ongoing session 管理；如果采用 tmux，实现细节和 tmux 标识符记录先收敛在该服务内部，不把启动和 ongoing 列表拆成两个只传递参数的薄服务。
+- Service 边界按应用能力划分，不按 UI 页签一一对应。Prompt Editor 和 Ongoing Sessions 可以共同依赖 `SessionLifecycleService`，但该服务不依赖 Avalonia 控件、ViewModel、tab 状态或 DataContext。
 - 历史 session 的业务入口固定为 `Services/SessionHistory/SessionHistoryService`。该服务负责历史 session 列表所需信息、搜索、排序、过滤、映射和后续操作准备。
 - 历史 session 原始数据读取固定隔离在 `Services/SessionHistory/ISessionHistoryReader` / `CodexSessionHistoryReader` 后面。该层知道文件路径和当前接入来源的文件格式，并把不稳定的原始格式转换成稳定的中间数据。
 - UI 只消费稳定模型，例如 `HistorySessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`，不直接解析外部文件或进程输出。
@@ -136,7 +136,7 @@ public sealed class ConfigService
 - [x] **1-1-T03 Tab ViewModel 占位**：新增 4 个 tab 对应 ViewModel，并让每个 tab ViewModel 暴露统一的 `SetWorkspace(WorkspaceInfo workspace)` 入口。审阅重点是页面状态按 ViewModel 独立持有，`MainWindowViewModel` 不承载 tab 业务状态。
 - [x] **1-1-T04 Footer 组件占位**：新增 `WorkspaceFooterView` 和 `WorkspaceFooterViewModel`，提供 workspace 路径、状态文本和 workspace 选择命令绑定字段。审阅重点是 Footer 职责独立，后续阶段可直接接入真实 workspace 切换。
 - [x] **1-1-T05 基础模型占位**：在 `Models` 下新增 `WorkspaceInfo`、`HistorySessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式。
-- [x] **1-1-T06 平铺服务边界占位**：新增 `WorkspaceService`、`OngoingSessionService`、`GitService`、`ConfigService`、`DragDropService`、`SessionLaunchService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据。
+- [x] **1-1-T06 平铺服务边界占位**：新增 `WorkspaceService`、`SessionLifecycleService`、`GitService`、`ConfigService`、`DragDropService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据。
 - [x] **1-1-T07 历史 session 读取边界占位**：新增 `Services/SessionHistory/SessionHistoryService`、`ISessionHistoryReader`、`MockHistorySessionReader`、`CodexSessionHistoryReader`。审阅重点是原始数据读取和格式解析被隔离在 reader 层，ViewModel 只消费 `HistorySessionInfo`。
 - [ ] **1-1-T08 基础设施占位**：新增 `Infrastructure/ProcessRunner` 和 `FileSystem`，供后续 session launch、Git、文件读取等服务复用。审阅重点是只建立边界，不在阶段 1 实现复杂业务逻辑。
 - [ ] **1-1-T09 应用启动组装**：在 `App.OnFrameworkInitializationCompleted()` 中创建服务、创建各 ViewModel、注入依赖、组装 `MainWindowViewModel`，并设置 `MainWindow.DataContext`。审阅重点是 App 只做依赖组装，不手动拼装 View。
@@ -148,7 +148,7 @@ public sealed class ConfigService
 - 4 个 tab 的 View/UserControl 和 ViewModel 占位。
 - Footer 的 View/UserControl 和 ViewModel 占位。
 - `Models` 目录补充 MVP1 需要的基础数据模型占位。
-- `Services` 目录补充 workspace、ongoing、git、config、drag-drop、session launch 的平铺服务边界，并将历史 session 相关文件放入 `Services/SessionHistory/`。
+- `Services` 目录补充 workspace、session lifecycle、git、config、drag-drop 的平铺服务边界，并将历史 session 相关文件放入 `Services/SessionHistory/`。
 - `Services/SessionHistory/ISessionHistoryReader` / `MockHistorySessionReader` / `CodexSessionHistoryReader` 边界占位，用于隔离历史 session 原始数据来源和文件格式。
 - `App.OnFrameworkInitializationCompleted()` 完成服务和 ViewModel 的集中组装，并设置 `MainWindow.DataContext`。窗口和页面布局仍由 XAML 静态声明。
 

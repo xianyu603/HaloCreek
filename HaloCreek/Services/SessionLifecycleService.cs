@@ -1,9 +1,10 @@
 using System;
+using System.Collections.Generic;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services
 {
-    public sealed class SessionLaunchService
+    public sealed class SessionLifecycleService
     {
         public SessionLaunchResult Launch(
             WorkspaceInfo workspace,
@@ -16,13 +17,25 @@ namespace HaloCreek.Services
 
             return new SessionLaunchResult(
                 false,
-                "Session launch is not connected yet.",
+                "Session lifecycle is not connected yet.",
                 null);
+        }
+
+        public IReadOnlyList<OngoingSessionInfo> GetOngoingSessions(WorkspaceInfo? workspace)
+        {
+            return Array.Empty<OngoingSessionInfo>();
+        }
+
+        public bool TryBringToFront(OngoingSessionInfo session)
+        {
+            ArgumentNullException.ThrowIfNull(session);
+
+            return false;
         }
     }
 
     public sealed record SessionLaunchResult(
         bool Started,
         string StatusMessage,
-        int? ProcessId);
+        OngoingSessionInfo? Session);
 }
