@@ -72,6 +72,7 @@ HaloCreek/
 │  ├─ GitService.cs
 │  ├─ ConfigService.cs
 │  ├─ DragDropService.cs
+│  ├─ SessionLaunchService.cs
 │  └─ SessionHistory/
 │  │  ├─ SessionHistoryService.cs
 │  │  ├─ ISessionHistoryReader.cs
@@ -86,7 +87,7 @@ HaloCreek/
 
 `Services/` 默认保持平铺，只有内部文件会继续增长、且需要隔离外部数据读取边界的模块才拆子目录。阶段 1 只将历史 session 相关文件放入 `Services/SessionHistory/`，其他服务仍直接放在 `Services/` 下。
 
-应用启动和组件组装集中放在 `App.OnFrameworkInitializationCompleted()`。本阶段不引入完整 DI 容器，由该入口创建服务、创建各 tab ViewModel、创建 `WorkspaceFooterViewModel`，最后组装 `MainWindowViewModel`。
+窗口和页面布局由 XAML 静态声明；`App.OnFrameworkInitializationCompleted()` 只负责创建服务、创建 ViewModel、注入依赖，并把组装好的 `MainWindowViewModel` 设置为 `MainWindow.DataContext`。View 不在 App 中手动拼装。
 
 占位数据由服务层或底层 reader 的 mock 实现返回，不写入 XAML，也不直接写在 ViewModel 里。ViewModel 始终依赖正式服务接口和正式数据模型，后续替换真实实现时不改变 ViewModel 的调用方式。例如：
 
@@ -94,7 +95,7 @@ HaloCreek/
 HistorySessionsViewModel
 └─ Services/SessionHistory/SessionHistoryService
    └─ Services/SessionHistory/ISessionHistoryReader
-      └─ MockHistorySessionReader / FileSessionHistoryReader
+      └─ MockHistorySessionReader / CodexSessionHistoryReader
 ```
 
 `ConfigService` 在阶段 1 使用正式方法签名返回默认配置：
@@ -116,10 +117,11 @@ public sealed class ConfigService
 - 每个 tab 拆成独立 `UserControl + ViewModel`。`MainWindow.axaml` 只负责承载主布局和组合各 tab。
 - ViewModel 按页面拆分，`MainWindowViewModel` 只负责组合和跨页面状态分发，不承载各 tab 的业务状态。
 - Footer 使用独立 `WorkspaceFooterViewModel`，由 `MainWindowViewModel` 持有。workspace 摘要、状态文本和 workspace 选择入口统一归 Footer 组件管理。
-- workspace 状态由 `MainWindowViewModel` 持有，并在创建或切换时传递给各 tab ViewModel。项目不使用全局变量或事件总线传递 workspace。
+- workspace 状态由 `MainWindowViewModel` 持有，并在创建或切换时传递给各 tab ViewModel。各 tab ViewModel 暴露 `SetWorkspace(WorkspaceInfo workspace)` 作为统一的 workspace 更新入口。项目不使用全局变量或事件总线传递 workspace。
 - 占位数据通过正式服务边界提供。服务可以临时返回 mock 数据，但 ViewModel、View 和模型结构保持与真实实现一致。
 - 命令绑定使用 CommunityToolkit `RelayCommand`。项目继续沿用 `CommunityToolkit.Mvvm` 的 MVVM 写法。
 - 文件拖入能力抽成 `Services/DragDropService`。Prompt Editor、History Sessions、Ongoing Sessions 等页面需要处理文件或路径拖入时复用同一服务。
+- Prompt Launch 能力抽成 `Services/SessionLaunchService`。该服务负责把提示词、workspace 和固定启动参数转换成一次 Codex 启动请求，并通过 `ProcessRunner` 执行。该边界不需要像历史 session 读取那样再做 reader 层隔离，Codex 启动命令相对稳定，阶段 3 先保持一层服务封装。
 - 历史 session 的业务入口固定为 `Services/SessionHistory/SessionHistoryService`。该服务负责历史 session 列表所需信息、搜索、排序、过滤、映射和后续操作准备。
 - 历史 session 原始数据读取固定隔离在 `Services/SessionHistory/ISessionHistoryReader` / `CodexSessionHistoryReader` 后面。该层知道文件路径和当前接入来源的文件格式，并把不稳定的原始格式转换成稳定的中间数据。
 - UI 只消费稳定模型，例如 `SessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`，不直接解析外部文件或进程输出。
@@ -133,9 +135,9 @@ public sealed class ConfigService
 - 4 个 tab 的 View/UserControl 和 ViewModel 占位。
 - Footer 的 View/UserControl 和 ViewModel 占位。
 - `Models` 目录补充 MVP1 需要的基础数据模型占位。
-- `Services` 目录补充 workspace、ongoing、git、config、drag-drop 的平铺服务边界，并将历史 session 相关文件放入 `Services/SessionHistory/`。
-- `Services/SessionHistory/ISessionHistoryReader` / `FileSessionHistoryReader` 边界占位，用于隔离历史 session 原始数据来源和文件格式。
-- `App.OnFrameworkInitializationCompleted()` 完成服务和 ViewModel 的集中组装。
+- `Services` 目录补充 workspace、ongoing、git、config、drag-drop、session launch 的平铺服务边界，并将历史 session 相关文件放入 `Services/SessionHistory/`。
+- `Services/SessionHistory/ISessionHistoryReader` / `MockHistorySessionReader` / `CodexSessionHistoryReader` 边界占位，用于隔离历史 session 原始数据来源和文件格式。
+- `App.OnFrameworkInitializationCompleted()` 完成服务和 ViewModel 的集中组装，并设置 `MainWindow.DataContext`。窗口和页面布局仍由 XAML 静态声明。
 
 ## 后续阶段衔接
 
