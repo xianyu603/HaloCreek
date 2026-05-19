@@ -43,10 +43,10 @@ After changing that file, the user must run `wsl --shutdown` from Windows PowerS
 
 ## Launch For Review
 
-When the user wants to review the window, launch the already-built Windows executable detached from the agent process:
+When the user wants to review the window, launch the already-built Windows executable detached from the agent process. Run this from the repository root and keep the app path relative to the workspace:
 
 ```bash
-/mnt/c/Windows/System32/cmd.exe /c start "" "D:\work\halocreek\HaloCreek\bin\Debug\net10.0\HaloCreek.exe"
+/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -Command "Start-Process -FilePath '.\HaloCreek\bin\Debug\net10.0\HaloCreek.exe'"
 ```
 
 Then report that the app was launched and leave the window open for the user. Do not stop the process unless the user explicitly asks to close it.
