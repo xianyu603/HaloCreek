@@ -17,8 +17,8 @@
 已有代码边界：
 
 - `PromptEditorView.axaml`：已有多行 `TextBox` 和禁用态 `Launch` 按钮占位。
-- `PromptEditorViewModel`：已有 `PromptText`、`WorkspacePath`、`GetPrimaryDroppedPath(...)`、`LaunchPrompt()`。
-- `DragDropService`：当前只返回第一个有效拖入路径。
+- `TextBoxDropPathBehavior`：复用“拖入文件/目录路径并追加到 TextBox 文本”的 Avalonia attached behavior。
+- `PromptEditorViewModel`：已有 `PromptText`、`WorkspacePath`、`LaunchPrompt()`。
 - `SessionLifecycleService.Launch(...)`：已有方法签名，但当前返回未接通状态。
 - `ConfigService.LoadEffectiveConfig(...)`：当前返回 MVP1 默认配置。
 - `MainWindowViewModel.SetWorkspacePath(...)`：已经把 workspace path 分发到 `PromptEditorViewModel`。
@@ -36,11 +36,11 @@
 
 ### 3.2 处理拖入路径
 
-在 `PromptEditorView.axaml.cs` 中处理 Avalonia 拖放事件：
+通过 `TextBoxDropPathBehavior` 处理 Avalonia 拖放事件：
 
 - 从拖放数据中读取文件/目录路径。
-- 调用 `PromptEditorViewModel.GetPrimaryDroppedPath(...)` 做 MVP1 统一筛选。
-- 将路径追加到 `PromptText`，而不是直接操作 `TextBox.Text`。
+- 只选择第一个有效路径。
+- 将路径追加到 `TextBox.Text`，由现有双向绑定同步到 `PromptEditorViewModel.PromptText`。
 - 追加格式建议先使用纯路径文本，每个路径单独占一行。
 
 阶段 3 只接入第一个拖入路径，文件和目录一视同仁，不做目录展开。
@@ -79,7 +79,7 @@ LaunchCommand
 - [x] **3-T02 新增 LaunchCommand 与状态分发**：在 ViewModel 中提供命令和可用状态，先以固定 prompt 调用 `SessionLifecycleService`，并把 launch 结果同步到 Footer 全局状态。
 - [x] **3-T03 接通 Launch 按钮**：按钮绑定命令，先完成固定 prompt 的手动点击启动闭环。
 - [x] **3-T04 接通 PromptText 绑定**：让编辑区与 `PromptEditorViewModel.PromptText` 双向同步，并把 LaunchCommand 从固定 prompt 切换为使用 `PromptText`。
-- [ ] **3-T05 接通拖放事件**：从 Avalonia 拖放数据读取路径，调用 `DragDropService`，把第一个路径以裸路径形式追加到 `PromptText`。
+- [x] **3-T05 接通拖放事件**：通过 `TextBoxDropPathBehavior` 从 Avalonia 拖放数据读取路径，把第一个路径以裸路径形式追加到编辑区文本。
 - [ ] **3-T06 人工验收**：输入 prompt、拖入路径、未选择 workspace 点击/禁用、选择 workspace 后 launch 结果展示。
 
 ## 5. 已确定决策
@@ -116,5 +116,6 @@ LaunchCommand
 - `PromptEditorViewModel` 已新增 `LaunchCommand`，使用固定 prompt 调用 `SessionLifecycleService`，并把 `SessionLaunchResult.StatusMessage` 分发到 Footer 全局状态。
 - `Launch` 按钮已绑定 `LaunchCommand`，按钮启用状态由命令 `CanExecute` 控制，不再单独绑定 `IsEnabled`。
 - Prompt Editor 编辑区已双向绑定到 `PromptEditorViewModel.PromptText`，文本变化会刷新 `LaunchCommand` 可用状态，Launch 使用当前 prompt 文本。
+- `TextBoxDropPathBehavior` 已接入 Prompt Editor 编辑区，拖入文件或目录时自动把第一个路径以裸路径形式追加到文本中，并通过双向绑定同步回 `PromptText`。
 - `PlatformInfrastructure`、`SessionLifecycleService`、`PromptEditorViewModel`、`OngoingSessionsViewModel` 的无参构造已移除，实例由 `App.axaml.cs` 组合根显式创建和注入。
 - 已完成构建验证，`HaloCreek/HaloCreek.csproj` 构建结果为 `0 个警告`、`0 个错误`。

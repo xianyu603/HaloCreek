@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Models;
 using HaloCreek.Services;
@@ -9,18 +8,15 @@ namespace HaloCreek.ViewModels.Tabs
     public sealed class PromptEditorViewModel : ViewModelBase
     {
         private readonly ConfigService _configService;
-        private readonly DragDropService _dragDropService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private string _promptText = string.Empty;
         private Action<string>? _statusDispatcher;
         private string? _workspacePath;
 
         public PromptEditorViewModel(
-            DragDropService dragDropService,
             SessionLifecycleService sessionLifecycleService,
             ConfigService configService)
         {
-            _dragDropService = dragDropService;
             _sessionLifecycleService = sessionLifecycleService;
             _configService = configService;
 
@@ -56,11 +52,6 @@ namespace HaloCreek.ViewModels.Tabs
         public void SetStatusDispatcher(Action<string> statusDispatcher)
         {
             _statusDispatcher = statusDispatcher ?? throw new ArgumentNullException(nameof(statusDispatcher));
-        }
-
-        public string? GetPrimaryDroppedPath(IEnumerable<string>? paths)
-        {
-            return _dragDropService.GetPrimaryDroppedPath(paths);
         }
 
         public SessionLaunchResult LaunchPrompt()

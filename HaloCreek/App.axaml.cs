@@ -34,7 +34,6 @@ namespace HaloCreek
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
             var configService = new ConfigService();
-            var dragDropService = new DragDropService();
             var sessionLifecycleService = new SessionLifecycleService(platformInfrastructure);
             var gitService = new GitService();
 
@@ -42,7 +41,6 @@ namespace HaloCreek
             var sessionHistoryService = new SessionHistoryService(sessionHistoryReader, configService);
 
             var promptEditor = new PromptEditorViewModel(
-                dragDropService,
                 sessionLifecycleService,
                 configService);
             var historySessions = new HistorySessionsViewModel(sessionHistoryService);
