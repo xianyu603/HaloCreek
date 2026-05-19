@@ -8,8 +8,6 @@ namespace HaloCreek.ViewModels.Tabs
 {
     public sealed class PromptEditorViewModel : ViewModelBase
     {
-        private const string FixedLaunchPromptText = "Hello from HaloCreek MVP1 prompt editor.";
-
         private readonly ConfigService _configService;
         private readonly DragDropService _dragDropService;
         private readonly SessionLifecycleService _sessionLifecycleService;
@@ -32,7 +30,13 @@ namespace HaloCreek.ViewModels.Tabs
         public string PromptText
         {
             get => _promptText;
-            set => SetProperty(ref _promptText, value);
+            set
+            {
+                if (SetProperty(ref _promptText, value ?? string.Empty))
+                {
+                    LaunchCommand.NotifyCanExecuteChanged();
+                }
+            }
         }
 
         public string? WorkspacePath
@@ -66,19 +70,19 @@ namespace HaloCreek.ViewModels.Tabs
                 return new SessionLaunchResult(false, "No workspace selected.", null);
             }
 
-            if (string.IsNullOrWhiteSpace(FixedLaunchPromptText))
+            if (string.IsNullOrWhiteSpace(PromptText))
             {
                 return new SessionLaunchResult(false, "Prompt is empty.", null);
             }
 
             var config = _configService.LoadEffectiveConfig(WorkspacePath);
-            return _sessionLifecycleService.Launch(WorkspacePath, FixedLaunchPromptText, config);
+            return _sessionLifecycleService.Launch(WorkspacePath, PromptText, config);
         }
 
         private bool CanLaunchPrompt()
         {
             return !string.IsNullOrWhiteSpace(WorkspacePath)
-                && !string.IsNullOrWhiteSpace(FixedLaunchPromptText);
+                && !string.IsNullOrWhiteSpace(PromptText);
         }
 
         private void Launch()

@@ -78,7 +78,7 @@ LaunchCommand
 - [x] **3-T01 实现真实 session 启动**：`SessionLifecycleService` 通过 `PlatformInfrastructure` 拉起 Terminal，并通过命令行参数传递 prompt 启动真实 `codex`。先用固定 prompt 验证进程启动、工作目录、Terminal 拉起和错误返回。
 - [x] **3-T02 新增 LaunchCommand 与状态分发**：在 ViewModel 中提供命令和可用状态，先以固定 prompt 调用 `SessionLifecycleService`，并把 launch 结果同步到 Footer 全局状态。
 - [x] **3-T03 接通 Launch 按钮**：按钮绑定命令，先完成固定 prompt 的手动点击启动闭环。
-- [ ] **3-T04 接通 PromptText 绑定**：让编辑区与 `PromptEditorViewModel.PromptText` 双向同步，并把 LaunchCommand 从固定 prompt 切换为使用 `PromptText`。
+- [x] **3-T04 接通 PromptText 绑定**：让编辑区与 `PromptEditorViewModel.PromptText` 双向同步，并把 LaunchCommand 从固定 prompt 切换为使用 `PromptText`。
 - [ ] **3-T05 接通拖放事件**：从 Avalonia 拖放数据读取路径，调用 `DragDropService`，把第一个路径以裸路径形式追加到 `PromptText`。
 - [ ] **3-T06 人工验收**：输入 prompt、拖入路径、未选择 workspace 点击/禁用、选择 workspace 后 launch 结果展示。
 
@@ -115,5 +115,6 @@ LaunchCommand
 - Codex executable、固定启动参数和 fixed prompt 已通过 bash 参数转义后传入命令行。
 - `PromptEditorViewModel` 已新增 `LaunchCommand`，使用固定 prompt 调用 `SessionLifecycleService`，并把 `SessionLaunchResult.StatusMessage` 分发到 Footer 全局状态。
 - `Launch` 按钮已绑定 `LaunchCommand`，按钮启用状态由命令 `CanExecute` 控制，不再单独绑定 `IsEnabled`。
+- Prompt Editor 编辑区已双向绑定到 `PromptEditorViewModel.PromptText`，文本变化会刷新 `LaunchCommand` 可用状态，Launch 使用当前 prompt 文本。
 - `PlatformInfrastructure`、`SessionLifecycleService`、`PromptEditorViewModel`、`OngoingSessionsViewModel` 的无参构造已移除，实例由 `App.axaml.cs` 组合根显式创建和注入。
 - 已完成构建验证，`HaloCreek/HaloCreek.csproj` 构建结果为 `0 个警告`、`0 个错误`。
