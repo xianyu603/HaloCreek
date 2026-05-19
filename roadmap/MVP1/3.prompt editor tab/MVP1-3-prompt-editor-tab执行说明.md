@@ -75,9 +75,9 @@ LaunchCommand
 
 按风险优先执行，先验证真实 Codex 启动链路，再逐步接 UI 输入：
 
-- [ ] **3-T01 实现真实 session 启动**：在 `SessionLifecycleService` 内通过 `Process.Start` 拉起 Terminal，并通过命令行参数传递 prompt 启动真实 `codex`。先用固定 prompt 验证进程启动、工作目录、Terminal 拉起和错误返回。
-- [ ] **3-T02 新增 LaunchCommand 与状态分发**：在 ViewModel 中提供命令和可用状态，先以固定 prompt 调用 `SessionLifecycleService`，并把 launch 结果同步到 Footer 全局状态。
-- [ ] **3-T03 接通 Launch 按钮**：按钮绑定命令，先完成固定 prompt 的手动点击启动闭环。
+- [x] **3-T01 实现真实 session 启动**：`SessionLifecycleService` 通过 `PlatformInfrastructure` 拉起 Terminal，并通过命令行参数传递 prompt 启动真实 `codex`。先用固定 prompt 验证进程启动、工作目录、Terminal 拉起和错误返回。
+- [x] **3-T02 新增 LaunchCommand 与状态分发**：在 ViewModel 中提供命令和可用状态，先以固定 prompt 调用 `SessionLifecycleService`，并把 launch 结果同步到 Footer 全局状态。
+- [x] **3-T03 接通 Launch 按钮**：按钮绑定命令，先完成固定 prompt 的手动点击启动闭环。
 - [ ] **3-T04 接通 PromptText 绑定**：让编辑区与 `PromptEditorViewModel.PromptText` 双向同步，并把 LaunchCommand 从固定 prompt 切换为使用 `PromptText`。
 - [ ] **3-T05 接通拖放事件**：从 Avalonia 拖放数据读取路径，调用 `DragDropService`，把第一个路径以裸路径形式追加到 `PromptText`。
 - [ ] **3-T06 人工验收**：输入 prompt、拖入路径、未选择 workspace 点击/禁用、选择 workspace 后 launch 结果展示。
@@ -86,7 +86,7 @@ LaunchCommand
 
 - **Launch 接入真实进程**：阶段 3 需要启动真实 `codex`。
 - **prompt 传递方式**：暂定通过命令行参数传递 prompt。
-- **启动实现边界**：直接使用 `Process.Start`，但必须隔离在 `SessionLifecycleService` 内。
+- **启动实现边界**：`SessionLifecycleService` 只负责 session 校验和结果封装；`Process.Start`、Terminal/WSL 启动参数、路径转换和 shell 参数转义隔离在 `PlatformInfrastructure` 内。
 - **启动后窗口行为**：拉起 Terminal。
 - **拖入路径格式**：追加裸路径。
 - **多文件拖入策略**：只取第一个路径。
@@ -106,3 +106,14 @@ LaunchCommand
 - 点击 `Launch` 后，Footer 展示 `SessionLaunchResult.StatusMessage`。
 - `PromptEditorViewModel` 不直接依赖 Avalonia 控件或 `Process` 细节。
 - `SessionLifecycleService` 仍是 session 启动能力的唯一服务入口。
+
+## 7. 已完成的修改
+
+- `SessionLifecycleService.Launch(...)` 已接入真实 launch 流程，负责校验 workspace、prompt 和 config，并将启动结果包装为 `SessionLaunchResult`。
+- Terminal/WSL 启动细节已下沉到 `PlatformInfrastructure.LaunchWslTerminalCommand(...)`，由 `wt.exe` 拉起 `wsl.exe --cd <workspace> --exec bash -ic <command>`，让 `codex` 在 WSL 环境中执行。
+- Windows workspace path 已在平台层转换为 WSL `/mnt/<drive>/...` 路径。
+- Codex executable、固定启动参数和 fixed prompt 已通过 bash 参数转义后传入命令行。
+- `PromptEditorViewModel` 已新增 `LaunchCommand`，使用固定 prompt 调用 `SessionLifecycleService`，并把 `SessionLaunchResult.StatusMessage` 分发到 Footer 全局状态。
+- `Launch` 按钮已绑定 `LaunchCommand`，按钮启用状态由命令 `CanExecute` 控制，不再单独绑定 `IsEnabled`。
+- `PlatformInfrastructure`、`SessionLifecycleService`、`PromptEditorViewModel`、`OngoingSessionsViewModel` 的无参构造已移除，实例由 `App.axaml.cs` 组合根显式创建和注入。
+- 已完成构建验证，`HaloCreek/HaloCreek.csproj` 构建结果为 `0 个警告`、`0 个错误`。

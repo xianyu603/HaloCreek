@@ -11,11 +11,6 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<OngoingSessionInfo> _sessions = Array.Empty<OngoingSessionInfo>();
         private string? _workspacePath;
 
-        public OngoingSessionsViewModel()
-            : this(new SessionLifecycleService())
-        {
-        }
-
         public OngoingSessionsViewModel(SessionLifecycleService sessionLifecycleService)
         {
             _sessionLifecycleService = sessionLifecycleService;

@@ -24,6 +24,7 @@ namespace HaloCreek.ViewModels
             WorkspaceFooter = workspaceFooter;
 
             WorkspaceFooter.SetWorkspaceDispatcher(SetWorkspacePath);
+            PromptEditor.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
         }
 
         public PromptEditorViewModel PromptEditor { get; }
