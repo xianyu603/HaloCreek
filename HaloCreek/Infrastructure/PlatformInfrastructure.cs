@@ -59,6 +59,7 @@ namespace HaloCreek.Infrastructure
             }
         }
 
+        // TODO ???????path util
         public string NormalizeDirectoryPath(string path)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -84,6 +85,31 @@ namespace HaloCreek.Infrastructure
                 or PathTooLongException
                 or UnauthorizedAccessException)
             {
+                return false;
+            }
+        }
+
+        public bool TryNormalizeValidDirectoryPath(string? path, out string normalizedPath)
+        {
+            normalizedPath = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            try
+            {
+                normalizedPath = NormalizeDirectoryPath(path);
+
+                return Directory.Exists(normalizedPath);
+            }
+            catch (Exception ex) when (ex is ArgumentException
+                or NotSupportedException
+                or PathTooLongException
+                or UnauthorizedAccessException)
+            {
+                normalizedPath = string.Empty;
                 return false;
             }
         }

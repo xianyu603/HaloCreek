@@ -48,12 +48,19 @@ namespace HaloCreek
             var git = new GitViewModel(gitService);
             var workspaceFooter = new WorkspaceFooterViewModel(platformInfrastructure);
 
-            return new MainWindowViewModel(
+            var mainWindowViewModel = new MainWindowViewModel(
+                platformInfrastructure,
                 promptEditor,
                 historySessions,
                 ongoingSessions,
                 git,
                 workspaceFooter);
+
+            var defaultWorkspacePath = configService.LoadEffectiveConfig(null).DefaultWorkspacePath;
+            // TODO: 未来走Cache并支持多workspace选择。
+            mainWindowViewModel.SetWorkspacePath(defaultWorkspacePath);
+
+            return mainWindowViewModel;
         }
     }
 }

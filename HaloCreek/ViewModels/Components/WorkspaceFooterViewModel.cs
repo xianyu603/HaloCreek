@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Infrastructure;
@@ -11,11 +10,10 @@ namespace HaloCreek.ViewModels.Components
         private const string NoWorkspaceSelectedText = "No workspace selected";
         private const string ReadyStatusText = "Ready";
         private const string SelectingWorkspaceStatusText = "Selecting workspace...";
-        private const string InvalidWorkspacePathStatusText = "Invalid workspace path";
         private const string WorkspaceDispatcherNotConnectedStatusText = "Workspace dispatcher is not connected";
 
         private readonly PlatformInfrastructure _platformInfrastructure;
-        private Action<string>? _setWorkspace;
+        private Action<string?>? _setWorkspace;
         private string _workspacePath = NoWorkspaceSelectedText;
         private string _statusText = ReadyStatusText;
 
@@ -44,7 +42,7 @@ namespace HaloCreek.ViewModels.Components
             WorkspacePath = workspacePath;
         }
 
-        public void SetWorkspaceDispatcher(Action<string> setWorkspace)
+        public void SetWorkspaceDispatcher(Action<string?> setWorkspace)
         {
             _setWorkspace = setWorkspace ?? throw new ArgumentNullException(nameof(setWorkspace));
         }
@@ -66,27 +64,7 @@ namespace HaloCreek.ViewModels.Components
                 return;
             }
 
-            string normalizedPath;
-            try
-            {
-                normalizedPath = _platformInfrastructure.NormalizeDirectoryPath(selectedPath);
-            }
-            catch (Exception ex) when (ex is ArgumentException
-                or NotSupportedException
-                or PathTooLongException)
-            {
-                StatusText = InvalidWorkspacePathStatusText;
-                return;
-            }
-
-            if (!_platformInfrastructure.IsValidDirectoryPath(normalizedPath))
-            {
-                StatusText = InvalidWorkspacePathStatusText;
-                return;
-            }
-
-            _setWorkspace(normalizedPath);
-            StatusText = ReadyStatusText;
+            _setWorkspace(selectedPath);
         }
     }
 }
