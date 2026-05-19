@@ -1,11 +1,12 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core;
-using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
+using HaloCreek.Services;
+using HaloCreek.Services.SessionHistory;
 using HaloCreek.ViewModels;
+using HaloCreek.ViewModels.Components;
+using HaloCreek.ViewModels.Tabs;
 using HaloCreek.Views;
-using System.Linq;
 
 namespace HaloCreek
 {
@@ -22,11 +23,40 @@ namespace HaloCreek
             {
                 desktop.MainWindow = new MainWindow
                 {
-                    DataContext = new MainWindowViewModel(),
+                    DataContext = CreateMainWindowViewModel(),
                 };
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        private static MainWindowViewModel CreateMainWindowViewModel()
+        {
+            var workspaceService = new WorkspaceService();
+            var configService = new ConfigService();
+            var dragDropService = new DragDropService();
+            var sessionLifecycleService = new SessionLifecycleService();
+            var gitService = new GitService();
+
+            ISessionHistoryReader sessionHistoryReader = new MockHistorySessionReader();
+            var sessionHistoryService = new SessionHistoryService(sessionHistoryReader, configService);
+
+            var promptEditor = new PromptEditorViewModel(
+                dragDropService,
+                sessionLifecycleService,
+                configService);
+            var historySessions = new HistorySessionsViewModel(sessionHistoryService);
+            var ongoingSessions = new OngoingSessionsViewModel(sessionLifecycleService);
+            var git = new GitViewModel(gitService);
+            var workspaceFooter = new WorkspaceFooterViewModel(workspaceService);
+
+            return new MainWindowViewModel(
+                workspaceService,
+                promptEditor,
+                historySessions,
+                ongoingSessions,
+                git,
+                workspaceFooter);
         }
     }
 }

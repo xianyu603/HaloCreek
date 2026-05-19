@@ -139,7 +139,7 @@ public sealed class ConfigService
 - [x] **1-1-T05 基础模型占位**：在 `Models` 下新增 `WorkspaceInfo`、`HistorySessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式。
 - [x] **1-1-T06 平铺服务边界占位**：新增 `WorkspaceService`、`SessionLifecycleService`、`GitService`、`ConfigService`、`DragDropService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据。
 - [x] **1-1-T07 历史 session 读取边界占位**：新增 `Services/SessionHistory/SessionHistoryService`、`ISessionHistoryReader`、`MockHistorySessionReader`、`CodexSessionHistoryReader`。审阅重点是原始数据读取和格式解析被隔离在 reader 层，ViewModel 只消费 `HistorySessionInfo`。
-- [ ] **1-1-T08 应用启动组装**：在 `App.OnFrameworkInitializationCompleted()` 中创建服务、创建各 ViewModel、注入依赖、组装 `MainWindowViewModel`，并设置 `MainWindow.DataContext`。审阅重点是 App 只做依赖组装，不手动拼装 View。
+- [x] **1-1-T08 应用启动组装**：在 `App.OnFrameworkInitializationCompleted()` 中创建服务、创建各 ViewModel、注入依赖、组装 `MainWindowViewModel`，并设置 `MainWindow.DataContext`。审阅重点是 App 只做依赖组装，不手动拼装 View。
 - [ ] **1-1-T09 构建与人工验收**：完成阶段 1-1 后执行项目构建，并人工检查窗口能启动、4 个 tab 可切换、Footer 字段可显示。审阅重点是骨架可运行，且没有引入真实业务逻辑或额外 UI 控件库。
 
 ## 6. 阶段 1 交付物

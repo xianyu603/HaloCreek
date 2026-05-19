@@ -2,13 +2,18 @@
 
 using HaloCreek.ViewModels.Components;
 using HaloCreek.ViewModels.Tabs;
+using HaloCreek.Models;
+using HaloCreek.Services;
 
 namespace HaloCreek.ViewModels
 {
     public partial class MainWindowViewModel : ViewModelBase
     {
+        private readonly WorkspaceService _workspaceService;
+
         public MainWindowViewModel()
             : this(
+                new WorkspaceService(),
                 new PromptEditorViewModel(),
                 new HistorySessionsViewModel(),
                 new OngoingSessionsViewModel(),
@@ -18,12 +23,14 @@ namespace HaloCreek.ViewModels
         }
 
         public MainWindowViewModel(
+            WorkspaceService workspaceService,
             PromptEditorViewModel promptEditor,
             HistorySessionsViewModel historySessions,
             OngoingSessionsViewModel ongoingSessions,
             GitViewModel git,
             WorkspaceFooterViewModel workspaceFooter)
         {
+            _workspaceService = workspaceService;
             PromptEditor = promptEditor;
             HistorySessions = historySessions;
             OngoingSessions = ongoingSessions;
@@ -40,5 +47,18 @@ namespace HaloCreek.ViewModels
         public GitViewModel Git { get; }
 
         public WorkspaceFooterViewModel WorkspaceFooter { get; }
+
+        public WorkspaceInfo? CurrentWorkspace => _workspaceService.GetCurrentWorkspace();
+
+        public void SetWorkspace(WorkspaceInfo workspace)
+        {
+            _workspaceService.SetCurrentWorkspace(workspace);
+
+            PromptEditor.SetWorkspace(workspace);
+            HistorySessions.SetWorkspace(workspace);
+            OngoingSessions.SetWorkspace(workspace);
+            Git.SetWorkspace(workspace);
+            WorkspaceFooter.SetWorkspace(workspace);
+        }
     }
 }
