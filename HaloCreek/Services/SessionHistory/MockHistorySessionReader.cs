@@ -6,9 +6,9 @@ namespace HaloCreek.Services.SessionHistory
 {
     public sealed class MockHistorySessionReader : ISessionHistoryReader
     {
-        public IReadOnlyList<HistorySessionInfo> ReadSessions(WorkspaceInfo? workspace, AppConfig config)
+        public IReadOnlyList<HistorySessionInfo> ReadSessions(string? workspacePath, AppConfig config)
         {
-            if (workspace is null)
+            if (string.IsNullOrWhiteSpace(workspacePath))
             {
                 return Array.Empty<HistorySessionInfo>();
             }
@@ -20,7 +20,7 @@ namespace HaloCreek.Services.SessionHistory
                 new HistorySessionInfo(
                     "mvp1-layout-review",
                     "Review MVP1 layout skeleton",
-                    workspace.Path,
+                    workspacePath,
                     updatedAt.AddDays(-2),
                     updatedAt.AddHours(-3),
                     HistorySessionState.Completed,
@@ -28,7 +28,7 @@ namespace HaloCreek.Services.SessionHistory
                 new HistorySessionInfo(
                     "mvp1-service-boundaries",
                     "Draft service boundaries",
-                    workspace.Path,
+                    workspacePath,
                     updatedAt.AddDays(-1),
                     updatedAt.AddMinutes(-45),
                     HistorySessionState.Ready,

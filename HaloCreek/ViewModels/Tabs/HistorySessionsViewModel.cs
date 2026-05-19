@@ -11,7 +11,7 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly SessionHistoryService _sessionHistoryService;
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
-        private WorkspaceInfo? _workspace;
+        private string? _workspacePath;
 
         public HistorySessionsViewModel()
             : this(new SessionHistoryService(
@@ -37,10 +37,10 @@ namespace HaloCreek.ViewModels.Tabs
             }
         }
 
-        public WorkspaceInfo? Workspace
+        public string? WorkspacePath
         {
-            get => _workspace;
-            private set => SetProperty(ref _workspace, value);
+            get => _workspacePath;
+            private set => SetProperty(ref _workspacePath, value);
         }
 
         public IReadOnlyList<HistorySessionInfo> Sessions
@@ -49,15 +49,15 @@ namespace HaloCreek.ViewModels.Tabs
             private set => SetProperty(ref _sessions, value);
         }
 
-        public void SetWorkspace(WorkspaceInfo workspace)
+        public void SetWorkspacePath(string workspacePath)
         {
-            Workspace = workspace;
+            WorkspacePath = workspacePath;
             RefreshSessions();
         }
 
         private void RefreshSessions()
         {
-            Sessions = _sessionHistoryService.SearchSessions(Workspace, SearchText);
+            Sessions = _sessionHistoryService.SearchSessions(WorkspacePath, SearchText);
         }
     }
 }

@@ -17,19 +17,19 @@ namespace HaloCreek.Services.SessionHistory
             _configService = configService;
         }
 
-        public IReadOnlyList<HistorySessionInfo> GetSessions(WorkspaceInfo? workspace)
+        public IReadOnlyList<HistorySessionInfo> GetSessions(string? workspacePath)
         {
-            var config = _configService.LoadEffectiveConfig(workspace);
+            var config = _configService.LoadEffectiveConfig(workspacePath);
 
             return _reader
-                .ReadSessions(workspace, config)
+                .ReadSessions(workspacePath, config)
                 .OrderByDescending(session => session.LastUpdatedAt)
                 .ToArray();
         }
 
-        public IReadOnlyList<HistorySessionInfo> SearchSessions(WorkspaceInfo? workspace, string? searchText)
+        public IReadOnlyList<HistorySessionInfo> SearchSessions(string? workspacePath, string? searchText)
         {
-            var sessions = GetSessions(workspace);
+            var sessions = GetSessions(workspacePath);
 
             if (string.IsNullOrWhiteSpace(searchText))
             {

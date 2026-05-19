@@ -4,7 +4,7 @@ namespace HaloCreek.Services
 {
     public sealed class ConfigService
     {
-        public AppConfig LoadEffectiveConfig(WorkspaceInfo? workspace)
+        public AppConfig LoadEffectiveConfig(string? workspacePath)
         {
             return AppConfig.DefaultForMvp1;
         }

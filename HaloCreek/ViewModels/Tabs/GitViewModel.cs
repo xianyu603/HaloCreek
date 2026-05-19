@@ -9,7 +9,7 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private readonly GitService _gitService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
-        private WorkspaceInfo? _workspace;
+        private string? _workspacePath;
 
         public GitViewModel()
             : this(new GitService())
@@ -21,10 +21,10 @@ namespace HaloCreek.ViewModels.Tabs
             _gitService = gitService;
         }
 
-        public WorkspaceInfo? Workspace
+        public string? WorkspacePath
         {
-            get => _workspace;
-            private set => SetProperty(ref _workspace, value);
+            get => _workspacePath;
+            private set => SetProperty(ref _workspacePath, value);
         }
 
         public IReadOnlyList<GitChangeInfo> Changes
@@ -33,15 +33,15 @@ namespace HaloCreek.ViewModels.Tabs
             private set => SetProperty(ref _changes, value);
         }
 
-        public void SetWorkspace(WorkspaceInfo workspace)
+        public void SetWorkspacePath(string workspacePath)
         {
-            Workspace = workspace;
+            WorkspacePath = workspacePath;
             RefreshChanges();
         }
 
         public void RefreshChanges()
         {
-            Changes = _gitService.GetChanges(Workspace);
+            Changes = _gitService.GetChanges(WorkspacePath);
         }
     }
 }

@@ -61,13 +61,11 @@ HaloCreek/
 │  └─ Components/
 │     └─ WorkspaceFooterViewModel.cs
 ├─ Models/
-│  ├─ WorkspaceInfo.cs
 │  ├─ HistorySessionInfo.cs
 │  ├─ OngoingSessionInfo.cs
 │  ├─ GitChangeInfo.cs
 │  └─ AppConfig.cs
 ├─ Services/
-│  ├─ WorkspaceService.cs
 │  ├─ GitService.cs
 │  ├─ ConfigService.cs
 │  ├─ DragDropService.cs
@@ -103,7 +101,7 @@ HistorySessionsViewModel
 ```csharp
 public sealed class ConfigService
 {
-    public AppConfig LoadEffectiveConfig(WorkspaceInfo? workspace)
+    public AppConfig LoadEffectiveConfig(string? workspacePath)
     {
         return AppConfig.DefaultForMvp1;
     }
@@ -117,7 +115,7 @@ public sealed class ConfigService
 - 每个 tab 拆成独立 `UserControl + ViewModel`。`MainWindow.axaml` 只负责承载主布局和组合各 tab。
 - ViewModel 按页面拆分，`MainWindowViewModel` 只负责组合和跨页面状态分发，不承载各 tab 的业务状态。
 - Footer 使用独立 `WorkspaceFooterViewModel`，由 `MainWindowViewModel` 持有。workspace 摘要、状态文本和 workspace 选择入口统一归 Footer 组件管理。
-- workspace 状态由 `MainWindowViewModel` 持有，并在创建或切换时传递给各 tab ViewModel。各 tab ViewModel 暴露 `SetWorkspace(WorkspaceInfo workspace)` 作为统一的 workspace 更新入口。项目不使用全局变量或事件总线传递 workspace。
+- MVP1 阶段 workspace 与工作目录路径划等号，不单独引入 `WorkspaceInfo` 或 `WorkspaceService`。当前工作目录路径由 `MainWindowViewModel` 持有，并在创建或切换时传递给各 tab ViewModel。各 tab ViewModel 暴露 `SetWorkspacePath(string workspacePath)` 作为统一更新入口。项目不使用全局变量或事件总线传递 workspace。
 - 占位数据通过正式服务边界提供。服务可以临时返回 mock 数据，但 ViewModel、View 和模型结构保持与真实实现一致。
 - 命令绑定使用 CommunityToolkit `RelayCommand`。项目继续沿用 `CommunityToolkit.Mvvm` 的 MVVM 写法。
 - 文件拖入能力抽成 `Services/DragDropService`。Prompt Editor、History Sessions、Ongoing Sessions 等页面需要处理文件或路径拖入时复用同一服务。
@@ -134,10 +132,10 @@ public sealed class ConfigService
 
 - [x] **1-1-T01 主窗口布局骨架**：将 `MainWindow` 调整为 `Grid` 上下两行布局，上方承载 `TabControl`，下方承载 Footer，并设置合理最小窗口尺寸。审阅重点是主布局稳定、缩放不破坏基本结构。
 - [x] **1-1-T02 Tab 视图占位**：新增 `Views/Tabs/PromptEditorView.axaml`、`HistorySessionsView.axaml`、`OngoingSessionsView.axaml`、`GitView.axaml`，并在 `MainWindow.axaml` 中以静态 XAML 组合到 4 个 tab。审阅重点是 tab 命名、占位区域和主窗口组合方式。
-- [x] **1-1-T03 Tab ViewModel 占位**：新增 4 个 tab 对应 ViewModel，并让每个 tab ViewModel 暴露统一的 `SetWorkspace(WorkspaceInfo workspace)` 入口。审阅重点是页面状态按 ViewModel 独立持有，`MainWindowViewModel` 不承载 tab 业务状态。
+- [x] **1-1-T03 Tab ViewModel 占位**：新增 4 个 tab 对应 ViewModel，并让每个 tab ViewModel 暴露统一的 `SetWorkspacePath(string workspacePath)` 入口。审阅重点是页面状态按 ViewModel 独立持有，`MainWindowViewModel` 不承载 tab 业务状态。
 - [x] **1-1-T04 Footer 组件占位**：新增 `WorkspaceFooterView` 和 `WorkspaceFooterViewModel`，提供 workspace 路径、状态文本和 workspace 选择命令绑定字段。审阅重点是 Footer 职责独立，后续阶段可直接接入真实 workspace 切换。
-- [x] **1-1-T05 基础模型占位**：在 `Models` 下新增 `WorkspaceInfo`、`HistorySessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式。
-- [x] **1-1-T06 平铺服务边界占位**：新增 `WorkspaceService`、`SessionLifecycleService`、`GitService`、`ConfigService`、`DragDropService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据。
+- [x] **1-1-T05 基础模型占位**：在 `Models` 下新增 `HistorySessionInfo`、`OngoingSessionInfo`、`GitChangeInfo`、`AppConfig`。审阅重点是 UI 和 ViewModel 只依赖稳定模型，不直接暴露外部文件或进程输出格式；MVP1 的 workspace 暂不作为业务模型建模。
+- [x] **1-1-T06 平铺服务边界占位**：新增 `SessionLifecycleService`、`GitService`、`ConfigService`、`DragDropService`。审阅重点是服务方法签名面向后续真实实现，阶段 1 可以返回默认值或 mock 数据；路径校验和规范化后续归入文件/路径操作边界。
 - [x] **1-1-T07 历史 session 读取边界占位**：新增 `Services/SessionHistory/SessionHistoryService`、`ISessionHistoryReader`、`MockHistorySessionReader`、`CodexSessionHistoryReader`。审阅重点是原始数据读取和格式解析被隔离在 reader 层，ViewModel 只消费 `HistorySessionInfo`。
 - [x] **1-1-T08 应用启动组装**：在 `App.OnFrameworkInitializationCompleted()` 中创建服务、创建各 ViewModel、注入依赖、组装 `MainWindowViewModel`，并设置 `MainWindow.DataContext`。审阅重点是 App 只做依赖组装，不手动拼装 View。
 - [ ] **1-1-T09 构建与人工验收**：完成阶段 1-1 后执行项目构建，并人工检查窗口能启动、4 个 tab 可切换、Footer 字段可显示。审阅重点是骨架可运行，且没有引入真实业务逻辑或额外 UI 控件库。
@@ -147,8 +145,8 @@ public sealed class ConfigService
 - `MainWindow` 改为稳定的 `TabControl + Footer` 布局。
 - 4 个 tab 的 View/UserControl 和 ViewModel 占位。
 - Footer 的 View/UserControl 和 ViewModel 占位。
-- `Models` 目录补充 MVP1 需要的基础数据模型占位。
-- `Services` 目录补充 workspace、session lifecycle、git、config、drag-drop 的平铺服务边界，并将历史 session 相关文件放入 `Services/SessionHistory/`。
+- `Models` 目录补充 MVP1 需要的基础数据模型占位，workspace 暂不作为独立模型。
+- `Services` 目录补充 session lifecycle、git、config、drag-drop 的平铺服务边界，并将历史 session 相关文件放入 `Services/SessionHistory/`。
 - `Services/SessionHistory/ISessionHistoryReader` / `MockHistorySessionReader` / `CodexSessionHistoryReader` 边界占位，用于隔离历史 session 原始数据来源和文件格式。
 - `App.OnFrameworkInitializationCompleted()` 完成服务和 ViewModel 的集中组装，并设置 `MainWindow.DataContext`。窗口和页面布局仍由 XAML 静态声明。
 

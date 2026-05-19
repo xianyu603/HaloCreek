@@ -32,7 +32,6 @@ namespace HaloCreek
 
         private static MainWindowViewModel CreateMainWindowViewModel()
         {
-            var workspaceService = new WorkspaceService();
             var configService = new ConfigService();
             var dragDropService = new DragDropService();
             var sessionLifecycleService = new SessionLifecycleService();
@@ -48,10 +47,9 @@ namespace HaloCreek
             var historySessions = new HistorySessionsViewModel(sessionHistoryService);
             var ongoingSessions = new OngoingSessionsViewModel(sessionLifecycleService);
             var git = new GitViewModel(gitService);
-            var workspaceFooter = new WorkspaceFooterViewModel(workspaceService);
+            var workspaceFooter = new WorkspaceFooterViewModel();
 
             return new MainWindowViewModel(
-                workspaceService,
                 promptEditor,
                 historySessions,
                 ongoingSessions,

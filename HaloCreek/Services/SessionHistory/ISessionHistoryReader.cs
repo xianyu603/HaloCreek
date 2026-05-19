@@ -5,6 +5,6 @@ namespace HaloCreek.Services.SessionHistory
 {
     public interface ISessionHistoryReader
     {
-        IReadOnlyList<HistorySessionInfo> ReadSessions(WorkspaceInfo? workspace, AppConfig config);
+        IReadOnlyList<HistorySessionInfo> ReadSessions(string? workspacePath, AppConfig config);
     }
 }

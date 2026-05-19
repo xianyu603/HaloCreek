@@ -7,11 +7,11 @@ namespace HaloCreek.Services
     public sealed class SessionLifecycleService
     {
         public SessionLaunchResult Launch(
-            WorkspaceInfo workspace,
+            string workspacePath,
             string promptText,
             AppConfig config)
         {
-            ArgumentNullException.ThrowIfNull(workspace);
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
             ArgumentException.ThrowIfNullOrWhiteSpace(promptText);
             ArgumentNullException.ThrowIfNull(config);
 
@@ -21,7 +21,7 @@ namespace HaloCreek.Services
                 null);
         }
 
-        public IReadOnlyList<OngoingSessionInfo> GetOngoingSessions(WorkspaceInfo? workspace)
+        public IReadOnlyList<OngoingSessionInfo> GetOngoingSessions(string? workspacePath)
         {
             return Array.Empty<OngoingSessionInfo>();
         }

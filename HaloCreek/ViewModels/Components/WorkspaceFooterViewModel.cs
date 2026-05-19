@@ -1,23 +1,14 @@
 using CommunityToolkit.Mvvm.Input;
-using HaloCreek.Models;
-using HaloCreek.Services;
 
 namespace HaloCreek.ViewModels.Components
 {
     public sealed class WorkspaceFooterViewModel : ViewModelBase
     {
-        private readonly WorkspaceService _workspaceService;
         private string _workspacePath = "No workspace selected";
         private string _statusText = "Ready";
 
         public WorkspaceFooterViewModel()
-            : this(new WorkspaceService())
         {
-        }
-
-        public WorkspaceFooterViewModel(WorkspaceService workspaceService)
-        {
-            _workspaceService = workspaceService;
             ChooseWorkspaceCommand = new RelayCommand(ChooseWorkspace);
         }
 
@@ -35,17 +26,14 @@ namespace HaloCreek.ViewModels.Components
 
         public IRelayCommand ChooseWorkspaceCommand { get; }
 
-        public void SetWorkspace(WorkspaceInfo workspace)
+        public void SetWorkspacePath(string workspacePath)
         {
-            WorkspacePath = workspace.Path;
+            WorkspacePath = workspacePath;
         }
 
         private void ChooseWorkspace()
         {
-            var workspace = _workspaceService.GetCurrentWorkspace();
-            StatusText = workspace is null
-                ? "Workspace selection is not connected yet"
-                : $"Current workspace: {workspace.Path}";
+            StatusText = "Workspace selection is not connected yet";
         }
     }
 }

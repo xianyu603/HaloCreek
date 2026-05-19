@@ -9,7 +9,7 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private readonly SessionLifecycleService _sessionLifecycleService;
         private IReadOnlyList<OngoingSessionInfo> _sessions = Array.Empty<OngoingSessionInfo>();
-        private WorkspaceInfo? _workspace;
+        private string? _workspacePath;
 
         public OngoingSessionsViewModel()
             : this(new SessionLifecycleService())
@@ -21,10 +21,10 @@ namespace HaloCreek.ViewModels.Tabs
             _sessionLifecycleService = sessionLifecycleService;
         }
 
-        public WorkspaceInfo? Workspace
+        public string? WorkspacePath
         {
-            get => _workspace;
-            private set => SetProperty(ref _workspace, value);
+            get => _workspacePath;
+            private set => SetProperty(ref _workspacePath, value);
         }
 
         public IReadOnlyList<OngoingSessionInfo> Sessions
@@ -33,15 +33,15 @@ namespace HaloCreek.ViewModels.Tabs
             private set => SetProperty(ref _sessions, value);
         }
 
-        public void SetWorkspace(WorkspaceInfo workspace)
+        public void SetWorkspacePath(string workspacePath)
         {
-            Workspace = workspace;
+            WorkspacePath = workspacePath;
             RefreshSessions();
         }
 
         public void RefreshSessions()
         {
-            Sessions = _sessionLifecycleService.GetOngoingSessions(Workspace);
+            Sessions = _sessionLifecycleService.GetOngoingSessions(WorkspacePath);
         }
     }
 }

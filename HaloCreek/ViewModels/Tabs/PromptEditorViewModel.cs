@@ -11,7 +11,7 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly DragDropService _dragDropService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private string _promptText = string.Empty;
-        private WorkspaceInfo? _workspace;
+        private string? _workspacePath;
 
         public PromptEditorViewModel()
             : this(
@@ -37,15 +37,15 @@ namespace HaloCreek.ViewModels.Tabs
             set => SetProperty(ref _promptText, value);
         }
 
-        public WorkspaceInfo? Workspace
+        public string? WorkspacePath
         {
-            get => _workspace;
-            private set => SetProperty(ref _workspace, value);
+            get => _workspacePath;
+            private set => SetProperty(ref _workspacePath, value);
         }
 
-        public void SetWorkspace(WorkspaceInfo workspace)
+        public void SetWorkspacePath(string workspacePath)
         {
-            Workspace = workspace;
+            WorkspacePath = workspacePath;
         }
 
         public string? GetPrimaryDroppedPath(IEnumerable<string>? paths)
@@ -55,13 +55,13 @@ namespace HaloCreek.ViewModels.Tabs
 
         public SessionLaunchResult LaunchPrompt()
         {
-            if (Workspace is null)
+            if (string.IsNullOrWhiteSpace(WorkspacePath))
             {
                 return new SessionLaunchResult(false, "No workspace selected.", null);
             }
 
-            var config = _configService.LoadEffectiveConfig(Workspace);
-            return _sessionLifecycleService.Launch(Workspace, PromptText, config);
+            var config = _configService.LoadEffectiveConfig(WorkspacePath);
+            return _sessionLifecycleService.Launch(WorkspacePath, PromptText, config);
         }
     }
 }

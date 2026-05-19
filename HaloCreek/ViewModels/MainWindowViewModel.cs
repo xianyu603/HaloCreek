@@ -1,19 +1,17 @@
 ﻿// agent 开发平台
 
+using System;
 using HaloCreek.ViewModels.Components;
 using HaloCreek.ViewModels.Tabs;
-using HaloCreek.Models;
-using HaloCreek.Services;
 
 namespace HaloCreek.ViewModels
 {
     public partial class MainWindowViewModel : ViewModelBase
     {
-        private readonly WorkspaceService _workspaceService;
+        private string? _currentWorkspacePath;
 
         public MainWindowViewModel()
             : this(
-                new WorkspaceService(),
                 new PromptEditorViewModel(),
                 new HistorySessionsViewModel(),
                 new OngoingSessionsViewModel(),
@@ -23,14 +21,12 @@ namespace HaloCreek.ViewModels
         }
 
         public MainWindowViewModel(
-            WorkspaceService workspaceService,
             PromptEditorViewModel promptEditor,
             HistorySessionsViewModel historySessions,
             OngoingSessionsViewModel ongoingSessions,
             GitViewModel git,
             WorkspaceFooterViewModel workspaceFooter)
         {
-            _workspaceService = workspaceService;
             PromptEditor = promptEditor;
             HistorySessions = historySessions;
             OngoingSessions = ongoingSessions;
@@ -48,17 +44,23 @@ namespace HaloCreek.ViewModels
 
         public WorkspaceFooterViewModel WorkspaceFooter { get; }
 
-        public WorkspaceInfo? CurrentWorkspace => _workspaceService.GetCurrentWorkspace();
-
-        public void SetWorkspace(WorkspaceInfo workspace)
+        public string? CurrentWorkspacePath
         {
-            _workspaceService.SetCurrentWorkspace(workspace);
+            get => _currentWorkspacePath;
+            private set => SetProperty(ref _currentWorkspacePath, value);
+        }
 
-            PromptEditor.SetWorkspace(workspace);
-            HistorySessions.SetWorkspace(workspace);
-            OngoingSessions.SetWorkspace(workspace);
-            Git.SetWorkspace(workspace);
-            WorkspaceFooter.SetWorkspace(workspace);
+        public void SetWorkspacePath(string workspacePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
+            CurrentWorkspacePath = workspacePath;
+
+            PromptEditor.SetWorkspacePath(workspacePath);
+            HistorySessions.SetWorkspacePath(workspacePath);
+            OngoingSessions.SetWorkspacePath(workspacePath);
+            Git.SetWorkspacePath(workspacePath);
+            WorkspaceFooter.SetWorkspacePath(workspacePath);
         }
     }
 }
