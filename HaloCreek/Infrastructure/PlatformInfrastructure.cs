@@ -59,37 +59,12 @@ namespace HaloCreek.Infrastructure
             }
         }
 
-        // TODO ???????path util
-        public string NormalizeDirectoryPath(string path)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(path);
-
-            return Path.GetFullPath(path.Trim());
-        }
-
-        public bool IsValidDirectoryPath(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return false;
-            }
-
-            try
-            {
-                var normalizedPath = NormalizeDirectoryPath(path);
-
-                return Directory.Exists(normalizedPath);
-            }
-            catch (Exception ex) when (ex is ArgumentException
-                or NotSupportedException
-                or PathTooLongException
-                or UnauthorizedAccessException)
-            {
-                return false;
-            }
-        }
-
-        public bool TryNormalizeValidDirectoryPath(string? path, out string normalizedPath)
+        /// <summary>
+        /// Normalizes a directory path only when it points to an existing directory.
+        /// Invalid, blank, or missing paths return false and do not expose a normalized path.
+        /// If a caller needs normalize-only or allow-missing behavior, add an explicit API for that contract.
+        /// </summary>
+        public bool TryNormalizeExistingDirectoryPath(string? path, out string normalizedPath)
         {
             normalizedPath = string.Empty;
 
@@ -100,9 +75,14 @@ namespace HaloCreek.Infrastructure
 
             try
             {
-                normalizedPath = NormalizeDirectoryPath(path);
+                var candidatePath = Path.GetFullPath(path.Trim());
+                if (!Directory.Exists(candidatePath))
+                {
+                    return false;
+                }
 
-                return Directory.Exists(normalizedPath);
+                normalizedPath = candidatePath;
+                return true;
             }
             catch (Exception ex) when (ex is ArgumentException
                 or NotSupportedException

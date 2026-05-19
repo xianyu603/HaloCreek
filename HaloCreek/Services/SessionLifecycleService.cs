@@ -37,7 +37,7 @@ namespace HaloCreek.Services
                 return new SessionLaunchResult(false, "Config is not available.", null);
             }
 
-            if (!Directory.Exists(workspacePath))
+            if (!_platformInfrastructure.TryNormalizeExistingDirectoryPath(workspacePath, out var normalizedWorkspacePath))
             {
                 return new SessionLaunchResult(false, "Workspace path does not exist.", null);
             }
@@ -45,7 +45,7 @@ namespace HaloCreek.Services
             try
             {
                 var process = _platformInfrastructure.LaunchWslTerminalCommand(
-                    workspacePath,
+                    normalizedWorkspacePath,
                     config.CodexExecutableName,
                     config.CodexLaunchArguments.Concat(new[] { promptText }));
                 if (process is null)
@@ -57,7 +57,7 @@ namespace HaloCreek.Services
                 var session = new OngoingSessionInfo(
                     process.Id.ToString(),
                     "Codex session",
-                    workspacePath,
+                    normalizedWorkspacePath,
                     now,
                     now,
                     OngoingSessionState.Starting);

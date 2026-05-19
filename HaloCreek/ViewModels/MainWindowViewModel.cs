@@ -52,13 +52,9 @@ namespace HaloCreek.ViewModels
 
         public void SetWorkspacePath(string? workspacePath)
         {
-            if (!_platformInfrastructure.TryNormalizeValidDirectoryPath(workspacePath, out var normalizedPath))
+            if (!_platformInfrastructure.TryNormalizeExistingDirectoryPath(workspacePath, out var normalizedPath))
             {
-                if (!string.IsNullOrWhiteSpace(workspacePath))
-                {
-                    WorkspaceFooter.StatusText = InvalidWorkspacePathStatusText;
-                }
-
+                WorkspaceFooter.StatusText = InvalidWorkspacePathStatusText;
                 return;
             }
 
