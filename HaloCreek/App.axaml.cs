@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using HaloCreek.Infrastructure;
 using HaloCreek.Services;
 using HaloCreek.Services.SessionHistory;
 using HaloCreek.ViewModels;
@@ -21,16 +22,15 @@ namespace HaloCreek
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.MainWindow = new MainWindow
-                {
-                    DataContext = CreateMainWindowViewModel(),
-                };
+                var mainWindow = new MainWindow();
+                mainWindow.DataContext = CreateMainWindowViewModel(mainWindow);
+                desktop.MainWindow = mainWindow;
             }
 
             base.OnFrameworkInitializationCompleted();
         }
 
-        private static MainWindowViewModel CreateMainWindowViewModel()
+        private static MainWindowViewModel CreateMainWindowViewModel(MainWindow mainWindow)
         {
             var configService = new ConfigService();
             var dragDropService = new DragDropService();
@@ -47,7 +47,8 @@ namespace HaloCreek
             var historySessions = new HistorySessionsViewModel(sessionHistoryService);
             var ongoingSessions = new OngoingSessionsViewModel(sessionLifecycleService);
             var git = new GitViewModel(gitService);
-            var workspaceFooter = new WorkspaceFooterViewModel();
+            var platformInfrastructure = new PlatformInfrastructure(mainWindow);
+            var workspaceFooter = new WorkspaceFooterViewModel(platformInfrastructure);
 
             return new MainWindowViewModel(
                 promptEditor,

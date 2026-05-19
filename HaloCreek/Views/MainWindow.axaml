@@ -15,10 +15,6 @@
         MinWidth="960"
         MinHeight="640">
 
-    <Design.DataContext>
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
-
     <Grid RowDefinitions="*,Auto">
         <TabControl Grid.Row="0">
             <TabItem Header="Prompt Editor">

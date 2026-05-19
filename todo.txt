@@ -1,0 +1,2 @@
+删掉无参构造函数 精简逻辑 避免业务逻辑静默缺失
+workspace 添加cache 记录最近打开的若干workspace 供选择

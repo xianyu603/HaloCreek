@@ -10,16 +10,6 @@ namespace HaloCreek.ViewModels
     {
         private string? _currentWorkspacePath;
 
-        public MainWindowViewModel()
-            : this(
-                new PromptEditorViewModel(),
-                new HistorySessionsViewModel(),
-                new OngoingSessionsViewModel(),
-                new GitViewModel(),
-                new WorkspaceFooterViewModel())
-        {
-        }
-
         public MainWindowViewModel(
             PromptEditorViewModel promptEditor,
             HistorySessionsViewModel historySessions,
@@ -32,6 +22,8 @@ namespace HaloCreek.ViewModels
             OngoingSessions = ongoingSessions;
             Git = git;
             WorkspaceFooter = workspaceFooter;
+
+            WorkspaceFooter.SetWorkspaceDispatcher(SetWorkspacePath);
         }
 
         public PromptEditorViewModel PromptEditor { get; }
