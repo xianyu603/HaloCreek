@@ -6,14 +6,14 @@ namespace HaloCreek.Models
     public sealed record AppConfig(
         string CodexExecutableName,
         IReadOnlyList<string> CodexLaunchArguments,
-        string SessionHistoryRootPath,
+        int MaxSessionHistoryFiles,
         string DiffToolPath,
         string DefaultWorkspacePath)
     {
         public static AppConfig DefaultForMvp1 { get; } = new(
             "codex",
             Array.Empty<string>(),
-            string.Empty,
+            100,
             string.Empty,
             string.Empty);
     }

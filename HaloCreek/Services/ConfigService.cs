@@ -107,7 +107,7 @@ namespace HaloCreek.Services
             return new AppConfig(
                 Coalesce(fileConfig.CodexExecutableName, baseConfig.CodexExecutableName),
                 Coalesce(fileConfig.CodexLaunchArguments, baseConfig.CodexLaunchArguments),
-                Coalesce(fileConfig.SessionHistoryRootPath, baseConfig.SessionHistoryRootPath),
+                CoalescePositive(fileConfig.MaxSessionHistoryFiles, baseConfig.MaxSessionHistoryFiles),
                 Coalesce(fileConfig.DiffToolPath, baseConfig.DiffToolPath),
                 Coalesce(fileConfig.DefaultWorkspacePath, baseConfig.DefaultWorkspacePath));
         }
@@ -128,13 +128,20 @@ namespace HaloCreek.Services
                 : values.Where(value => value is not null).Select(value => value!).ToArray();
         }
 
+        private static int CoalescePositive(int? value, int fallback)
+        {
+            return value.GetValueOrDefault() > 0
+                ? value.GetValueOrDefault()
+                : fallback;
+        }
+
         private sealed class AppConfigFile
         {
             public string? CodexExecutableName { get; init; }
 
             public List<string?>? CodexLaunchArguments { get; init; }
 
-            public string? SessionHistoryRootPath { get; init; }
+            public int? MaxSessionHistoryFiles { get; init; }
 
             public string? DiffToolPath { get; init; }
 

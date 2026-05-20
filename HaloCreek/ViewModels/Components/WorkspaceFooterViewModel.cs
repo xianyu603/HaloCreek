@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Infrastructure;
@@ -84,6 +84,7 @@ namespace HaloCreek.ViewModels.Components
 
             _applyValidatedWorkspace(normalizedPath);
             StatusText = $"Selected workspace {normalizedPath}.";
+            //TODO Status Bar的优先级和具体的产品定位待进一步设计
         }
     }
 }

@@ -39,7 +39,7 @@ namespace HaloCreek
             var sessionLifecycleService = new SessionLifecycleService(platformInfrastructure);
             var gitService = new GitService();
 
-            ISessionHistoryReader sessionHistoryReader = new MockHistorySessionReader();
+            ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(platformInfrastructure);
             var sessionHistoryService = new SessionHistoryService(sessionHistoryReader, configService);
 
             var promptEditor = new PromptEditorViewModel(

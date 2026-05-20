@@ -251,9 +251,9 @@ HistorySessionsViewModel
 
 按“先确定 UI，再用可验证的业务纵切同步补基础能力”的顺序推进。每个业务功能的基础能力随该功能一起实现，避免先做一批无法从界面验证的底层代码。
 
-- [ ] **4-T01 确认 History Sessions UI 布局**：先单独确定列表字段、列宽/换行策略、行内 `Resume` / `Reedit` 按钮位置、搜索框位置、加载态、空态、错误态和缩放表现；本任务只产出布局决策，不改业务逻辑。
+- [x] **4-T01 确认 History Sessions UI 布局**：先单独确定列表字段、列宽/换行策略、行内 `Resume` / `Reedit` 按钮位置、搜索框位置、加载态、空态、错误态和缩放表现；本任务只产出布局决策，不改业务逻辑。
 - [x] **4-T02 用 mock 数据落地 UI 骨架**：重组 `HistorySessionInfo` 为 `Id / WorkspacePath / CreatedAt / LastUpdatedAt / InitialPrompt / LastPrompt / LastReply / SessionFilePath`，同步 `MockHistorySessionReader`，接通搜索框、列表、空态和行内按钮占位；此时仍使用 mock reader，先验证 UI 和绑定形态。
-- [ ] **4-T03 接通真实历史列表读取纵切**：为“筛出当前 workspace 的真实 session 并形成最小可用列表”同时实现所需基础能力，包括删除 `SessionHistoryRootPath`、新增 `MaxSessionHistoryFiles=100`、在 `CodexSessionHistoryReader` 内定位 `$CODEX_HOME/sessions` / `~/.codex/sessions`、按最新文件限制枚举、实现 Windows/WSL 路径等价、读取 `session_meta` 并解析 `Id`、`WorkspacePath`、`CreatedAt`、`SessionFilePath`、`LastUpdatedAt`。其中 `Id`、`WorkspacePath`、`CreatedAt` 来自 `session_meta.payload.id/cwd/timestamp`，`SessionFilePath` 来自当前 JSONL 文件路径，`LastUpdatedAt` 来自文件内最后一条有效记录的 `timestamp`；`InitialPrompt`、`LastPrompt`、`LastReply` 在本任务中允许先填空字符串。最后在 `App.axaml.cs` 切换到真实 reader，并只接通 `SetWorkspacePath(...)` 触发的一次性加载，不实现定时刷新；验收点是选择或切换 workspace 后列表能显示真实 session 数量、id、workspace、创建时间和更新时间。
+- [x] **4-T03 接通真实历史列表读取纵切**：为“筛出当前 workspace 的真实 session 并形成最小可用列表”同时实现所需基础能力，包括删除 `SessionHistoryRootPath`、新增 `MaxSessionHistoryFiles=100`、在 `CodexSessionHistoryReader` 内定位 `$CODEX_HOME/sessions` / `~/.codex/sessions`、按最新文件限制枚举、实现 Windows/WSL 路径等价、读取 `session_meta` 并解析 `Id`、`WorkspacePath`、`CreatedAt`、`SessionFilePath`、`LastUpdatedAt`。其中 `Id`、`WorkspacePath`、`CreatedAt` 来自 `session_meta.payload.id/cwd/timestamp`，`SessionFilePath` 来自当前 JSONL 文件路径，`LastUpdatedAt` 来自文件内最后一条有效记录的 `timestamp`；`InitialPrompt`、`LastPrompt`、`LastReply` 在本任务中允许先填空字符串。最后在 `App.axaml.cs` 切换到真实 reader，并只接通 `SetWorkspacePath(...)` 触发的一次性加载，不实现定时刷新；验收点是选择或切换 workspace 后列表能显示真实 session 数量、id、workspace、创建时间和更新时间。
 - [ ] **4-T04 补齐列表展示字段解析纵切**：为“列表展示可读上下文”在 T03 的真实 session 基础上补齐文本字段解析，只处理 `InitialPrompt`、`LastPrompt`、`LastReply` 三个字段和对应坏文件跳过策略；不再改 history root 定位、路径等价、文件枚举限制、`Id`、`WorkspacePath`、`CreatedAt`、`LastUpdatedAt`、`SessionFilePath` 的解析边界。验收点是 UI 中能看到真实初始 prompt、最后 prompt、最后回复，缺少文本字段时按本任务规则降级或跳过，且不会拖垮整个列表。
 - [ ] **4-T05 接通搜索业务纵切**：将 `SessionHistoryService` 搜索范围改为只过滤已加载 session 的 `InitialPrompt`，保持搜索框即时过滤；验收点是搜索不会重新扫描文件，且不会匹配 `Id`、`WorkspacePath`、`LastPrompt`、`LastReply`。
 - [ ] **4-T06 接通定时刷新纵切**：为“workspace 不变时历史列表自动更新”实现固定间隔重新扫描；workspace 切换后的立即加载沿用 T03 已完成能力，搜索只作用于当前已加载结果，不提供手动 `Refresh` 按钮；验收点是不切换 workspace，仅等待定时周期也能发现新增或变化的 session 文件。
@@ -354,4 +354,16 @@ HistorySessionsViewModel
 - `HistorySessionsView.axaml` 已从静态占位行改为绑定 `Sessions` 的列表；搜索框绑定 `SearchText`；空态绑定 `IsEmptyStateVisible`；加载态和错误态保留为后续任务承载位。
 - 行内 `Resume` / `Reedit` 按钮已接入占位命令，点击不执行真实业务，也不会抛未处理异常；真实行为留给 `4-T07` 和 `4-T08`。
 - `SessionHistoryService.SearchSessions(...)` 已按后续反馈更名为 `GetFilteredSessions(...)`，当前过滤逻辑保持为只匹配 `InitialPrompt`。
+- 已执行构建验证：`dotnet build HaloCreek/HaloCreek.csproj` 通过，结果为 `0 个警告`、`0 个错误`。
+
+### 2026-05-20：完成 4-T03 真实历史列表读取纵切
+
+- `AppConfig` 已删除 `SessionHistoryRootPath`，新增 `MaxSessionHistoryFiles`，默认值为 `100`；配置合并支持正整数覆盖。
+- `CodexSessionHistoryReader` 已接入真实 JSONL 读取：优先 `$CODEX_HOME/sessions`，再 fallback 到 `~/.codex/sessions`；只枚举 `.jsonl`，按文件更新时间取最新的至多 `MaxSessionHistoryFiles` 个文件。
+- 已实现 `session_meta.payload.id/cwd/timestamp` 解析，`SessionFilePath` 使用当前 JSONL 文件路径，`LastUpdatedAt` 使用文件内最后一条有效记录的顶层 `timestamp`。
+- 已实现 Windows/WSL workspace 路径等价，例如 `D:\work\HaloCreek` 可匹配 `/mnt/d/work/HaloCreek`；该能力放在 `PlatformInfrastructure`。
+- 单个 JSONL 文件无法打开、格式非法或缺少必需字段时会跳过该文件，不影响其他 session；跳过数量会通过 Footer 状态展示。
+- `InitialPrompt`、`LastPrompt`、`LastReply` 在本任务保持空字符串，留给 `4-T04` 补齐。
+- `App.axaml.cs` 已从 `MockHistorySessionReader` 切换到 `CodexSessionHistoryReader`。
+- `HistorySessionsViewModel` 已改为 workspace 切换时加载一次真实列表；搜索只过滤已加载的内存列表，不会重新扫描文件。
 - 已执行构建验证：`dotnet build HaloCreek/HaloCreek.csproj` 通过，结果为 `0 个警告`、`0 个错误`。

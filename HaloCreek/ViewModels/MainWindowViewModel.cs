@@ -36,6 +36,7 @@ namespace HaloCreek.ViewModels
 
             WorkspaceFooter.SetWorkspaceDispatcher(ApplyValidatedWorkspacePath);
             PromptEditor.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
+            HistorySessions.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
         }
 
         public PromptEditorViewModel PromptEditor { get; }

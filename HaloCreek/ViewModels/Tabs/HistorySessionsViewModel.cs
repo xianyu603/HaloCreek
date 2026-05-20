@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Models;
 using HaloCreek.Services;
@@ -10,8 +11,10 @@ namespace HaloCreek.ViewModels.Tabs
     public sealed class HistorySessionsViewModel : ViewModelBase
     {
         private readonly SessionHistoryService _sessionHistoryService;
+        private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
+        private Action<string>? _statusDispatcher;
         private string? _workspacePath;
 
         public HistorySessionsViewModel()
@@ -35,7 +38,7 @@ namespace HaloCreek.ViewModels.Tabs
             {
                 if (SetProperty(ref _searchText, value))
                 {
-                    RefreshSessions();
+                    ApplySearch();
                 }
             }
         }
@@ -70,12 +73,47 @@ namespace HaloCreek.ViewModels.Tabs
         public void SetWorkspacePath(string workspacePath)
         {
             WorkspacePath = workspacePath;
-            RefreshSessions();
+            LoadSessions();
         }
 
-        private void RefreshSessions()
+        public void SetStatusDispatcher(Action<string> statusDispatcher)
         {
-            Sessions = _sessionHistoryService.GetFilteredSessions(WorkspacePath, SearchText);
+            _statusDispatcher = statusDispatcher ?? throw new ArgumentNullException(nameof(statusDispatcher));
+        }
+
+        private void LoadSessions()
+        {
+            var result = _sessionHistoryService.GetSessions(WorkspacePath);
+            _loadedSessions = result.Sessions;
+            ApplySearch();
+
+            if (result.SkippedFileCount > 0)
+            {
+                _statusDispatcher?.Invoke(
+                    $"Loaded {_loadedSessions.Count} sessions, skipped {result.SkippedFileCount} invalid files.");
+            }
+        }
+
+        private void ApplySearch()
+        {
+            Sessions = FilterSessions(_loadedSessions, SearchText);
+        }
+
+        private static IReadOnlyList<HistorySessionInfo> FilterSessions(
+            IReadOnlyList<HistorySessionInfo> sessions,
+            string? searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                return sessions;
+            }
+
+            var query = searchText.Trim();
+
+            return sessions
+                .Where(session =>
+                    session.InitialPrompt.Contains(query, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
         }
 
         private static void ResumePlaceholder(HistorySessionInfo? session)

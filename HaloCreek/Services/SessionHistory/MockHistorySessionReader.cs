@@ -6,15 +6,14 @@ namespace HaloCreek.Services.SessionHistory
 {
     public sealed class MockHistorySessionReader : ISessionHistoryReader
     {
-        public IReadOnlyList<HistorySessionInfo> ReadSessions(string? workspacePath, AppConfig config)
+        public SessionHistoryResult ReadSessions(string? workspacePath, AppConfig config)
         {
             if (string.IsNullOrWhiteSpace(workspacePath))
             {
-                return Array.Empty<HistorySessionInfo>();
+                return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
             }
 
-            var updatedAt = DateTimeOffset.Now;
-            return Array.Empty<HistorySessionInfo>();
+            return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
 
             //return new[]
             //{

@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using HaloCreek.Models;
 using HaloCreek.Services;
 
 namespace HaloCreek.Services.SessionHistory
@@ -17,36 +14,17 @@ namespace HaloCreek.Services.SessionHistory
             _configService = configService;
         }
 
-        public IReadOnlyList<HistorySessionInfo> GetSessions(string? workspacePath)
+        public SessionHistoryResult GetSessions(string? workspacePath)
         {
             var config = _configService.LoadEffectiveConfig(workspacePath);
+            var result = _reader.ReadSessions(workspacePath, config);
 
-            return _reader
-                .ReadSessions(workspacePath, config)
-                .OrderByDescending(session => session.LastUpdatedAt)
-                .ToArray();
-        }
-
-        public IReadOnlyList<HistorySessionInfo> GetFilteredSessions(string? workspacePath, string? searchText)
-        {
-            var sessions = GetSessions(workspacePath);
-
-            if (string.IsNullOrWhiteSpace(searchText))
+            return result with
             {
-                return sessions;
-            }
-
-            var query = searchText.Trim();
-
-            return sessions
-                .Where(session =>
-                    Contains(session.InitialPrompt, query))
-                .ToArray();
-        }
-
-        private static bool Contains(string value, string query)
-        {
-            return value.Contains(query, StringComparison.OrdinalIgnoreCase);
+                Sessions = result.Sessions
+                    .OrderByDescending(session => session.LastUpdatedAt)
+                    .ToArray()
+            };
         }
     }
 }
