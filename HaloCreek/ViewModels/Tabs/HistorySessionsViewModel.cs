@@ -10,7 +10,7 @@ namespace HaloCreek.ViewModels.Tabs
 {
     public sealed class HistorySessionsViewModel : ViewModelBase
     {
-        private readonly SessionHistoryService _sessionHistoryService;
+        private readonly SessionHistoryQueryService _sessionHistoryQueryService;
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
@@ -19,15 +19,15 @@ namespace HaloCreek.ViewModels.Tabs
         private string? _workspacePath;
 
         public HistorySessionsViewModel()
-            : this(new SessionHistoryService(
+            : this(new SessionHistoryQueryService(
                 new MockHistorySessionReader(),
                 new ConfigService()))
         {
         }
 
-        public HistorySessionsViewModel(SessionHistoryService sessionHistoryService)
+        public HistorySessionsViewModel(SessionHistoryQueryService sessionHistoryQueryService)
         {
-            _sessionHistoryService = sessionHistoryService;
+            _sessionHistoryQueryService = sessionHistoryQueryService;
             ResumeCommand = new RelayCommand<HistorySessionInfo>(ResumePlaceholder, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPromptPlaceholder, HasSelectedSession);
         }
@@ -100,7 +100,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void LoadSessions()
         {
-            var result = _sessionHistoryService.GetSessions(WorkspacePath);
+            var result = _sessionHistoryQueryService.GetSessions(WorkspacePath);
             _loadedSessions = result.Sessions;
             ApplySearch();
 

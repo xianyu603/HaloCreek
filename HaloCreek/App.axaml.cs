@@ -40,12 +40,12 @@ namespace HaloCreek
             var gitService = new GitService();
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(platformInfrastructure);
-            var sessionHistoryService = new SessionHistoryService(sessionHistoryReader, configService);
+            var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader, configService);
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
                 configService);
-            var historySessions = new HistorySessionsViewModel(sessionHistoryService);
+            var historySessions = new HistorySessionsViewModel(sessionHistoryQueryService);
             var ongoingSessions = new OngoingSessionsViewModel(sessionLifecycleService);
             var git = new GitViewModel(gitService);
             var workspaceFooter = new WorkspaceFooterViewModel(platformInfrastructure);
