@@ -41,11 +41,12 @@ namespace HaloCreek
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(platformInfrastructure);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader, configService);
+            var sessionHistoryRefreshService = new SessionHistoryRefreshService(sessionHistoryQueryService);
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
                 configService);
-            var historySessions = new HistorySessionsViewModel(sessionHistoryQueryService);
+            var historySessions = new HistorySessionsViewModel(sessionHistoryRefreshService);
             var ongoingSessions = new OngoingSessionsViewModel(sessionLifecycleService);
             var git = new GitViewModel(gitService);
             var workspaceFooter = new WorkspaceFooterViewModel(platformInfrastructure);

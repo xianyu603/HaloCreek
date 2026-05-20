@@ -10,7 +10,7 @@ namespace HaloCreek.ViewModels.Tabs
 {
     public sealed class HistorySessionsViewModel : ViewModelBase
     {
-        private readonly SessionHistoryQueryService _sessionHistoryQueryService;
+        private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
@@ -19,15 +19,16 @@ namespace HaloCreek.ViewModels.Tabs
         private string? _workspacePath;
 
         public HistorySessionsViewModel()
-            : this(new SessionHistoryQueryService(
+            : this(new SessionHistoryRefreshService(
                 new MockHistorySessionReader(),
                 new ConfigService()))
         {
         }
 
-        public HistorySessionsViewModel(SessionHistoryQueryService sessionHistoryQueryService)
+        public HistorySessionsViewModel(SessionHistoryRefreshService sessionHistoryRefreshService)
         {
-            _sessionHistoryQueryService = sessionHistoryQueryService;
+            _sessionHistoryRefreshService = sessionHistoryRefreshService;
+            _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
             ResumeCommand = new RelayCommand<HistorySessionInfo>(ResumePlaceholder, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPromptPlaceholder, HasSelectedSession);
         }
@@ -90,25 +91,15 @@ namespace HaloCreek.ViewModels.Tabs
         public void SetWorkspacePath(string workspacePath)
         {
             WorkspacePath = workspacePath;
-            LoadSessions();
+            _loadedSessions = Array.Empty<HistorySessionInfo>();
+            ApplySearch();
+            _sessionHistoryRefreshService.SetWorkspacePath(workspacePath);
+            _sessionHistoryRefreshService.RequestRefresh();
         }
 
         public void SetStatusDispatcher(Action<string> statusDispatcher)
         {
             _statusDispatcher = statusDispatcher ?? throw new ArgumentNullException(nameof(statusDispatcher));
-        }
-
-        private void LoadSessions()
-        {
-            var result = _sessionHistoryQueryService.GetSessions(WorkspacePath);
-            _loadedSessions = result.Sessions;
-            ApplySearch();
-
-            if (result.SkippedFileCount > 0)
-            {
-                _statusDispatcher?.Invoke(
-                    $"Loaded {_loadedSessions.Count} sessions, skipped {result.SkippedFileCount} invalid files.");
-            }
         }
 
         private void ApplySearch()
@@ -136,6 +127,33 @@ namespace HaloCreek.ViewModels.Tabs
                 .Where(session =>
                     session.InitialPrompt.Contains(query, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
+        }
+
+        private void HandleRefreshCompleted(SessionHistoryRefreshResult refreshResult)
+        {
+            if (!string.Equals(WorkspacePath, refreshResult.WorkspacePath, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (refreshResult.HistoryResult is null)
+            {
+                if (!string.IsNullOrWhiteSpace(refreshResult.ErrorMessage))
+                {
+                    _statusDispatcher?.Invoke($"Failed to load history sessions: {refreshResult.ErrorMessage}");
+                }
+
+                return;
+            }
+
+            _loadedSessions = refreshResult.HistoryResult.Sessions;
+            ApplySearch();
+
+            if (refreshResult.HistoryResult.SkippedFileCount > 0)
+            {
+                _statusDispatcher?.Invoke(
+                    $"Loaded {_loadedSessions.Count} sessions, skipped {refreshResult.HistoryResult.SkippedFileCount} invalid files.");
+            }
         }
 
         private static void ResumePlaceholder(HistorySessionInfo? session)
