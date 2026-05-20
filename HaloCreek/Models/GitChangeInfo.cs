@@ -1,4 +1,4 @@
-﻿namespace HaloCreek.Models
+namespace HaloCreek.Models
 {
     public sealed record GitChangeInfo(
         string RelativePath,

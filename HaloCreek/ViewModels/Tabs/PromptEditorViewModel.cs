@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Models;
 using HaloCreek.Services;

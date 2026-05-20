@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services.SessionHistory

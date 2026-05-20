@@ -1,11 +1,7 @@
-# Coding Rules
-#
-# Git attributes can enforce line endings. UTF-8 BOM policy is documented in
-# docs/CodingRules.md and must be checked by tools/review because Git attributes
-# cannot portably require UTF-8 with BOM across environments.
+# Text files are normalized to LF line endings.
+# File encoding is UTF-8; Git attributes do not portably enforce encoding.
 
-* text=auto eol=crlf
+* text=auto eol=lf
 
-# Codex skill loader requires SKILL.md frontmatter to start at byte 0, so these
-# files must be UTF-8 without BOM while still using CRLF line endings.
-.codex/skills/**/SKILL.md text eol=crlf
+# Keep icon assets binary.
+*.ico binary

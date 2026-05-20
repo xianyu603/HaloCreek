@@ -1,4 +1,4 @@
-﻿# MVP1-4 T06：History Session 定时刷新补充决策
+# MVP1-4 T06：History Session 定时刷新补充决策
 
 ## 1. 背景
 

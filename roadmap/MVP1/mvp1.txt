@@ -1,14 +1,14 @@
-﻿目标 形成能够显著提高个人工作效率的基础应用
+目标 形成能够显著提高个人工作效率的基础应用
 验证诸多操作是否成立(如以提示词拉起/git 展示/历史session信息收集/multi session management)
 
 整体以多页签形式展示 每个页签提供独立的若干功能 彼此之间允许有少量联动
 tab 0 提示词编辑器 提供一个按钮'Launch' 支持拖入文件自动在编辑窗口转为文件路径文本
 tab 1 历史session 选择 以list形式展示'当前workspace的历史session' 提供resume/reedit init prompt()/search
 tab 2 On going session list, 拉到前台, 在session历史中显示
-tab 3 仿照vs或rider的git插件 预览当前diff文件 点击打开diff工具 commit 
+tab 3 仿照vs或rider的git插件 预览当前diff文件 点击打开diff工具 commit
 
 workspace选择 footer 摘要信息 不可编辑 按键选择路径
-配置文件 
+配置文件
 	历史session条目
 	codex 参数(--search 权限参数等)
 提供两层配置 global(写在%appdata%之类的路径) 和workspace(写在.HaloCreek) workspace覆盖global

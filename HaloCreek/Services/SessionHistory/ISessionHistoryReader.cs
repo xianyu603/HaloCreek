@@ -1,4 +1,4 @@
-﻿using HaloCreek.Models;
+using HaloCreek.Models;
 
 namespace HaloCreek.Services.SessionHistory
 {

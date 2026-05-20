@@ -1,4 +1,4 @@
-﻿# MVP1 阶段 1：workspace 路径架构调整
+# MVP1 阶段 1：workspace 路径架构调整
 
 ## 改了什么
 

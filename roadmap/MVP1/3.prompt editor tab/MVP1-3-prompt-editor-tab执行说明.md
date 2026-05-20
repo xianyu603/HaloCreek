@@ -1,4 +1,4 @@
-﻿# MVP1 阶段 3：Prompt Editor Tab 执行说明
+# MVP1 阶段 3：Prompt Editor Tab 执行说明
 
 ## 1. 目标
 

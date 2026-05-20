@@ -1,4 +1,4 @@
-﻿# MVP1 阶段 2：workspace 及 footer 执行说明
+# MVP1 阶段 2：workspace 及 footer 执行说明
 
 ## 1. 目标
 
