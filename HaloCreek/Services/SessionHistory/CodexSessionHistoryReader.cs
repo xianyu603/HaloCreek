@@ -204,6 +204,9 @@ namespace HaloCreek.Services.SessionHistory
             string? sessionWorkspacePath = null;
             DateTimeOffset? createdAt = null;
             DateTimeOffset? lastUpdatedAt = null;
+            string? initialPrompt = null;
+            var lastPrompt = string.Empty;
+            var lastReply = string.Empty;
             var foundSessionMeta = false;
 
             foreach (var line in File.ReadLines(sessionFilePath))
@@ -219,6 +222,18 @@ namespace HaloCreek.Services.SessionHistory
                 if (TryGetTimestamp(root, out var recordTimestamp))
                 {
                     lastUpdatedAt = recordTimestamp;
+                }
+
+                if (TryReadEventUserMessage(root, out var eventUserPrompt))
+                {
+                    // If this source renders poorly, switch to response_item role=user instead.
+                    initialPrompt ??= eventUserPrompt;
+                    lastPrompt = eventUserPrompt;
+                }
+
+                if (TryReadAssistantReply(root, out var assistantReply))
+                {
+                    lastReply = assistantReply;
                 }
 
                 if (!IsRecordType(root, "session_meta"))
@@ -269,10 +284,56 @@ namespace HaloCreek.Services.SessionHistory
                 sessionWorkspacePath,
                 createdAt.Value,
                 lastUpdatedAt.Value,
-                string.Empty,
-                string.Empty,
-                string.Empty,
+                initialPrompt ?? string.Empty,
+                lastPrompt,
+                lastReply,
                 sessionFilePath);
+        }
+
+        private static bool TryReadEventUserMessage(JsonElement root, out string message)
+        {
+            message = string.Empty;
+
+            if (!IsRecordType(root, "event_msg")
+                || !TryGetObject(root, "payload", out var payload)
+                || !IsPayloadType(payload, "user_message")
+                || !TryGetNonEmptyString(payload, "message", out message)
+                || IsEnvironmentContextMessage(message))
+            {
+                message = string.Empty;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryReadAssistantReply(JsonElement root, out string message)
+        {
+            message = string.Empty;
+
+            if (!IsRecordType(root, "event_msg")
+                || !TryGetObject(root, "payload", out var payload)
+                || !IsPayloadType(payload, "agent_message")
+                || !TryGetNonEmptyString(payload, "message", out message))
+            {
+                message = string.Empty;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsPayloadType(JsonElement payload, string expectedType)
+        {
+            return TryGetString(payload, "type", out var type)
+                && string.Equals(type, expectedType, StringComparison.Ordinal);
+        }
+
+        private static bool IsEnvironmentContextMessage(string message)
+        {
+            var trimmedMessage = message.TrimStart();
+            return trimmedMessage.StartsWith("<environment_context>", StringComparison.Ordinal)
+                && trimmedMessage.Contains("</environment_context>", StringComparison.Ordinal);
         }
 
         private static bool IsRecordType(JsonElement root, string expectedType)
@@ -293,6 +354,21 @@ namespace HaloCreek.Services.SessionHistory
             return property;
         }
 
+        private static bool TryGetObject(
+            JsonElement element,
+            string propertyName,
+            out JsonElement property)
+        {
+            if (element.TryGetProperty(propertyName, out property)
+                && property.ValueKind == JsonValueKind.Object)
+            {
+                return true;
+            }
+
+            property = default;
+            return false;
+        }
+
         private static string GetRequiredString(JsonElement element, string propertyName)
         {
             if (!element.TryGetProperty(propertyName, out var property)
@@ -308,6 +384,38 @@ namespace HaloCreek.Services.SessionHistory
             }
 
             return value;
+        }
+
+        private static bool TryGetNonEmptyString(
+            JsonElement element,
+            string propertyName,
+            out string value)
+        {
+            if (TryGetString(element, propertyName, out value)
+                && !string.IsNullOrWhiteSpace(value))
+            {
+                return true;
+            }
+
+            value = string.Empty;
+            return false;
+        }
+
+        private static bool TryGetString(
+            JsonElement element,
+            string propertyName,
+            out string value)
+        {
+            value = string.Empty;
+
+            if (!element.TryGetProperty(propertyName, out var property)
+                || property.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+
+            value = property.GetString() ?? string.Empty;
+            return true;
         }
 
         private static DateTimeOffset GetRequiredTimestamp(JsonElement element, string propertyName)

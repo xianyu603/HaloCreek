@@ -94,10 +94,10 @@ public sealed record HistorySessionInfo(
 
 已确认口径：
 
-- `InitialPrompt` 优先读取第一条 `event_msg` 且 `payload.type == "user_message"` 的 `payload.message`。
-- 若没有 `event_msg user_message`，再 fallback 到第一条 `response_item` 且 `payload.type == "message"`、`payload.role == "user"` 的文本内容。
+- `InitialPrompt` 先只读取第一条 `event_msg` 且 `payload.type == "user_message"` 的 `payload.message`。
+- 不静默 fallback 到 `response_item` 用户消息；如果真实展示效果不对，再明确切换到 `response_item` 且 `payload.type == "message"`、`payload.role == "user"` 的文本内容。
 - `LastPrompt` 读取最后一条可识别的用户 prompt。
-- `LastReply` 读取最后一条可识别的 assistant 回复。
+- `LastReply` 先只读取最后一条 `event_msg` 且 `payload.type == "agent_message"` 的 `payload.message`。
 - 跳过仅包含环境上下文的 user message。
 - 不解析 tool call 细节，不拼接完整多轮 transcript。
 - prompt/reply 原文只保存在内存模型中，不写入 HaloCreek 自己的缓存文件。
@@ -254,7 +254,7 @@ HistorySessionsViewModel
 - [x] **4-T01 确认 History Sessions UI 布局**：先单独确定列表字段、列宽/换行策略、行内 `Resume` / `Reedit` 按钮位置、搜索框位置、加载态、空态、错误态和缩放表现；本任务只产出布局决策，不改业务逻辑。
 - [x] **4-T02 用 mock 数据落地 UI 骨架**：重组 `HistorySessionInfo` 为 `Id / WorkspacePath / CreatedAt / LastUpdatedAt / InitialPrompt / LastPrompt / LastReply / SessionFilePath`，同步 `MockHistorySessionReader`，接通搜索框、列表、空态和行内按钮占位；此时仍使用 mock reader，先验证 UI 和绑定形态。
 - [x] **4-T03 接通真实历史列表读取纵切**：为“筛出当前 workspace 的真实 session 并形成最小可用列表”同时实现所需基础能力，包括删除 `SessionHistoryRootPath`、新增 `MaxSessionHistoryFiles=100`、在 `CodexSessionHistoryReader` 内定位 `$CODEX_HOME/sessions` / `~/.codex/sessions`、按最新文件限制枚举、实现 Windows/WSL 路径等价、读取 `session_meta` 并解析 `Id`、`WorkspacePath`、`CreatedAt`、`SessionFilePath`、`LastUpdatedAt`。其中 `Id`、`WorkspacePath`、`CreatedAt` 来自 `session_meta.payload.id/cwd/timestamp`，`SessionFilePath` 来自当前 JSONL 文件路径，`LastUpdatedAt` 来自文件内最后一条有效记录的 `timestamp`；`InitialPrompt`、`LastPrompt`、`LastReply` 在本任务中允许先填空字符串。最后在 `App.axaml.cs` 切换到真实 reader，并只接通 `SetWorkspacePath(...)` 触发的一次性加载，不实现定时刷新；验收点是选择或切换 workspace 后列表能显示真实 session 数量、id、workspace、创建时间和更新时间。
-- [ ] **4-T04 补齐列表展示字段解析纵切**：为“列表展示可读上下文”在 T03 的真实 session 基础上补齐文本字段解析，只处理 `InitialPrompt`、`LastPrompt`、`LastReply` 三个字段和对应坏文件跳过策略；不再改 history root 定位、路径等价、文件枚举限制、`Id`、`WorkspacePath`、`CreatedAt`、`LastUpdatedAt`、`SessionFilePath` 的解析边界。验收点是 UI 中能看到真实初始 prompt、最后 prompt、最后回复，缺少文本字段时按本任务规则降级或跳过，且不会拖垮整个列表。
+- [x] **4-T04 补齐列表展示字段解析纵切**：为“列表展示可读上下文”在 T03 的真实 session 基础上补齐文本字段解析，只处理 `InitialPrompt`、`LastPrompt`、`LastReply` 三个字段和对应坏文件跳过策略；不再改 history root 定位、路径等价、文件枚举限制、`Id`、`WorkspacePath`、`CreatedAt`、`LastUpdatedAt`、`SessionFilePath` 的解析边界。验收点是 UI 中能看到真实初始 prompt、最后 prompt、最后回复，缺少文本字段时按本任务规则降级或跳过，且不会拖垮整个列表。
 - [ ] **4-T05 接通搜索业务纵切**：将 `SessionHistoryService` 搜索范围改为只过滤已加载 session 的 `InitialPrompt`，保持搜索框即时过滤；验收点是搜索不会重新扫描文件，且不会匹配 `Id`、`WorkspacePath`、`LastPrompt`、`LastReply`。
 - [ ] **4-T06 接通定时刷新纵切**：为“workspace 不变时历史列表自动更新”实现固定间隔重新扫描；workspace 切换后的立即加载沿用 T03 已完成能力，搜索只作用于当前已加载结果，不提供手动 `Refresh` 按钮；验收点是不切换 workspace，仅等待定时周期也能发现新增或变化的 session 文件。
 - [ ] **4-T07 接通 Resume 纵切**：为“从历史列表恢复 session”同时实现 `SessionLifecycleService.Resume(session, currentWorkspacePath, config)`、Terminal 启动参数、行内 `ResumeCommand` 和 Footer 状态同步；验收点是点击行内 `Resume` 会在当前 workspace 执行 `codex resume <session-id>`。
@@ -366,4 +366,12 @@ HistorySessionsViewModel
 - `InitialPrompt`、`LastPrompt`、`LastReply` 在本任务保持空字符串，留给 `4-T04` 补齐。
 - `App.axaml.cs` 已从 `MockHistorySessionReader` 切换到 `CodexSessionHistoryReader`。
 - `HistorySessionsViewModel` 已改为 workspace 切换时加载一次真实列表；搜索只过滤已加载的内存列表，不会重新扫描文件。
+- 已执行构建验证：`dotnet build HaloCreek/HaloCreek.csproj` 通过，结果为 `0 个警告`、`0 个错误`。
+
+### 2026-05-20：完成 4-T04 列表展示字段解析纵切
+
+- `CodexSessionHistoryReader` 已补齐 `InitialPrompt`、`LastPrompt`、`LastReply` 解析；基础字段、history root 定位、路径等价和文件枚举限制保持 T03 边界不变。
+- `InitialPrompt` 先只使用第一条 `event_msg` / `payload.type == "user_message"` 的 `payload.message`；不再静默 fallback 到 `response_item` 用户消息，后续如果真实展示效果不对再明确切换。
+- `LastPrompt` 会读取最后一条 `event_msg user_message`，`LastReply` 会读取最后一条 `event_msg agent_message`；不静默切换到 `response_item` 文本形态。
+- 仅包含环境上下文的 user message 会被跳过；文本字段缺失、为空或结构不认识时保留空字符串，不影响该 session 的基础列表字段展示。
 - 已执行构建验证：`dotnet build HaloCreek/HaloCreek.csproj` 通过，结果为 `0 个警告`、`0 个错误`。
