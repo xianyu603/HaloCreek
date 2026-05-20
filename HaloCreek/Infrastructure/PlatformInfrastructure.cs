@@ -42,13 +42,7 @@ namespace HaloCreek.Infrastructure
             {
                 var folder = folders[0];
                 var localPath = folder.TryGetLocalPath();
-
-                if (!string.IsNullOrWhiteSpace(localPath))
-                {
-                    return localPath;
-                }
-
-                return folder.Path.IsFile ? folder.Path.LocalPath : folder.Path.ToString();
+                return localPath;
             }
             finally
             {
