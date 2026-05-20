@@ -8,10 +8,32 @@
     <Grid RowDefinitions="Auto,*"
           Margin="20"
           RowSpacing="12">
-        <TextBox Grid.Row="0"
-                 Height="36"
-                 Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 PlaceholderText="Search initial prompt"/>
+        <Grid Grid.Row="0"
+              ColumnDefinitions="*,Auto,Auto,Auto"
+              ColumnSpacing="8">
+            <TextBox Grid.Column="0"
+                     Height="36"
+                     Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     PlaceholderText="Search initial prompt"/>
+            <Button Grid.Column="1"
+                    Content="Detail"
+                    MinWidth="84"
+                    Height="36"
+                    Command="{Binding DetailCommand}"
+                    CommandParameter="{Binding SelectedSession}"/>
+            <Button Grid.Column="2"
+                    Content="Resume"
+                    MinWidth="84"
+                    Height="36"
+                    Command="{Binding ResumeCommand}"
+                    CommandParameter="{Binding SelectedSession}"/>
+            <Button Grid.Column="3"
+                    Content="Reedit"
+                    MinWidth="84"
+                    Height="36"
+                    Command="{Binding ReeditInitialPromptCommand}"
+                    CommandParameter="{Binding SelectedSession}"/>
+        </Grid>
 
         <Border Grid.Row="1"
                 BorderBrush="#CBD5E1"
@@ -22,23 +44,23 @@
                 <Border Grid.Row="0"
                         MinHeight="38"
                         Background="#F8FAFC"
-                        Padding="14,0">
-                    <Grid ColumnDefinitions="2.6*,2.1*,156"
+                        Padding="12,0">
+                    <Grid ColumnDefinitions="190,2.3*,2.1*"
                           ColumnSpacing="14">
                         <TextBlock Grid.Column="0"
-                                   Text="Initial Prompt"
+                                   Text="Time"
                                    VerticalAlignment="Center"
                                    Foreground="#475569"
                                    FontSize="12"
                                    FontWeight="SemiBold"/>
                         <TextBlock Grid.Column="1"
-                                   Text="Latest Activity"
+                                   Text="InitialPrompt"
                                    VerticalAlignment="Center"
                                    Foreground="#475569"
                                    FontSize="12"
                                    FontWeight="SemiBold"/>
                         <TextBlock Grid.Column="2"
-                                   Text="Actions"
+                                   Text="Latest Activity"
                                    VerticalAlignment="Center"
                                    Foreground="#475569"
                                    FontSize="12"
@@ -46,76 +68,82 @@
                     </Grid>
                 </Border>
 
-                <ScrollViewer Grid.Row="1"
-                              IsVisible="{Binding HasSessions}"
-                              HorizontalScrollBarVisibility="Disabled"
-                              VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding Sessions}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="model:HistorySessionInfo"
-                                          x:CompileBindings="False">
-                                <Border BorderBrush="#E2E8F0"
-                                        BorderThickness="0,1,0,0"
-                                        Padding="14,12"
-                                        Background="White">
-                                    <Grid ColumnDefinitions="2.6*,2.1*,156"
-                                          ColumnSpacing="14">
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding Sessions}"
+                         SelectedItem="{Binding SelectedSession, Mode=TwoWay}"
+                         SelectionMode="Single"
+                         IsVisible="{Binding HasSessions}"
+                         BorderThickness="0"
+                         Background="White"
+                         Padding="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Height" Value="90"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="model:HistorySessionInfo"
+                                      x:CompileBindings="False">
+                            <Grid Height="90"
+                                  RowDefinitions="1,*"
+                                  Background="Transparent"
+                                  ClipToBounds="True">
+                                <Border Grid.Row="0"
+                                        Background="#E2E8F0"/>
+                                <Border Grid.Row="1"
+                                        Padding="12,8"
+                                        Background="Transparent">
+                                    <Grid ColumnDefinitions="190,2.3*,2.1*"
+                                          ColumnSpacing="14"
+                                          ClipToBounds="True"
+                                          VerticalAlignment="Top">
                                         <StackPanel Grid.Column="0"
-                                                    Spacing="6">
-                                            <TextBlock Text="{Binding InitialPrompt}"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="#0F172A"
-                                                       FontWeight="SemiBold"/>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="8">
-                                                <TextBlock Text="{Binding CreatedAt, StringFormat='Created {0:g}'}"
-                                                           TextWrapping="NoWrap"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           Foreground="#64748B"
-                                                           FontSize="12"/>
-                                                <TextBlock Text="{Binding LastUpdatedAt, StringFormat='Updated {0:g}'}"
-                                                           TextWrapping="NoWrap"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           Foreground="#64748B"
-                                                           FontSize="12"/>
-                                            </StackPanel>
-                                            <TextBlock Text="{Binding Id}"
+                                                    Spacing="6"
+                                                    VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding CreatedAt, StringFormat='Created time {0:g}'}"
                                                        TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"
-                                                       Foreground="#94A3B8"
+                                                       Foreground="#334155"
                                                        FontSize="12"/>
-                                        </StackPanel>
-
-                                        <StackPanel Grid.Column="1"
-                                                    Spacing="6">
-                                            <TextBlock Text="{Binding LastPrompt, StringFormat='Last prompt: {0}'}"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="#334155"/>
-                                            <TextBlock Text="{Binding LastReply, StringFormat='Last reply: {0}'}"
-                                                       TextWrapping="Wrap"
+                                            <TextBlock Text="{Binding LastUpdatedAt, StringFormat='Updated Time {0:g}'}"
+                                                       TextWrapping="NoWrap"
+                                                       TextTrimming="CharacterEllipsis"
                                                        Foreground="#64748B"
                                                        FontSize="12"/>
                                         </StackPanel>
 
-                                        <StackPanel Grid.Column="2"
-                                                    Orientation="Horizontal"
-                                                    Spacing="8"
-                                                    VerticalAlignment="Top">
-                                            <Button Content="Resume"
-                                                    MinWidth="72"
-                                                    Command="{Binding #HistorySessionsRoot.DataContext.ResumeCommand}"
-                                                    CommandParameter="{Binding}"/>
-                                            <Button Content="Reedit"
-                                                    MinWidth="72"
-                                                    Command="{Binding #HistorySessionsRoot.DataContext.ReeditInitialPromptCommand}"
-                                                    CommandParameter="{Binding}"/>
-                                        </StackPanel>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding InitialPromptText}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="#334155"
+                                                   FontSize="13"
+                                                   LineHeight="18"
+                                                   MaxHeight="72"
+                                                   ClipToBounds="True"
+                                                   VerticalAlignment="Top"/>
+
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding LatestActivityText}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="#334155"
+                                                   FontSize="13"
+                                                   LineHeight="18"
+                                                   MaxHeight="72"
+                                                   ClipToBounds="True"
+                                                   VerticalAlignment="Top"/>
                                     </Grid>
                                 </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
                 <Grid Grid.Row="1"
                       MinHeight="160"

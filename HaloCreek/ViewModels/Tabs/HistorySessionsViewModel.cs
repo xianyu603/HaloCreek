@@ -14,6 +14,7 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
+        private HistorySessionInfo? _selectedSession;
         private Action<string>? _statusDispatcher;
         private string? _workspacePath;
 
@@ -27,8 +28,9 @@ namespace HaloCreek.ViewModels.Tabs
         public HistorySessionsViewModel(SessionHistoryService sessionHistoryService)
         {
             _sessionHistoryService = sessionHistoryService;
-            ResumeCommand = new RelayCommand<HistorySessionInfo>(ResumePlaceholder);
-            ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPromptPlaceholder);
+            ResumeCommand = new RelayCommand<HistorySessionInfo>(ResumePlaceholder, HasSelectedSession);
+            ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPromptPlaceholder, HasSelectedSession);
+            DetailCommand = new RelayCommand<HistorySessionInfo>(DetailPlaceholder, HasSelectedSession);
         }
 
         public string SearchText
@@ -62,6 +64,20 @@ namespace HaloCreek.ViewModels.Tabs
             }
         }
 
+        public HistorySessionInfo? SelectedSession
+        {
+            get => _selectedSession;
+            set
+            {
+                if (SetProperty(ref _selectedSession, value))
+                {
+                    ResumeCommand.NotifyCanExecuteChanged();
+                    ReeditInitialPromptCommand.NotifyCanExecuteChanged();
+                    DetailCommand.NotifyCanExecuteChanged();
+                }
+            }
+        }
+
         public bool HasSessions => Sessions.Count > 0;
 
         public bool IsEmptyStateVisible => !HasSessions;
@@ -69,6 +85,8 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand<HistorySessionInfo> ResumeCommand { get; }
 
         public IRelayCommand<HistorySessionInfo> ReeditInitialPromptCommand { get; }
+
+        public IRelayCommand<HistorySessionInfo> DetailCommand { get; }
 
         public void SetWorkspacePath(string workspacePath)
         {
@@ -97,6 +115,11 @@ namespace HaloCreek.ViewModels.Tabs
         private void ApplySearch()
         {
             Sessions = FilterSessions(_loadedSessions, SearchText);
+
+            if (SelectedSession is not null && !Sessions.Contains(SelectedSession))
+            {
+                SelectedSession = null;
+            }
         }
 
         private static IReadOnlyList<HistorySessionInfo> FilterSessions(
@@ -120,7 +143,16 @@ namespace HaloCreek.ViewModels.Tabs
         {
         }
 
+        private static bool HasSelectedSession(HistorySessionInfo? session)
+        {
+            return session is not null;
+        }
+
         private static void ReeditInitialPromptPlaceholder(HistorySessionInfo? session)
+        {
+        }
+
+        private static void DetailPlaceholder(HistorySessionInfo? session)
         {
         }
     }
