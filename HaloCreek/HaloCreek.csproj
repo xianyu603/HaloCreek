@@ -4,7 +4,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\avalonia-logo.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(UsePublishIcon)' == 'true' and Exists('Assets\publish.ico')">
+    <ApplicationIcon>Assets\publish.ico</ApplicationIcon>
+    <DefineConstants>$(DefineConstants);PUBLISH_ICON</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

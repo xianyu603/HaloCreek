@@ -8,7 +8,6 @@
         mc:Ignorable="d" d:DesignWidth="1120" d:DesignHeight="760"
         x:Class="HaloCreek.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
         Title="HaloCreek"
         Width="1120"
         Height="760"
