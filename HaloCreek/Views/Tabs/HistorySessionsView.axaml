@@ -3,21 +3,227 @@
              x:Class="HaloCreek.Views.Tabs.HistorySessionsView">
     <Grid RowDefinitions="Auto,*"
           Margin="20"
-          RowSpacing="16">
+          RowSpacing="12">
         <Grid Grid.Row="0"
-              ColumnDefinitions="*">
+              ColumnDefinitions="*,Auto"
+              ColumnSpacing="12">
             <TextBox Grid.Column="0"
-                     PlaceholderText="Search sessions"/>
+                     Height="36"
+                     PlaceholderText="Search initial prompt"/>
+
+            <Button Grid.Column="1"
+                    Content="Refresh"
+                    MinWidth="86"
+                    Height="36"/>
         </Grid>
 
         <Border Grid.Row="1"
                 BorderBrush="#CBD5E1"
                 BorderThickness="1"
-                CornerRadius="6">
-            <TextBlock Text="History session list placeholder"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Foreground="#64748B"/>
+                CornerRadius="6"
+                ClipToBounds="True">
+            <Grid RowDefinitions="Auto,*">
+                <Border Grid.Row="0"
+                        MinHeight="38"
+                        Background="#F8FAFC"
+                        Padding="14,0">
+                    <Grid ColumnDefinitions="2.6*,2.1*,156"
+                          ColumnSpacing="14">
+                        <TextBlock Grid.Column="0"
+                                   Text="Initial Prompt"
+                                   VerticalAlignment="Center"
+                                   Foreground="#475569"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="Latest Activity"
+                                   VerticalAlignment="Center"
+                                   Foreground="#475569"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="2"
+                                   Text="Actions"
+                                   VerticalAlignment="Center"
+                                   Foreground="#475569"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+                    </Grid>
+                </Border>
+
+                <ScrollViewer Grid.Row="1"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+                          Background="White">
+                        <Border Grid.Row="0"
+                                BorderBrush="#E2E8F0"
+                                BorderThickness="0,1,0,0"
+                                Padding="14,12">
+                            <Grid ColumnDefinitions="2.6*,2.1*,156"
+                                  ColumnSpacing="14">
+                                <StackPanel Grid.Column="0"
+                                            Spacing="6">
+                                    <TextBlock Text="Create the MVP1 history sessions tab and keep the first pass limited to UI decisions."
+                                               TextWrapping="Wrap"
+                                               Foreground="#0F172A"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="Created today 09:14 · Updated today 09:42"
+                                               TextWrapping="NoWrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="#64748B"
+                                               FontSize="12"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1"
+                                            Spacing="6">
+                                    <TextBlock Text="Last prompt: tighten the row layout and make the empty state less noisy."
+                                               TextWrapping="Wrap"
+                                               Foreground="#334155"/>
+                                    <TextBlock Text="Last reply: updated the list spacing and preserved room for actions."
+                                               TextWrapping="Wrap"
+                                               Foreground="#64748B"
+                                               FontSize="12"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2"
+                                            Orientation="Horizontal"
+                                            Spacing="8"
+                                            VerticalAlignment="Top">
+                                    <Button Content="Resume"
+                                            MinWidth="72"
+                                            IsEnabled="False"/>
+                                    <Button Content="Reedit"
+                                            MinWidth="72"
+                                            IsEnabled="False"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="1"
+                                BorderBrush="#E2E8F0"
+                                BorderThickness="0,1,0,0"
+                                Padding="14,12">
+                            <Grid ColumnDefinitions="2.6*,2.1*,156"
+                                  ColumnSpacing="14">
+                                <StackPanel Grid.Column="0"
+                                            Spacing="6">
+                                    <TextBlock Text="Review workspace path handling before wiring Codex history files."
+                                               TextWrapping="Wrap"
+                                               Foreground="#0F172A"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="Created yesterday 18:48 · Updated yesterday 18:55"
+                                               TextWrapping="NoWrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="#64748B"
+                                               FontSize="12"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1"
+                                            Spacing="6">
+                                    <TextBlock Text="Last prompt: compare D:\work\HaloCreek with /mnt/d/work/HaloCreek."
+                                               TextWrapping="Wrap"
+                                               Foreground="#334155"/>
+                                    <TextBlock Text="Last reply: keep path equivalence below the ViewModel."
+                                               TextWrapping="Wrap"
+                                               Foreground="#64748B"
+                                               FontSize="12"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2"
+                                            Orientation="Horizontal"
+                                            Spacing="8"
+                                            VerticalAlignment="Top">
+                                    <Button Content="Resume"
+                                            MinWidth="72"
+                                            IsEnabled="False"/>
+                                    <Button Content="Reedit"
+                                            MinWidth="72"
+                                            IsEnabled="False"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="2"
+                                BorderBrush="#E2E8F0"
+                                BorderThickness="0,1,0,0"
+                                Padding="14,12">
+                            <Grid ColumnDefinitions="2.6*,2.1*,156"
+                                  ColumnSpacing="14">
+                                <StackPanel Grid.Column="0"
+                                            Spacing="6">
+                                    <TextBlock Text="Draft service boundaries for session history, lifecycle, footer status, and prompt handoff."
+                                               TextWrapping="Wrap"
+                                               Foreground="#0F172A"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="Created May 18 13:20 · Updated May 18 14:03"
+                                               TextWrapping="NoWrap"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="#64748B"
+                                               FontSize="12"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1"
+                                            Spacing="6">
+                                    <TextBlock Text="Last prompt: keep JSONL parsing isolated from the UI."
+                                               TextWrapping="Wrap"
+                                               Foreground="#334155"/>
+                                    <TextBlock Text="Last reply: reader produces stable HistorySessionInfo records."
+                                               TextWrapping="Wrap"
+                                               Foreground="#64748B"
+                                               FontSize="12"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2"
+                                            Orientation="Horizontal"
+                                            Spacing="8"
+                                            VerticalAlignment="Top">
+                                    <Button Content="Resume"
+                                            MinWidth="72"
+                                            IsEnabled="False"/>
+                                    <Button Content="Reedit"
+                                            MinWidth="72"
+                                            IsEnabled="False"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="3"
+                              MinHeight="160"
+                              IsVisible="False">
+                            <TextBlock Text="No sessions for current workspace"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="#64748B"/>
+                        </Grid>
+                    </Grid>
+                </ScrollViewer>
+
+                <Grid Grid.Row="1"
+                      Background="#FFFFFF"
+                      IsVisible="False">
+                    <TextBlock Text="Loading sessions..."
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="#64748B"/>
+                </Grid>
+
+                <Grid Grid.Row="1"
+                      Background="#FFFFFF"
+                      IsVisible="False">
+                    <Border Background="#FEF2F2"
+                            BorderBrush="#FCA5A5"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            MaxWidth="460">
+                        <TextBlock Text="Could not load session history."
+                                   TextWrapping="Wrap"
+                                   Foreground="#991B1B"/>
+                    </Border>
+                </Grid>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>
