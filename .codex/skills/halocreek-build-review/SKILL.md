@@ -1,6 +1,6 @@
 ---
 name: halocreek-build-review
-description: Build, validate, and launch the HaloCreek Avalonia desktop app from this repository. Use when Codex is asked to compile HaloCreek, verify build health, run the app, or start the Windows desktop window for human review from WSL/agent context.
+description: Build and validate the HaloCreek Avalonia desktop app from this repository, and only launch the Windows desktop window when the user explicitly asks for it. Use when Codex is asked to compile HaloCreek, verify build health, run the app, or start the Windows desktop window for human review from WSL/agent context.
 ---
 
 # HaloCreek Build Review
@@ -31,6 +31,8 @@ Report the output assembly path if present, normally:
 D:\work\halocreek\HaloCreek\bin\Debug\net10.0\HaloCreek.dll
 ```
 
+If the build fails because `HaloCreek.exe`, `HaloCreek.dll`, or another output file is locked by a running HaloCreek process, report the locked file/process from the build output. Do not kill the process, do not switch to an alternate output directory, and do not launch another app window unless the user explicitly asks for that recovery step.
+
 If Windows `.exe` interop fails with `cannot execute binary file: Exec format error`, check `/etc/wsl.conf` for:
 
 ```ini
@@ -43,7 +45,9 @@ After changing that file, the user must run `wsl --shutdown` from Windows PowerS
 
 ## Launch For Review
 
-When the user wants to review the window, launch the already-built Windows executable detached from the agent process. Run this from the repository root and keep the app path relative to the workspace:
+Only launch the app when the user explicitly asks to open or review the desktop window. Do this after all requested edits, builds, and checks are complete. Do not launch automatically after a successful build.
+
+When launch is explicitly requested, launch the already-built Windows executable detached from the agent process. Run this from the repository root and keep the app path relative to the workspace:
 
 ```bash
 /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -Command "Start-Process -FilePath '.\HaloCreek\bin\Debug\net10.0\HaloCreek.exe'"
