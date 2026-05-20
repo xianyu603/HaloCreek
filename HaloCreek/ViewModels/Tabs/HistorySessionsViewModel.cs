@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.Services.SessionHistory;
@@ -23,6 +24,8 @@ namespace HaloCreek.ViewModels.Tabs
         public HistorySessionsViewModel(SessionHistoryService sessionHistoryService)
         {
             _sessionHistoryService = sessionHistoryService;
+            ResumeCommand = new RelayCommand<HistorySessionInfo>(ResumePlaceholder);
+            ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPromptPlaceholder);
         }
 
         public string SearchText
@@ -46,8 +49,23 @@ namespace HaloCreek.ViewModels.Tabs
         public IReadOnlyList<HistorySessionInfo> Sessions
         {
             get => _sessions;
-            private set => SetProperty(ref _sessions, value);
+            private set
+            {
+                if (SetProperty(ref _sessions, value))
+                {
+                    OnPropertyChanged(nameof(HasSessions));
+                    OnPropertyChanged(nameof(IsEmptyStateVisible));
+                }
+            }
         }
+
+        public bool HasSessions => Sessions.Count > 0;
+
+        public bool IsEmptyStateVisible => !HasSessions;
+
+        public IRelayCommand<HistorySessionInfo> ResumeCommand { get; }
+
+        public IRelayCommand<HistorySessionInfo> ReeditInitialPromptCommand { get; }
 
         public void SetWorkspacePath(string workspacePath)
         {
@@ -57,7 +75,15 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void RefreshSessions()
         {
-            Sessions = _sessionHistoryService.SearchSessions(WorkspacePath, SearchText);
+            Sessions = _sessionHistoryService.GetFilteredSessions(WorkspacePath, SearchText);
+        }
+
+        private static void ResumePlaceholder(HistorySessionInfo? session)
+        {
+        }
+
+        private static void ReeditInitialPromptPlaceholder(HistorySessionInfo? session)
+        {
         }
     }
 }

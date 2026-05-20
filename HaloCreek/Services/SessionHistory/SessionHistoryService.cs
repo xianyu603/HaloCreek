@@ -27,7 +27,7 @@ namespace HaloCreek.Services.SessionHistory
                 .ToArray();
         }
 
-        public IReadOnlyList<HistorySessionInfo> SearchSessions(string? workspacePath, string? searchText)
+        public IReadOnlyList<HistorySessionInfo> GetFilteredSessions(string? workspacePath, string? searchText)
         {
             var sessions = GetSessions(workspacePath);
 
@@ -40,9 +40,7 @@ namespace HaloCreek.Services.SessionHistory
 
             return sessions
                 .Where(session =>
-                    Contains(session.Title, query) ||
-                    Contains(session.InitialPromptPreview, query) ||
-                    Contains(session.WorkspacePath, query))
+                    Contains(session.InitialPrompt, query))
                 .ToArray();
         }
 
