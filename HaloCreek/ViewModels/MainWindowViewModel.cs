@@ -1,7 +1,9 @@
 ﻿// agent 开发平台
 
 using System;
+using System.Threading.Tasks;
 using HaloCreek.Infrastructure;
+using HaloCreek.Services;
 using HaloCreek.ViewModels.Components;
 using HaloCreek.ViewModels.Tabs;
 
@@ -9,14 +11,15 @@ namespace HaloCreek.ViewModels
 {
     public partial class MainWindowViewModel : ViewModelBase
     {
-        private const string InvalidWorkspacePathStatusText = "Invalid workspace path";
-        private const string ReadyStatusText = "Ready";
+        private const string ConfigErrorDialogTitle = "Config error";
 
         private readonly PlatformInfrastructure _platformInfrastructure;
+        private readonly ConfigService _configService;
         private string? _currentWorkspacePath;
 
         public MainWindowViewModel(
             PlatformInfrastructure platformInfrastructure,
+            ConfigService configService,
             PromptEditorViewModel promptEditor,
             HistorySessionsViewModel historySessions,
             OngoingSessionsViewModel ongoingSessions,
@@ -24,13 +27,14 @@ namespace HaloCreek.ViewModels
             WorkspaceFooterViewModel workspaceFooter)
         {
             _platformInfrastructure = platformInfrastructure ?? throw new ArgumentNullException(nameof(platformInfrastructure));
+            _configService = configService ?? throw new ArgumentNullException(nameof(configService));
             PromptEditor = promptEditor;
             HistorySessions = historySessions;
             OngoingSessions = ongoingSessions;
             Git = git;
             WorkspaceFooter = workspaceFooter;
 
-            WorkspaceFooter.SetWorkspaceDispatcher(SetWorkspacePath);
+            WorkspaceFooter.SetWorkspaceDispatcher(ApplyValidatedWorkspacePath);
             PromptEditor.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
         }
 
@@ -50,22 +54,41 @@ namespace HaloCreek.ViewModels
             private set => SetProperty(ref _currentWorkspacePath, value);
         }
 
-        public void SetWorkspacePath(string? workspacePath)
+        public async Task LoadConfigAndApplyDefaultWorkspaceAsync()
         {
-            if (!_platformInfrastructure.TryNormalizeExistingDirectoryPath(workspacePath, out var normalizedPath))
+            // TODO 思考一下workspace没有的时候如何聚合global和workspace config
+            var defaultWorkspacePath = _configService.LoadEffectiveConfig(null).DefaultWorkspacePath;
+            if (string.IsNullOrWhiteSpace(defaultWorkspacePath))
             {
-                WorkspaceFooter.StatusText = InvalidWorkspacePathStatusText;
                 return;
             }
 
-            CurrentWorkspacePath = normalizedPath;
+            if (!_platformInfrastructure.TryNormalizeExistingDirectoryPath(defaultWorkspacePath, out var normalizedPath))
+            {
+                await ShowConfigErrorAsync(
+                    $"DefaultWorkspacePath in config is not an existing directory: {defaultWorkspacePath}");
+                return;
+            }
 
-            PromptEditor.SetWorkspacePath(normalizedPath);
-            HistorySessions.SetWorkspacePath(normalizedPath);
-            OngoingSessions.SetWorkspacePath(normalizedPath);
-            Git.SetWorkspacePath(normalizedPath);
-            WorkspaceFooter.SetWorkspacePath(normalizedPath);
-            WorkspaceFooter.StatusText = ReadyStatusText;
+            ApplyValidatedWorkspacePath(normalizedPath);
+        }
+
+        private Task ShowConfigErrorAsync(string message)
+        {
+            return _platformInfrastructure.ShowErrorDialogAsync(ConfigErrorDialogTitle, message);
+        }
+
+        public void ApplyValidatedWorkspacePath(string workspacePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
+            CurrentWorkspacePath = workspacePath;
+
+            PromptEditor.SetWorkspacePath(workspacePath);
+            HistorySessions.SetWorkspacePath(workspacePath);
+            OngoingSessions.SetWorkspacePath(workspacePath);
+            Git.SetWorkspacePath(workspacePath);
+            WorkspaceFooter.SetWorkspacePath(workspacePath);
         }
     }
 }

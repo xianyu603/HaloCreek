@@ -9,11 +9,13 @@ namespace HaloCreek.ViewModels.Components
     {
         private const string NoWorkspaceSelectedText = "No workspace selected";
         private const string ReadyStatusText = "Ready";
+        private const string InvalidWorkspacePathStatusText = "Invalid workspace path";
+        private const string CanceledWorkspaceSelectionStatusText = "Canceled selected workspace.";
         private const string SelectingWorkspaceStatusText = "Selecting workspace...";
         private const string WorkspaceDispatcherNotConnectedStatusText = "Workspace dispatcher is not connected";
 
         private readonly PlatformInfrastructure _platformInfrastructure;
-        private Action<string?>? _setWorkspace;
+        private Action<string>? _applyValidatedWorkspace;
         private string _workspacePath = NoWorkspaceSelectedText;
         private string _statusText = ReadyStatusText;
 
@@ -42,14 +44,14 @@ namespace HaloCreek.ViewModels.Components
             WorkspacePath = workspacePath;
         }
 
-        public void SetWorkspaceDispatcher(Action<string?> setWorkspace)
+        public void SetWorkspaceDispatcher(Action<string> applyValidatedWorkspace)
         {
-            _setWorkspace = setWorkspace ?? throw new ArgumentNullException(nameof(setWorkspace));
+            _applyValidatedWorkspace = applyValidatedWorkspace ?? throw new ArgumentNullException(nameof(applyValidatedWorkspace));
         }
 
         private async Task ChooseWorkspaceAsync()
         {
-            if (_setWorkspace is null)
+            if (_applyValidatedWorkspace is null)
             {
                 StatusText = WorkspaceDispatcherNotConnectedStatusText;
                 return;
@@ -57,14 +59,31 @@ namespace HaloCreek.ViewModels.Components
 
             StatusText = SelectingWorkspaceStatusText;
 
-            var selectedPath = await _platformInfrastructure.SelectDirectoryAsync();
-            if (selectedPath is null)
+            string? selectedPath;
+            try
             {
-                StatusText = ReadyStatusText;
+                selectedPath = await _platformInfrastructure.SelectDirectoryAsync();
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Workspace picker failed: {ex.Message}";
                 return;
             }
 
-            _setWorkspace(selectedPath);
+            if (string.IsNullOrWhiteSpace(selectedPath))
+            {
+                StatusText = CanceledWorkspaceSelectionStatusText;
+                return;
+            }
+
+            if (!_platformInfrastructure.TryNormalizeExistingDirectoryPath(selectedPath, out var normalizedPath))
+            {
+                StatusText = InvalidWorkspacePathStatusText;
+                return;
+            }
+
+            _applyValidatedWorkspace(normalizedPath);
+            StatusText = $"Selected workspace {normalizedPath}.";
         }
     }
 }

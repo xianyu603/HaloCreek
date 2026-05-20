@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 
 namespace HaloCreek.Infrastructure
@@ -23,7 +25,7 @@ namespace HaloCreek.Infrastructure
         {
             if (!_owner.StorageProvider.CanPickFolder)
             {
-                return null;
+                throw new InvalidOperationException("Folder picker is not available.");
             }
 
             var folders = await _owner.StorageProvider.OpenFolderPickerAsync(
@@ -42,6 +44,11 @@ namespace HaloCreek.Infrastructure
             {
                 var folder = folders[0];
                 var localPath = folder.TryGetLocalPath();
+                if (string.IsNullOrWhiteSpace(localPath))
+                {
+                    throw new InvalidOperationException("Selected folder does not expose a local path.");
+                }
+
                 return localPath;
             }
             finally
@@ -51,6 +58,46 @@ namespace HaloCreek.Infrastructure
                     folder.Dispose();
                 }
             }
+        }
+
+        public async Task ShowErrorDialogAsync(string title, string message)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(title);
+            ArgumentException.ThrowIfNullOrWhiteSpace(message);
+
+            var dialog = new Window
+            {
+                Title = title,
+                Width = 520,
+                SizeToContent = SizeToContent.Height,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                CanResize = false,
+            };
+
+            var closeButton = new Button
+            {
+                Content = "OK",
+                MinWidth = 80,
+                HorizontalAlignment = HorizontalAlignment.Right,
+            };
+            closeButton.Click += (_, _) => dialog.Close();
+
+            dialog.Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(20),
+                Spacing = 16,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = message,
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                    closeButton,
+                },
+            };
+
+            await dialog.ShowDialog(_owner);
         }
 
         /// <summary>

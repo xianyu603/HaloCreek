@@ -23,7 +23,9 @@ namespace HaloCreek
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var mainWindow = new MainWindow();
-                mainWindow.DataContext = CreateMainWindowViewModel(mainWindow);
+                var mainWindowViewModel = CreateMainWindowViewModel(mainWindow);
+                mainWindow.DataContext = mainWindowViewModel;
+                mainWindow.Opened += async (_, _) => await mainWindowViewModel.LoadConfigAndApplyDefaultWorkspaceAsync();
                 desktop.MainWindow = mainWindow;
             }
 
@@ -50,15 +52,12 @@ namespace HaloCreek
 
             var mainWindowViewModel = new MainWindowViewModel(
                 platformInfrastructure,
+                configService,
                 promptEditor,
                 historySessions,
                 ongoingSessions,
                 git,
                 workspaceFooter);
-
-            var defaultWorkspacePath = configService.LoadEffectiveConfig(null).DefaultWorkspacePath;
-            // TODO: 未来走Cache并支持多workspace选择。
-            mainWindowViewModel.SetWorkspacePath(defaultWorkspacePath);
 
             return mainWindowViewModel;
         }

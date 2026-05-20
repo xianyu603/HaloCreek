@@ -28,3 +28,4 @@ tab3 只进行简单的list展示和接入 不做stash 不做add 先尝试接小
 6. git info tab
 7. Config 化，在此之前配置先写死
 	实现了初版 做到这个阶段的时候重新review一下
+
