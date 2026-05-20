@@ -1,4 +1,4 @@
-﻿---
+---
 name: halocreek-build-review
 description: Build and validate the HaloCreek Avalonia desktop app from this repository, and only launch the Windows desktop window when the user explicitly asks for it. Use when Codex is asked to compile HaloCreek, verify build health, run the app, or start the Windows desktop window for human review from WSL/agent context.
 ---
