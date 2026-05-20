@@ -1,4 +1,4 @@
-# MVP1 阶段 4：History Session Tab 执行说明
+﻿# MVP1 阶段 4：History Session Tab 执行说明
 
 ## 1. 目标
 

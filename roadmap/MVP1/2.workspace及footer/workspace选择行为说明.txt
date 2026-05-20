@@ -1,4 +1,4 @@
-workspace选择框 如果返回空，设置status bar为canceled text；返回不存在/错误的路径，设置status bar；返回存在的路径，设置status bar并setworkspace
+﻿workspace选择框 如果返回空，设置status bar为canceled text；返回不存在/错误的路径，设置status bar；返回存在的路径，设置status bar并setworkspace
 从config读到的路径 如果为空忽略 如果路径不存在/错误，走统一的config错误处理(暂定为弹框提醒哪里错了)，如果存在直接setworkspace，不设置status bar
 逻辑整理:
 将现有的加载配置并应用挪到Main VM中

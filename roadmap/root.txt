@@ -1,4 +1,4 @@
-MVP1 codex shell warpper
+﻿MVP1 codex shell warpper
 workspace选择 footer
 提示词编辑器 一键以提示词启动codex
 历史session选择 reedit/resume with prompt

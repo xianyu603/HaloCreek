@@ -1,4 +1,4 @@
-# Status Bar Notes
+﻿# Status Bar Notes
 
 短期不严肃设计 status bar，不引入统一状态仲裁、优先级队列或状态事件模型。
 
