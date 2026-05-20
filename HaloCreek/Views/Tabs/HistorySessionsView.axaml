@@ -5,32 +5,30 @@
              x:Name="HistorySessionsRoot"
              x:DataType="vm:HistorySessionsViewModel"
              x:Class="HaloCreek.Views.Tabs.HistorySessionsView">
-    <Grid RowDefinitions="Auto,*"
+    <Grid RowDefinitions="Auto,*,Auto"
           Margin="20"
           RowSpacing="12">
         <Grid Grid.Row="0"
-              ColumnDefinitions="*,Auto,Auto,Auto"
+              ColumnDefinitions="*,Auto,Auto"
               ColumnSpacing="8">
             <TextBox Grid.Column="0"
                      Height="36"
                      Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      PlaceholderText="Search initial prompt"/>
             <Button Grid.Column="1"
-                    Content="Detail"
-                    MinWidth="84"
-                    Height="36"
-                    Command="{Binding DetailCommand}"
-                    CommandParameter="{Binding SelectedSession}"/>
-            <Button Grid.Column="2"
                     Content="Resume"
                     MinWidth="84"
                     Height="36"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
                     Command="{Binding ResumeCommand}"
                     CommandParameter="{Binding SelectedSession}"/>
-            <Button Grid.Column="3"
+            <Button Grid.Column="2"
                     Content="Reedit"
                     MinWidth="84"
                     Height="36"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
                     Command="{Binding ReeditInitialPromptCommand}"
                     CommandParameter="{Binding SelectedSession}"/>
         </Grid>
@@ -54,7 +52,7 @@
                                    FontSize="12"
                                    FontWeight="SemiBold"/>
                         <TextBlock Grid.Column="1"
-                                   Text="InitialPrompt"
+                                   Text="Initial Prompt"
                                    VerticalAlignment="Center"
                                    Foreground="#475569"
                                    FontSize="12"
@@ -182,5 +180,14 @@
                 </Grid>
             </Grid>
         </Border>
+
+        <TextBox Grid.Row="2"
+                 Height="160"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 Text="{Binding SelectedSessionSummaryText, Mode=OneWay}"
+                 PlaceholderText="Select a session to view prompt and reply text"/>
     </Grid>
 </UserControl>

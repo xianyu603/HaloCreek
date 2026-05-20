@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 
 namespace HaloCreek.Models
@@ -14,6 +14,23 @@ namespace HaloCreek.Models
         string SessionFilePath)
     {
         public string InitialPromptText => RemoveBlankLines(InitialPrompt);
+        // 这里的Getter是model还是 model view? 不纠结再用到的时候再说
+        public string SessionSummaryText
+        {
+            get
+            {
+                var initialPrompt = RemoveBlankLines(InitialPrompt);
+                var lastPrompt = RemoveBlankLines(LastPrompt);
+                string ret = $"Initial Prompt:{Environment.NewLine}{initialPrompt}{Environment.NewLine}{Environment.NewLine}";
+
+                if (!string.Equals(lastPrompt.Trim(), initialPrompt.Trim(), StringComparison.Ordinal))
+                {
+                    ret += $"Last Prompt:{Environment.NewLine}{lastPrompt}{Environment.NewLine}{Environment.NewLine}";
+                }
+                ret += $"Last Reply:{Environment.NewLine}{RemoveBlankLines(LastReply)}";
+                return ret;
+            }
+        }
 
         public string LatestActivityText
         {

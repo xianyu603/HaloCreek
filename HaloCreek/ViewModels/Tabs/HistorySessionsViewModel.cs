@@ -30,7 +30,6 @@ namespace HaloCreek.ViewModels.Tabs
             _sessionHistoryService = sessionHistoryService;
             ResumeCommand = new RelayCommand<HistorySessionInfo>(ResumePlaceholder, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPromptPlaceholder, HasSelectedSession);
-            DetailCommand = new RelayCommand<HistorySessionInfo>(DetailPlaceholder, HasSelectedSession);
         }
 
         public string SearchText
@@ -73,7 +72,7 @@ namespace HaloCreek.ViewModels.Tabs
                 {
                     ResumeCommand.NotifyCanExecuteChanged();
                     ReeditInitialPromptCommand.NotifyCanExecuteChanged();
-                    DetailCommand.NotifyCanExecuteChanged();
+                    OnPropertyChanged(nameof(SelectedSessionSummaryText));
                 }
             }
         }
@@ -82,11 +81,11 @@ namespace HaloCreek.ViewModels.Tabs
 
         public bool IsEmptyStateVisible => !HasSessions;
 
+        public string SelectedSessionSummaryText => SelectedSession?.SessionSummaryText ?? string.Empty;
+
         public IRelayCommand<HistorySessionInfo> ResumeCommand { get; }
 
         public IRelayCommand<HistorySessionInfo> ReeditInitialPromptCommand { get; }
-
-        public IRelayCommand<HistorySessionInfo> DetailCommand { get; }
 
         public void SetWorkspacePath(string workspacePath)
         {
@@ -149,10 +148,6 @@ namespace HaloCreek.ViewModels.Tabs
         }
 
         private static void ReeditInitialPromptPlaceholder(HistorySessionInfo? session)
-        {
-        }
-
-        private static void DetailPlaceholder(HistorySessionInfo? session)
         {
         }
     }
