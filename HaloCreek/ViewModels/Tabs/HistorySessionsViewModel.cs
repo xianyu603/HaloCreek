@@ -94,7 +94,6 @@ namespace HaloCreek.ViewModels.Tabs
             _loadedSessions = Array.Empty<HistorySessionInfo>();
             ApplySearch();
             _sessionHistoryRefreshService.SetWorkspacePath(workspacePath);
-            _sessionHistoryRefreshService.RequestRefresh();
         }
 
         public void SetStatusDispatcher(Action<string> statusDispatcher)
@@ -106,10 +105,15 @@ namespace HaloCreek.ViewModels.Tabs
         {
             Sessions = FilterSessions(_loadedSessions, SearchText);
 
-            if (SelectedSession is not null && !Sessions.Contains(SelectedSession))
+            if (SelectedSession is null)
             {
-                SelectedSession = null;
+                return;
             }
+
+            var refreshedSelection = Sessions.FirstOrDefault(
+                session => string.Equals(session.Id, SelectedSession.Id, StringComparison.Ordinal));
+
+            SelectedSession = refreshedSelection;
         }
 
         private static IReadOnlyList<HistorySessionInfo> FilterSessions(

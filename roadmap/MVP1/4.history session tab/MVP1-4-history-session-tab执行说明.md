@@ -257,7 +257,7 @@ HistorySessionsViewModel
 - [x] **4-T04 补齐列表展示字段解析纵切**：为“列表展示可读上下文”在 T03 的真实 session 基础上补齐文本字段解析，只处理 `InitialPrompt`、`LastPrompt`、`LastReply` 三个字段和对应坏文件跳过策略；不再改 history root 定位、路径等价、文件枚举限制、`Id`、`WorkspacePath`、`CreatedAt`、`LastUpdatedAt`、`SessionFilePath` 的解析边界。验收点是 UI 中能看到真实初始 prompt、最后 prompt、最后回复，缺少文本字段时按本任务规则降级或跳过，且不会拖垮整个列表。
 - [x] **4-T05 接通搜索业务纵切**：将 `SessionHistoryService` 搜索范围改为只过滤已加载 session 的 `InitialPrompt`，保持搜索框即时过滤；验收点是搜索不会重新扫描文件，且不会匹配 `Id`、`WorkspacePath`、`LastPrompt`、`LastReply`。
 - [x] **4-T05a History Session 详情区 UI 修正**：删除右上角 `Detail` 按钮和相关命令；在列表下方增加只读可复制文本框，按 `Initial Prompt / Last Prompt / Last Reply` 展示选中 session 文本，三个文本字段展示前先去掉空行；列表标题改为 `Initial Prompt`，右上角剩余 `Resume` / `Reedit` 按钮文本居中。
-- [ ] **4-T06 接通定时刷新纵切**：为“workspace 不变时历史列表自动更新”实现固定间隔重新扫描；workspace 切换后的立即加载沿用 T03 已完成能力，搜索只作用于当前已加载结果，不提供手动 `Refresh` 按钮；验收点是不切换 workspace，仅等待定时周期也能发现新增或变化的 session 文件。
+- [x] **4-T06 接通定时刷新纵切**：为“workspace 不变时历史列表自动更新”实现固定间隔重新扫描；workspace 切换后的立即加载沿用 T03 已完成能力，搜索只作用于当前已加载结果，不提供手动 `Refresh` 按钮；验收点是不切换 workspace，仅等待定时周期也能发现新增或变化的 session 文件。
 - [ ] **4-T07 接通 Resume 纵切**：为“从历史列表恢复 session”同时实现 `SessionLifecycleService.Resume(session, currentWorkspacePath, config)`、Terminal 启动参数、行内 `ResumeCommand` 和 Footer 状态同步；验收点是点击行内 `Resume` 会在当前 workspace 执行 `codex resume <session-id>`。
 - [ ] **4-T08 接通 Reedit Initial Prompt 纵切**：为“重新编辑初始 prompt”同时实现 History 到 Prompt Editor 的跨 tab 分发、填充 `InitialPrompt`、切换到 Prompt Editor 页签；验收点是点击 `Reedit` 只填回 prompt，不自动 launch，也不执行 `codex fork`。
 - [ ] **4-T09 构建与人工验收**：构建项目，选择 workspace 后按 UI 布局、真实列表、字段展示、搜索、定时刷新、Resume、Reedit、错误态逐项验收。
