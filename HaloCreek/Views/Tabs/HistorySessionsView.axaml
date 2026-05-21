@@ -105,12 +105,12 @@
                                         <StackPanel Grid.Column="0"
                                                     Spacing="6"
                                                     VerticalAlignment="Top">
-                                            <TextBlock Text="{Binding CreatedAt, StringFormat='Created time {0:g}'}"
+                                            <TextBlock Text="{Binding CreatedAtLocalText, StringFormat='Created {0}'}"
                                                        TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"
                                                        Foreground="#334155"
                                                        FontSize="12"/>
-                                            <TextBlock Text="{Binding LastUpdatedAt, StringFormat='Updated Time {0:g}'}"
+                                            <TextBlock Text="{Binding LastUpdatedAtLocalText, StringFormat='Updated {0}'}"
                                                        TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"
                                                        Foreground="#64748B"

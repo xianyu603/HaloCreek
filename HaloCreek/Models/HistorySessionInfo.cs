@@ -13,6 +13,10 @@ namespace HaloCreek.Models
         string LastReply,
         string SessionFilePath)
     {
+        public string CreatedAtLocalText => FormatLocalTime(CreatedAt);
+
+        public string LastUpdatedAtLocalText => FormatLocalTime(LastUpdatedAt);
+
         public string InitialPromptText => RemoveBlankLines(InitialPrompt);
         // 这里的Getter是model还是 model view? 不纠结再用到的时候再说
         public string SessionSummaryText
@@ -53,6 +57,11 @@ namespace HaloCreek.Models
 
                 return $"Last prompt: {lastPrompt}{Environment.NewLine}Last reply: {lastReply}";
             }
+        }
+
+        private static string FormatLocalTime(DateTimeOffset timestamp)
+        {
+            return timestamp.ToLocalTime().ToString("g");
         }
 
         private static string RemoveBlankLines(string? text)
