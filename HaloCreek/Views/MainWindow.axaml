@@ -15,7 +15,8 @@
         MinHeight="640">
 
     <Grid RowDefinitions="*,Auto">
-        <TabControl Grid.Row="0">
+        <TabControl Grid.Row="0"
+                    SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
             <TabItem Header="Prompt Editor">
                 <tabs:PromptEditorView DataContext="{Binding PromptEditor}"/>
             </TabItem>

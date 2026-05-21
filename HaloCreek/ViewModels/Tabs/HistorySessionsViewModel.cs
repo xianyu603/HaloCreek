@@ -11,10 +11,13 @@ namespace HaloCreek.ViewModels.Tabs
     public sealed class HistorySessionsViewModel : ViewModelBase
     {
         private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
+        private readonly SessionLifecycleService? _sessionLifecycleService;
+        private readonly ConfigService? _configService;
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
         private HistorySessionInfo? _selectedSession;
+        private Action<HistorySessionInfo>? _reeditInitialPromptDispatcher;
         private Action<string>? _statusDispatcher;
         private string? _workspacePath;
 
@@ -25,12 +28,17 @@ namespace HaloCreek.ViewModels.Tabs
         {
         }
 
-        public HistorySessionsViewModel(SessionHistoryRefreshService sessionHistoryRefreshService)
+        public HistorySessionsViewModel(
+            SessionHistoryRefreshService sessionHistoryRefreshService,
+            SessionLifecycleService? sessionLifecycleService = null,
+            ConfigService? configService = null)
         {
             _sessionHistoryRefreshService = sessionHistoryRefreshService;
+            _sessionLifecycleService = sessionLifecycleService;
+            _configService = configService;
             _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
-            ResumeCommand = new RelayCommand<HistorySessionInfo>(ResumePlaceholder, HasSelectedSession);
-            ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPromptPlaceholder, HasSelectedSession);
+            ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
+            ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
         }
 
         public string SearchText
@@ -101,6 +109,12 @@ namespace HaloCreek.ViewModels.Tabs
             _statusDispatcher = statusDispatcher ?? throw new ArgumentNullException(nameof(statusDispatcher));
         }
 
+        public void SetReeditInitialPromptDispatcher(Action<HistorySessionInfo> reeditInitialPromptDispatcher)
+        {
+            _reeditInitialPromptDispatcher = reeditInitialPromptDispatcher
+                ?? throw new ArgumentNullException(nameof(reeditInitialPromptDispatcher));
+        }
+
         private void ApplySearch()
         {
             Sessions = FilterSessions(_loadedSessions, SearchText);
@@ -160,8 +174,22 @@ namespace HaloCreek.ViewModels.Tabs
             }
         }
 
-        private static void ResumePlaceholder(HistorySessionInfo? session)
+        private void Resume(HistorySessionInfo? session)
         {
+            if (session is null)
+            {
+                return;
+            }
+
+            if (_sessionLifecycleService is null || _configService is null)
+            {
+                _statusDispatcher?.Invoke("Resume is not available.");
+                return;
+            }
+
+            var config = _configService.LoadEffectiveConfig(WorkspacePath);
+            var result = _sessionLifecycleService.Resume(session, WorkspacePath ?? string.Empty, config);
+            _statusDispatcher?.Invoke(result.StatusMessage);
         }
 
         private static bool HasSelectedSession(HistorySessionInfo? session)
@@ -169,8 +197,33 @@ namespace HaloCreek.ViewModels.Tabs
             return session is not null;
         }
 
-        private static void ReeditInitialPromptPlaceholder(HistorySessionInfo? session)
+        private void ReeditInitialPrompt(HistorySessionInfo? session)
         {
+            if (session is null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(session.InitialPrompt))
+            {
+                _statusDispatcher?.Invoke("Initial prompt is empty.");
+                return;
+            }
+
+            if (_reeditInitialPromptDispatcher is null)
+            {
+                _statusDispatcher?.Invoke("Prompt editor is not available.");
+                return;
+            }
+
+            try
+            {
+                _reeditInitialPromptDispatcher.Invoke(session);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _statusDispatcher?.Invoke($"Failed to reedit initial prompt: {ex.Message}");
+            }
         }
     }
 }

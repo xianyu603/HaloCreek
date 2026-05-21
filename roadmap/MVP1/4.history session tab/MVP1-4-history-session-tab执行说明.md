@@ -258,8 +258,8 @@ HistorySessionsViewModel
 - [x] **4-T05 接通搜索业务纵切**：将 `SessionHistoryService` 搜索范围改为只过滤已加载 session 的 `InitialPrompt`，保持搜索框即时过滤；验收点是搜索不会重新扫描文件，且不会匹配 `Id`、`WorkspacePath`、`LastPrompt`、`LastReply`。
 - [x] **4-T05a History Session 详情区 UI 修正**：删除右上角 `Detail` 按钮和相关命令；在列表下方增加只读可复制文本框，按 `Initial Prompt / Last Prompt / Last Reply` 展示选中 session 文本，三个文本字段展示前先去掉空行；列表标题改为 `Initial Prompt`，右上角剩余 `Resume` / `Reedit` 按钮文本居中。
 - [x] **4-T06 接通定时刷新纵切**：为“workspace 不变时历史列表自动更新”实现固定间隔重新扫描；workspace 切换后的立即加载沿用 T03 已完成能力，搜索只作用于当前已加载结果，不提供手动 `Refresh` 按钮；验收点是不切换 workspace，仅等待定时周期也能发现新增或变化的 session 文件。
-- [ ] **4-T07 接通 Resume 纵切**：为“从历史列表恢复 session”同时实现 `SessionLifecycleService.Resume(session, currentWorkspacePath, config)`、Terminal 启动参数、行内 `ResumeCommand` 和 Footer 状态同步；验收点是点击行内 `Resume` 会在当前 workspace 执行 `codex resume <session-id>`。
-- [ ] **4-T08 接通 Reedit Initial Prompt 纵切**：为“重新编辑初始 prompt”同时实现 History 到 Prompt Editor 的跨 tab 分发、填充 `InitialPrompt`、切换到 Prompt Editor 页签；验收点是点击 `Reedit` 只填回 prompt，不自动 launch，也不执行 `codex fork`。
+- [x] **4-T07 接通 Resume 纵切**：为“从历史列表恢复 session”同时实现 `SessionLifecycleService.Resume(session, currentWorkspacePath, config)`、Terminal 启动参数、行内 `ResumeCommand` 和 Footer 状态同步；验收点是点击行内 `Resume` 会在当前 workspace 执行 `codex resume <session-id>`。
+- [x] **4-T08 接通 Reedit Initial Prompt 纵切**：为“重新编辑初始 prompt”同时实现 History 到 Prompt Editor 的跨 tab 分发、填充 `InitialPrompt`、切换到 Prompt Editor 页签；验收点是点击 `Reedit` 只填回 prompt，不自动 launch，也不执行 `codex fork`。
 - [ ] **4-T09 构建与人工验收**：构建项目，选择 workspace 后按 UI 布局、真实列表、字段展示、搜索、定时刷新、Resume、Reedit、错误态逐项验收。
 
 ## 6. 错误处理决策
@@ -317,8 +317,8 @@ HistorySessionsViewModel
 
 执行工作项：`4-T07`
 
-- 当前 workspace 为空属于编程错误，正常操作路径不会出现；`SessionLifecycleService.Resume(...)` 应抛异常，不作为可恢复 UI 状态处理。
-- session id 为空属于编程错误，正常操作路径不会出现；`SessionLifecycleService.Resume(...)` 应抛异常，不作为可恢复 UI 状态处理。
+- 当前 workspace 为空时，`SessionLifecycleService.Resume(...)` 与 `Launch(...)` 一样返回失败结果并更新 Footer。
+- session 或 session id 为空时，`SessionLifecycleService.Resume(...)` 与 `Launch(...)` 的空 prompt 一样返回失败结果并更新 Footer。
 - `codex resume <session-id>` 的 Terminal 启动失败时返回失败结果并更新 Footer。
 - Resume 不把进程加入 Ongoing Sessions，留到阶段 5 处理。
 
@@ -376,3 +376,11 @@ HistorySessionsViewModel
 - `LastPrompt` 会读取最后一条 `event_msg user_message`，`LastReply` 会读取最后一条 `event_msg agent_message`；不静默切换到 `response_item` 文本形态。
 - 仅包含环境上下文的 user message 会被跳过；文本字段缺失、为空或结构不认识时保留空字符串，不影响该 session 的基础列表字段展示。
 - 已执行构建验证：`dotnet build HaloCreek/HaloCreek.csproj` 通过，结果为 `0 个警告`、`0 个错误`。
+
+### 2026-05-21：完成 4-T07 Resume 纵切与 4-T08 Reedit Initial Prompt 纵切
+
+- `SessionLifecycleService` 已新增 `Resume(session, currentWorkspacePath, config)`，通过既有 Terminal/WSL 启动边界执行 `codex resume <session-id>`；workspace、session 或 session id 为空时与 `Launch(...)` 的空 prompt 一样返回失败状态，Terminal 启动失败也返回失败状态。
+- `HistorySessionsViewModel` 已将 `ResumeCommand` 接入真实 resume 流程，读取当前 workspace 的有效配置，并把 resume 结果同步到 Footer。
+- `HistorySessionsViewModel` 已将 `ReeditInitialPromptCommand` 接入跨 tab 分发；`InitialPrompt` 为空时只更新 Footer 状态，不启动任何进程。
+- `MainWindowViewModel` 负责把历史 session 的 `InitialPrompt` 填入 `PromptEditorViewModel.PromptText`，并通过 `SelectedTabIndex` 切换到 Prompt Editor 页签；该路径不自动 launch，也不执行 `codex fork`。
+- 已执行构建验证：`'/mnt/c/Program Files/dotnet/dotnet.exe' build HaloCreek/HaloCreek.csproj` 通过，输出 `D:\work\HaloCreek\HaloCreek\bin\Debug\net10.0\HaloCreek.dll`，结果为 `0 个警告`、`0 个错误`。
