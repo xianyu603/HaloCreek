@@ -253,6 +253,7 @@ namespace HaloCreek.Services
                 _frontSessionId = null;
             }
 
+            _tmuxService.Cleanup();
             SessionsChanged?.Invoke(this, EventArgs.Empty);
         }
 

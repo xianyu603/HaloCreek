@@ -14,16 +14,20 @@ namespace HaloCreek.Services
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly string _frontClientId;
         private readonly string _frontClientTtyMarkerPath;
+        private readonly string _keeperSessionId;
+        private string? _frontSessionId;
 
         public TmuxService(PlatformInfrastructure platformInfrastructure)
         {
             _platformInfrastructure = platformInfrastructure
                 ?? throw new ArgumentNullException(nameof(platformInfrastructure));
             _frontClientId = Guid.NewGuid().ToString("N")[..8];
+            _keeperSessionId = "halocreek-keeper-" + _frontClientId;
             _frontClientTtyMarkerPath = HaloCreekTempDirectory
                 + "/front-client-"
                 + _frontClientId
                 + ".tty";
+            EnsureKeeperSession();
         }
 
         public event EventHandler<TmuxSessionStateChangedEventArgs>? StateChanged;
@@ -62,6 +66,12 @@ namespace HaloCreek.Services
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
+            if (string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
+            {
+                SwitchFrontClientCore(_keeperSessionId);
+                _frontSessionId = null;
+            }
+
             TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
         }
 
@@ -87,6 +97,20 @@ namespace HaloCreek.Services
         }
 
         public void SwitchFrontClient(string identifier)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+            SwitchFrontClientCore(identifier);
+            _frontSessionId = identifier;
+        }
+
+        public void Cleanup()
+        {
+            _frontSessionId = null;
+            TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
+        }
+
+        private void SwitchFrontClientCore(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
@@ -145,6 +169,18 @@ namespace HaloCreek.Services
             TryRunTmuxCommand(
                 new[] { "set-option", "-q", "-t", identifier, optionName, optionValue },
                 out _);
+        }
+
+        private void EnsureKeeperSession()
+        {
+            if (TryRunTmuxCommand(new[] { "has-session", "-t", _keeperSessionId }, out _))
+            {
+                return;
+            }
+
+            RunTmuxCommand(
+                new[] { "new-session", "-d", "-s", _keeperSessionId, "-c", "/", "--", "bash" },
+                "launch tmux keeper session");
         }
 
         private void RunTmuxCommand(
