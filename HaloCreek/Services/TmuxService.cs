@@ -53,6 +53,7 @@ namespace HaloCreek.Services
 
             RunTmuxCommand(arguments, "launch tmux session");
 
+            TryRunTmuxCommand(new[] { "set-option", "-t", identifier, "mouse", "on" }, out _);
             SetSessionMetadata(identifier, wslWorkspacePath, request.Title);
             return identifier;
         }
