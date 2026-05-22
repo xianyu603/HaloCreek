@@ -46,11 +46,20 @@ namespace HaloCreek.Services
                 return new SessionLaunchResult(false, "Config is not available.", null);
             }
 
-            var identifier = _tmuxService.Launch(new TmuxLaunchRequest(
-                workspacePath,
-                config.CodexExecutableName,
-                config.CodexLaunchArguments.Concat(new[] { promptText }).ToArray(),
-                "Codex session"));
+            string identifier;
+            try
+            {
+                identifier = _tmuxService.Launch(new TmuxLaunchRequest(
+                    workspacePath,
+                    config.CodexExecutableName,
+                    config.CodexLaunchArguments.Concat(new[] { promptText }).ToArray(),
+                    "Codex session"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return new SessionLaunchResult(false, ex.Message, null);
+            }
+
             var now = DateTimeOffset.Now;
             var session = new OngoingSessionInfo(
                 identifier,
@@ -95,11 +104,20 @@ namespace HaloCreek.Services
                 return new SessionResumeResult(false, "Config is not available.");
             }
 
-            var identifier = _tmuxService.Launch(new TmuxLaunchRequest(
-                currentWorkspacePath,
-                config.CodexExecutableName,
-                config.CodexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
-                "Codex resume session"));
+            string identifier;
+            try
+            {
+                identifier = _tmuxService.Launch(new TmuxLaunchRequest(
+                    currentWorkspacePath,
+                    config.CodexExecutableName,
+                    config.CodexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
+                    "Codex resume session"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return new SessionResumeResult(false, ex.Message);
+            }
+
             var now = DateTimeOffset.Now;
             var ongoingSession = new OngoingSessionInfo(
                 identifier,

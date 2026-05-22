@@ -175,7 +175,7 @@ namespace HaloCreek.Infrastructure
             }
 
             var command = $"printf '%s' \"${{{name}:-}}\"";
-            if (!TryRunWslCommand(command, out var output))
+            if (!TryRunWslShellCommand(command, out var output))
             {
                 return false;
             }
@@ -222,6 +222,43 @@ namespace HaloCreek.Infrastructure
             var shellCommand = BuildShellCommand(executableName, arguments);
 
             return StartWindowsTerminal(null, wslWorkspacePath, shellCommand);
+        }
+
+        public string ConvertPathToWsl(string path)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+            return ConvertToWslPath(path);
+        }
+
+        public string BuildWslShellCommand(
+            string executableName,
+            IEnumerable<string> arguments)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            return BuildShellCommand(executableName, arguments);
+        }
+
+        public string QuoteWslShellArgument(string value)
+        {
+            ArgumentNullException.ThrowIfNull(value);
+
+            return QuoteBashArgument(value);
+        }
+
+        public bool TryRunWslCommand(
+            string executableName,
+            IEnumerable<string> arguments,
+            out string output)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            return TryRunWslShellCommand(
+                BuildShellCommand(executableName, arguments),
+                out output);
         }
 
         // TODO 这个类的命名需要整理
@@ -359,12 +396,14 @@ namespace HaloCreek.Infrastructure
             return _wslDistributionNames;
         }
 
-        private static bool TryRunWslCommand(string command, out string output)
+        private static bool TryRunWslShellCommand(string command, out string output)
         {
-            return TryRunWindowsProcess(
-                "wsl.exe",
-                new[] { "--exec", "sh", "-lc", command },
-                out output);
+            var fileName = OperatingSystem.IsWindows() ? "wsl.exe" : "bash";
+            var arguments = OperatingSystem.IsWindows()
+                ? new[] { "--exec", "bash", "-ic", command }
+                : new[] { "-ic", command };
+
+            return TryRunWindowsProcess(fileName, arguments, out output);
         }
 
         private static bool TryRunWindowsProcess(
@@ -402,8 +441,16 @@ namespace HaloCreek.Infrastructure
                     return false;
                 }
 
-                output = process.StandardOutput.ReadToEnd();
-                return process.ExitCode == 0;
+                var standardOutput = process.StandardOutput.ReadToEnd();
+                var standardError = process.StandardError.ReadToEnd();
+                if (process.ExitCode == 0)
+                {
+                    output = standardOutput;
+                    return true;
+                }
+
+                output = standardOutput + standardError;
+                return false;
             }
             catch (Exception ex) when (ex is InvalidOperationException
                 or IOException
