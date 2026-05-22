@@ -23,9 +23,6 @@
             <TabItem Header="History Sessions">
                 <tabs:HistorySessionsView DataContext="{Binding HistorySessions}"/>
             </TabItem>
-            <TabItem Header="Ongoing Sessions">
-                <tabs:OngoingSessionsView DataContext="{Binding OngoingSessions}"/>
-            </TabItem>
             <TabItem Header="Git">
                 <tabs:GitView DataContext="{Binding Git}"/>
             </TabItem>

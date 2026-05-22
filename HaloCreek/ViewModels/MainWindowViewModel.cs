@@ -25,7 +25,6 @@ namespace HaloCreek.ViewModels
             ConfigService configService,
             PromptEditorViewModel promptEditor,
             HistorySessionsViewModel historySessions,
-            OngoingSessionsViewModel ongoingSessions,
             GitViewModel git,
             WorkspaceFooterViewModel workspaceFooter)
         {
@@ -33,7 +32,6 @@ namespace HaloCreek.ViewModels
             _configService = configService ?? throw new ArgumentNullException(nameof(configService));
             PromptEditor = promptEditor;
             HistorySessions = historySessions;
-            OngoingSessions = ongoingSessions;
             Git = git;
             WorkspaceFooter = workspaceFooter;
 
@@ -46,8 +44,6 @@ namespace HaloCreek.ViewModels
         public PromptEditorViewModel PromptEditor { get; }
 
         public HistorySessionsViewModel HistorySessions { get; }
-
-        public OngoingSessionsViewModel OngoingSessions { get; }
 
         public GitViewModel Git { get; }
 
@@ -97,7 +93,6 @@ namespace HaloCreek.ViewModels
 
             PromptEditor.SetWorkspacePath(workspacePath);
             HistorySessions.SetWorkspacePath(workspacePath);
-            OngoingSessions.SetWorkspacePath(workspacePath);
             Git.SetWorkspacePath(workspacePath);
             WorkspaceFooter.SetWorkspacePath(workspacePath);
         }

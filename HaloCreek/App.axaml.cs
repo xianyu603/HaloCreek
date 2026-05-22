@@ -52,7 +52,6 @@ namespace HaloCreek
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
                 configService);
-            var ongoingSessions = new OngoingSessionsViewModel(sessionLifecycleService);
             var git = new GitViewModel(gitService);
             var workspaceFooter = new WorkspaceFooterViewModel(platformInfrastructure);
 
@@ -61,7 +60,6 @@ namespace HaloCreek
                 configService,
                 promptEditor,
                 historySessions,
-                ongoingSessions,
                 git,
                 workspaceFooter);
 

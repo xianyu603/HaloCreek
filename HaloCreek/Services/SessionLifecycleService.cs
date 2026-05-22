@@ -99,7 +99,26 @@ namespace HaloCreek.Services
 
         public IReadOnlyList<OngoingSessionInfo> GetOngoingSessions(string? workspacePath)
         {
-            return Array.Empty<OngoingSessionInfo>();
+            if (string.IsNullOrWhiteSpace(workspacePath))
+            {
+                return Array.Empty<OngoingSessionInfo>();
+            }
+
+            return new[]
+            {
+                new OngoingSessionInfo(
+                    "halocreek-mock-front",
+                    "Codex session",
+                    workspacePath,
+                    DateTimeOffset.Now.AddMinutes(-18),
+                    OngoingSessionState.Front),
+                new OngoingSessionInfo(
+                    "halocreek-mock-background",
+                    "Codex resume session",
+                    workspacePath,
+                    DateTimeOffset.Now.AddMinutes(-6),
+                    OngoingSessionState.BackgroundRunning),
+            };
         }
 
         public void BringToFront(string sessionId)

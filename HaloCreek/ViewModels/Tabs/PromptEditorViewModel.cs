@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Models;
 using HaloCreek.Services;
@@ -9,7 +12,9 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private readonly ConfigService _configService;
         private readonly SessionLifecycleService _sessionLifecycleService;
+        private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
         private string _promptText = string.Empty;
+        private OngoingSessionInfo? _selectedOngoingSession;
         private Action<string>? _statusDispatcher;
         private string? _workspacePath;
 
@@ -21,6 +26,10 @@ namespace HaloCreek.ViewModels.Tabs
             _configService = configService;
 
             LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
+            BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);
+            ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
+
+            _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
         }
 
         public string PromptText
@@ -41,11 +50,39 @@ namespace HaloCreek.ViewModels.Tabs
             private set => SetProperty(ref _workspacePath, value);
         }
 
+        public IReadOnlyList<OngoingSessionInfo> OngoingSessions
+        {
+            get => _ongoingSessions;
+            private set
+            {
+                if (SetProperty(ref _ongoingSessions, value))
+                {
+                    OnPropertyChanged(nameof(HasOngoingSessions));
+                    OnPropertyChanged(nameof(IsOngoingSessionsEmpty));
+                }
+            }
+        }
+
+        public OngoingSessionInfo? SelectedOngoingSession
+        {
+            get => _selectedOngoingSession;
+            set => SetProperty(ref _selectedOngoingSession, value);
+        }
+
+        public bool HasOngoingSessions => OngoingSessions.Count > 0;
+
+        public bool IsOngoingSessionsEmpty => !HasOngoingSessions;
+
         public IRelayCommand LaunchCommand { get; }
+
+        public IRelayCommand<OngoingSessionInfo> BringToFrontCommand { get; }
+
+        public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
 
         public void SetWorkspacePath(string workspacePath)
         {
             WorkspacePath = workspacePath;
+            RefreshOngoingSessions();
             LaunchCommand.NotifyCanExecuteChanged();
         }
 
@@ -80,6 +117,48 @@ namespace HaloCreek.ViewModels.Tabs
         {
             var result = LaunchPrompt();
             _statusDispatcher?.Invoke(result.StatusMessage);
+        }
+
+        private void RefreshOngoingSessions()
+        {
+            var selectedSessionId = SelectedOngoingSession?.Id;
+            OngoingSessions = _sessionLifecycleService.GetOngoingSessions(WorkspacePath);
+            SelectedOngoingSession = OngoingSessions.FirstOrDefault(
+                session => string.Equals(session.Id, selectedSessionId, StringComparison.Ordinal));
+        }
+
+        private void BringToFront(OngoingSessionInfo? session)
+        {
+            if (session is null)
+            {
+                return;
+            }
+
+            _sessionLifecycleService.BringToFront(session.Id);
+            RefreshOngoingSessions();
+            _statusDispatcher?.Invoke("Bring to front requested.");
+        }
+
+        private void ExitSession(OngoingSessionInfo? session)
+        {
+            if (session is null)
+            {
+                return;
+            }
+
+            _sessionLifecycleService.Exit(session.Id);
+            RefreshOngoingSessions();
+            _statusDispatcher?.Invoke("Session exit requested.");
+        }
+
+        private static bool HasOngoingSession(OngoingSessionInfo? session)
+        {
+            return session is not null;
+        }
+
+        private void HandleSessionsChanged(object? sender, EventArgs e)
+        {
+            Dispatcher.UIThread.Post(RefreshOngoingSessions);
         }
     }
 }
