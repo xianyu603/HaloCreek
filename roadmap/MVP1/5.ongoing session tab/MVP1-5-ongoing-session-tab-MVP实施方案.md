@@ -384,16 +384,28 @@ cleanup 是 best effort。MVP 不要求可靠处理所有失败。
 
 `Refresh` 只刷新 SessionLifecycleService 内部列表，不承诺重新扫描外部 tmux 世界。
 
-## 9. 验证步骤
+## 9. 任务拆分
 
-### 9.1 验证后台运行
+按“先稳定契约和 UI，再接内存编排，最后用真实 WT / tmux 验证”的顺序推进。平台命令、路径转换和参数转义能力随真实 Terminal / tmux 纵切一起落地，不单独拆成只能审阅、难以验收的工作项。
+
+- [ ] **5-T01 模型与服务契约调整，接空实现**：更新 `OngoingSessionInfo` / `OngoingSessionState`；新增 `TerminalCommandSpec`、`TerminalLaunchRequest`、`TerminalWindowMode`、`TmuxLaunchRequest`、tmux 状态事件模型；调整 `SessionLifecycleService` 对外接口为 `Launch`、`Resume`、`GetOngoingSessions`、`BringToFront`、`Exit`、`Cleanup`、`SessionsChanged`；新增 `TmuxService`、`TerminalService` 的空实现或最小返回；接好 `App.axaml.cs` 组合根。验收点是项目可构建，现有 Prompt Editor `Launch` 和 History Sessions `Resume` 调用点不崩。
+- [ ] **5-T02 UI 与 VM 接线到空实现**：落地 Ongoing Sessions 正式列表 UI，包含 `Refresh`、`Bring to Front`、`Exit` 命令、空状态和基础字段展示；`OngoingSessionsViewModel` 订阅 `SessionsChanged`，并继续按当前 workspace 过滤 `GetOngoingSessions(...)` 结果。本任务不要求真实 session 行为测试，验收点是 UI 能显示空状态和空实现返回的数据结构，项目可构建。
+- [ ] **5-T03 SessionLifecycleService 内存编排实现**：实现内部 session 表、`Launch` / `Resume` 新增 ongoing 记录、`BringToFront` 的 front/watch 互斥流程、`Exit` 移除记录、忽略 front session 的 tmux 状态回调。本任务允许依赖 `TmuxService` / `TerminalService` 的最小实现，不专门编写 fake 测试；行为验证推迟到真实 Terminal / tmux 纵切完成后一起做。验收点是编排路径代码完整、依赖方向清晰、项目可构建。
+- [ ] **5-T04 PlatformInfrastructure Terminal 启动能力与 TerminalService 实现**：从现有 `PlatformInfrastructure.LaunchWslTerminalCommand` 拆/扩出 `LaunchTerminal(TerminalLaunchRequest request)`，在平台层处理 Windows / WSL 路径转换、`wt.exe` / `wsl.exe` 参数和 shell 参数转义；实现 `TerminalService.ShowFront(TerminalCommandSpec command)`，由 TerminalService 维护 HaloCreek 前台 terminal window identity 和复用策略，并把业务请求转换为平台启动请求。本任务不要求真实 tmux，验收点是用 mock/fake `TerminalCommandSpec` 能打开或复用 WT，并在指定 WSL 工作目录执行指定命令。
+- [ ] **5-T05 TmuxService 最小真实实现**：实现 session name 生成、`tmux new-session -d ...`、`tmux kill-session`、`GetFrontCommand`，可选写入 tmux metadata；tmux 命令构造、WSL 路径和参数转义依赖 PlatformInfrastructure 提供的明确能力，不在 TmuxService 内随手拼平台细节。`StartWatching` / `StopWatching` 本任务可保持最小 no-op 或保守状态实现。验收点是 `Launch` / `Resume` 能进入后台 tmux，`Bring to Front` 能 attach 到目标 tmux session，`Exit` 能 kill 并从列表移除。
+- [ ] **5-T06 Cleanup 与资源释放接线**：将应用退出生命周期接到 `SessionLifecycleService.Cleanup`。`SessionLifecycleService` 只按业务表请求退出 ongoing session，不直接释放其他服务的内部资源；`TmuxService` 负责释放自己持有的 watcher、控制进程、timer 等 tmux 相关资源；`TerminalService` 负责释放自己持有的 terminal 呈现资源或明确 no-op，不跨层 kill 用户窗口。本任务验收点是关闭应用时会 best effort 退出 HaloCreek 当前维护的 tmux session，并且各服务资源释放职责清楚。
+- [ ] **5-T07 Tmux watch 实现与端到端验证**：实现 `StartWatching` / `StopWatching`、`StateChanged`、`BackgroundRunning` / `BackgroundIdle` / `Unknown` 状态更新，完成 front/watch 互斥验证。验收点是按第 10 章验证后台运行、置为前台、front/watch 互斥和退出流程；测试计划只覆盖 HaloCreek 正常路径，不覆盖用户手动破坏外部状态的非承诺场景。
+
+## 10. 验证步骤
+
+### 10.1 验证后台运行
 
 1. 在 Prompt Editor 输入一个会保持交互的 prompt 并 Launch，或在 History Sessions 点击 `Resume`。
 2. 切到 Ongoing Sessions。
 3. 列表能看到该 session。
 4. 状态为 `BackgroundRunning`、`BackgroundIdle` 或短暂 `Unknown`。
 
-### 9.2 验证置为前台
+### 10.2 验证置为前台
 
 1. 在 Ongoing Sessions 选中刚才的 session。
 2. 点击 `Bring to Front`。
@@ -401,7 +413,7 @@ cleanup 是 best effort。MVP 不要求可靠处理所有失败。
 4. 终端 attach 到对应 tmux session。
 5. Ongoing Sessions 中该 session 状态变为 `Front`。
 
-### 9.3 验证 front/watch 互斥
+### 10.3 验证 front/watch 互斥
 
 1. 启动两个 session。
 2. 将 session A `Bring to Front`。
@@ -410,7 +422,7 @@ cleanup 是 best effort。MVP 不要求可靠处理所有失败。
 5. 将 session B `Bring to Front`。
 6. session A 回到后台并重新开始监听，session B 变为 `Front`。
 
-### 9.4 验证退出
+### 10.4 验证退出
 
 1. 选中一个 ongoing session。
 2. 点击 `Exit`。
@@ -425,7 +437,7 @@ tmux show-options -t <sessionName> -gqv @halocreek.workspace
 tmux kill-session -t <sessionName>
 ```
 
-## 10. 暂不做
+## 11. 暂不做
 
 - 不扫描或恢复应用启动前已存在的 tmux session。
 - 不接管非 HaloCreek 创建的 tmux session。
