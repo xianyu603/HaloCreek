@@ -223,6 +223,22 @@ namespace HaloCreek.Infrastructure
             return StartWindowsTerminal(wslWorkspacePath, shellCommand);
         }
 
+        // TODO 这个类的命名需要整理
+        public Process? LaunchTerminal(TerminalLaunchRequest request)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(request.Command);
+            ArgumentException.ThrowIfNullOrWhiteSpace(request.Command.WorkingDirectory);
+            ArgumentException.ThrowIfNullOrWhiteSpace(request.Command.Executable);
+
+            var wslWorkspacePath = ConvertToWslPath(request.Command.WorkingDirectory);
+            var shellCommand = BuildShellCommand(
+                request.Command.Executable,
+                request.Command.Arguments);
+
+            return StartWindowsTerminal(wslWorkspacePath, shellCommand);
+        }
+
         private static Process? StartWindowsTerminal(string wslWorkspacePath, string shellCommand)
         {
             var startInfo = new ProcessStartInfo

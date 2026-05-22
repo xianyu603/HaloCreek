@@ -36,7 +36,9 @@ namespace HaloCreek
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
             var configService = new ConfigService();
-            var sessionLifecycleService = new SessionLifecycleService(platformInfrastructure);
+            var tmuxService = new TmuxService();
+            var terminalService = new TerminalService(platformInfrastructure);
+            var sessionLifecycleService = new SessionLifecycleService(tmuxService, terminalService);
             var gitService = new GitService();
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(platformInfrastructure);

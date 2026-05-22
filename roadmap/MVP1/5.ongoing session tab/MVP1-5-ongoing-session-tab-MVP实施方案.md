@@ -378,7 +378,7 @@ cleanup 是 best effort。MVP 不要求可靠处理所有失败。
 最小正式 UI：
 
 - 顶部 `Refresh` 按钮。
-- 列表展示 `Title`、`State`、`StartedAt`、`LastActivityAt`、`WorkspacePath`、`Id`。
+- 列表展示 `Title`、`State`、`StartedAt`、`WorkspacePath`、`Id`。
 - 提供 `Bring to Front` 和 `Exit` 操作。
 - 空状态显示当前 workspace 没有 ongoing session。
 
@@ -388,7 +388,7 @@ cleanup 是 best effort。MVP 不要求可靠处理所有失败。
 
 按“先稳定契约和 UI，再接内存编排，最后用真实 WT / tmux 验证”的顺序推进。平台命令、路径转换和参数转义能力随真实 Terminal / tmux 纵切一起落地，不单独拆成只能审阅、难以验收的工作项。
 
-- [ ] **5-T01 模型与服务契约调整，接空实现**：更新 `OngoingSessionInfo` / `OngoingSessionState`；新增 `TerminalCommandSpec`、`TerminalLaunchRequest`、`TerminalWindowMode`、`TmuxLaunchRequest`、tmux 状态事件模型；调整 `SessionLifecycleService` 对外接口为 `Launch`、`Resume`、`GetOngoingSessions`、`BringToFront`、`Exit`、`Cleanup`、`SessionsChanged`；新增 `TmuxService`、`TerminalService` 的空实现或最小返回；接好 `App.axaml.cs` 组合根。验收点是项目可构建，现有 Prompt Editor `Launch` 和 History Sessions `Resume` 调用点不崩。
+- [x] **5-T01 模型与服务契约调整，接空实现**：更新 `OngoingSessionInfo` / `OngoingSessionState`；新增 `TerminalCommandSpec`、`TerminalLaunchRequest`、`TerminalWindowMode`、`TmuxLaunchRequest`、tmux 状态事件模型；调整 `SessionLifecycleService` 对外接口为 `Launch`、`Resume`、`GetOngoingSessions`、`BringToFront`、`Exit`、`Cleanup`、`SessionsChanged`；新增 `TmuxService`、`TerminalService` 的空实现或最小返回；接好 `App.axaml.cs` 组合根。验收点是项目可构建，现有 Prompt Editor `Launch` 和 History Sessions `Resume` 调用点不崩。
 - [ ] **5-T02 UI 与 VM 接线到空实现**：落地 Ongoing Sessions 正式列表 UI，包含 `Refresh`、`Bring to Front`、`Exit` 命令、空状态和基础字段展示；`OngoingSessionsViewModel` 订阅 `SessionsChanged`，并继续按当前 workspace 过滤 `GetOngoingSessions(...)` 结果。本任务不要求真实 session 行为测试，验收点是 UI 能显示空状态和空实现返回的数据结构，项目可构建。
 - [ ] **5-T03 SessionLifecycleService 内存编排实现**：实现内部 session 表、`Launch` / `Resume` 新增 ongoing 记录、`BringToFront` 的 front/watch 互斥流程、`Exit` 移除记录、忽略 front session 的 tmux 状态回调。本任务允许依赖 `TmuxService` / `TerminalService` 的最小实现，不专门编写 fake 测试；行为验证推迟到真实 Terminal / tmux 纵切完成后一起做。验收点是编排路径代码完整、依赖方向清晰、项目可构建。
 - [ ] **5-T04 PlatformInfrastructure Terminal 启动能力与 TerminalService 实现**：从现有 `PlatformInfrastructure.LaunchWslTerminalCommand` 拆/扩出 `LaunchTerminal(TerminalLaunchRequest request)`，在平台层处理 Windows / WSL 路径转换、`wt.exe` / `wsl.exe` 参数和 shell 参数转义；实现 `TerminalService.ShowFront(TerminalCommandSpec command)`，由 TerminalService 维护 HaloCreek 前台 terminal window identity 和复用策略，并把业务请求转换为平台启动请求。本任务不要求真实 tmux，验收点是用 mock/fake `TerminalCommandSpec` 能打开或复用 WT，并在指定 WSL 工作目录执行指定命令。

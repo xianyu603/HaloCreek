@@ -7,15 +7,13 @@ namespace HaloCreek.Models
         string Title,
         string WorkspacePath,
         DateTimeOffset StartedAt,
-        DateTimeOffset LastActivityAt,
         OngoingSessionState State);
 
     public enum OngoingSessionState
     {
-        Unknown,
-        Starting,
-        Running,
-        WaitingForInput,
-        Exited
+        Front,
+        BackgroundRunning,
+        BackgroundIdle,
+        Unknown
     }
 }
