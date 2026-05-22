@@ -1,5 +1,6 @@
 using Avalonia;
 using System;
+using HaloCreek.Logging;
 
 namespace HaloCreek
 {
@@ -9,8 +10,26 @@ namespace HaloCreek
         // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
         // yet and stuff might break.
         [STAThread]
-        public static void Main(string[] args) => BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        public static void Main(string[] args)
+        {
+            Log.InitializeFileOutput();
+            Log.Info("Application", $"HaloCreek starting. LogFile={Log.CurrentFilePath}");
+
+            try
+            {
+                BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+                Log.Info("Application", "HaloCreek closed.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Application", ex, "HaloCreek terminated with an unhandled exception.");
+                throw;
+            }
+            finally
+            {
+                Log.Shutdown();
+            }
+        }
 
         // Avalonia configuration, don't remove; also used by visual designer.
         public static AppBuilder BuildAvaloniaApp()
