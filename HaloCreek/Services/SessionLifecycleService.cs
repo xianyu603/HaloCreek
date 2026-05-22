@@ -167,8 +167,9 @@ namespace HaloCreek.Services
             }
 
             _tmuxService.StopWatching(sessionId);
-            var command = _tmuxService.GetFrontCommand(sessionId);
-            _terminalService.ShowFront(command);
+            var startupCommand = _tmuxService.GetFrontClientStartupCommand(sessionId);
+            _terminalService.EnsureFrontClient(startupCommand);
+            _tmuxService.SwitchFrontClient(sessionId);
 
             lock (_sessionsLock)
             {

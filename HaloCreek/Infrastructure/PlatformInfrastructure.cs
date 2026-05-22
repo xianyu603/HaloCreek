@@ -10,6 +10,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using HaloCreek.Services;
 
 namespace HaloCreek.Infrastructure
 {
@@ -220,7 +221,7 @@ namespace HaloCreek.Infrastructure
             var wslWorkspacePath = ConvertToWslPath(workspacePath);
             var shellCommand = BuildShellCommand(executableName, arguments);
 
-            return StartWindowsTerminal(wslWorkspacePath, shellCommand);
+            return StartWindowsTerminal(null, wslWorkspacePath, shellCommand);
         }
 
         // TODO 这个类的命名需要整理
@@ -228,18 +229,73 @@ namespace HaloCreek.Infrastructure
         {
             ArgumentNullException.ThrowIfNull(request);
             ArgumentNullException.ThrowIfNull(request.Command);
-            ArgumentException.ThrowIfNullOrWhiteSpace(request.Command.WorkingDirectory);
-            ArgumentException.ThrowIfNullOrWhiteSpace(request.Command.Executable);
+            var command = MaterializeTerminalCommand(request.Command);
+            ArgumentException.ThrowIfNullOrWhiteSpace(command.WorkingDirectory);
+            ArgumentException.ThrowIfNullOrWhiteSpace(command.Executable);
 
-            var wslWorkspacePath = ConvertToWslPath(request.Command.WorkingDirectory);
+            var wslWorkspacePath = ConvertToWslPath(command.WorkingDirectory);
             var shellCommand = BuildShellCommand(
-                request.Command.Executable,
-                request.Command.Arguments);
+                command.Executable,
+                command.Arguments);
 
-            return StartWindowsTerminal(wslWorkspacePath, shellCommand);
+            var windowIdentity = request.WindowMode == TerminalWindowMode.ReuseOrCreateNamedWindow
+                ? request.WindowIdentity
+                : null;
+
+            return StartWindowsTerminal(windowIdentity, wslWorkspacePath, shellCommand);
         }
 
-        private static Process? StartWindowsTerminal(string wslWorkspacePath, string shellCommand)
+        private static TerminalExecutableCommandSpec MaterializeTerminalCommand(TerminalCommandSpec command)
+        {
+            return command switch
+            {
+                TerminalExecutableCommandSpec executableCommand => executableCommand,
+                TerminalWslScriptCommandSpec scriptCommand => WriteWslScriptCommand(scriptCommand),
+                _ => throw new NotSupportedException(
+                    "Unsupported terminal command type: " + command.GetType().FullName)
+            };
+        }
+
+        private static TerminalExecutableCommandSpec WriteWslScriptCommand(
+            TerminalWslScriptCommandSpec command)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(command.WorkingDirectory);
+            ArgumentException.ThrowIfNullOrWhiteSpace(command.FileNameHint);
+            ArgumentException.ThrowIfNullOrWhiteSpace(command.ScriptText);
+
+            var directory = Path.Combine(Path.GetTempPath(), "HaloCreek", "wsl-scripts");
+            Directory.CreateDirectory(directory);
+
+            var fileName = SanitizeFileNameSegment(command.FileNameHint);
+            if (!fileName.EndsWith(".sh", StringComparison.OrdinalIgnoreCase))
+            {
+                fileName += ".sh";
+            }
+
+            var scriptPath = Path.Combine(directory, fileName);
+            File.WriteAllText(
+                scriptPath,
+                command.ScriptText,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+            return new TerminalExecutableCommandSpec(
+                command.WorkingDirectory,
+                "bash",
+                new[] { ConvertToWslPath(scriptPath) });
+        }
+
+        public Process? ActivateTerminalWindow(string windowIdentity)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(windowIdentity);
+
+            return StartWindowsTerminal(windowIdentity, null, null, focusExistingTab: true);
+        }
+
+        private static Process? StartWindowsTerminal(
+            string? windowIdentity,
+            string? wslWorkspacePath,
+            string? shellCommand,
+            bool focusExistingTab = false)
         {
             var startInfo = new ProcessStartInfo
             {
@@ -247,13 +303,28 @@ namespace HaloCreek.Infrastructure
                 UseShellExecute = false
             };
 
-            startInfo.ArgumentList.Add("wsl.exe");
-            startInfo.ArgumentList.Add("--cd");
-            startInfo.ArgumentList.Add(wslWorkspacePath);
-            startInfo.ArgumentList.Add("--exec");
-            startInfo.ArgumentList.Add("bash");
-            startInfo.ArgumentList.Add("-ic");
-            startInfo.ArgumentList.Add(shellCommand);
+            if (!string.IsNullOrWhiteSpace(windowIdentity))
+            {
+                startInfo.ArgumentList.Add("--window");
+                startInfo.ArgumentList.Add(windowIdentity);
+            }
+
+            if (focusExistingTab)
+            {
+                startInfo.ArgumentList.Add("ft");
+            }
+
+            if (!string.IsNullOrWhiteSpace(wslWorkspacePath)
+                && shellCommand is not null)
+            {
+                startInfo.ArgumentList.Add("wsl.exe");
+                startInfo.ArgumentList.Add("--cd");
+                startInfo.ArgumentList.Add(wslWorkspacePath);
+                startInfo.ArgumentList.Add("--exec");
+                startInfo.ArgumentList.Add("bash");
+                startInfo.ArgumentList.Add("-ic");
+                startInfo.ArgumentList.Add(shellCommand);
+            }
 
             return Process.Start(startInfo);
         }
@@ -418,6 +489,26 @@ namespace HaloCreek.Infrastructure
                 " ",
                 new[] { QuoteBashArgument(executableName) }
                     .Concat(arguments.Select(QuoteBashArgument)));
+        }
+
+        private static string SanitizeFileNameSegment(string value)
+        {
+            var builder = new StringBuilder(value.Length);
+            foreach (var character in value)
+            {
+                builder.Append((char.IsAsciiLetterOrDigit(character)
+                    || character is '-' or '_' or '.')
+                        ? character
+                        : '-');
+            }
+
+            var segment = builder.ToString().Trim('-', '.', '_');
+            if (segment.Length == 0)
+            {
+                return "script";
+            }
+
+            return segment.Length <= 120 ? segment : segment[..120];
         }
 
         private static string QuoteBashArgument(string value)
