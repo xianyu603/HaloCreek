@@ -13,7 +13,6 @@ namespace HaloCreek
         public static void Main(string[] args)
         {
             Log.InitializeFileOutput();
-            Log.Info("Application", $"HaloCreek starting. LogFile={Log.CurrentFilePath}");
 
             try
             {

@@ -18,49 +18,26 @@ namespace HaloCreek.Logging
         private const string DefaultApplicationName = "HaloCreek";
         private const string DefaultLogDirectoryName = "Logs";
 
-        private static readonly object SyncRoot = new();
+        private static readonly object WriterLock = new();
         private static StreamWriter? _writer;
-        private static string? _currentFilePath;
-        private static bool _isShutDown;
-
-        public static string? CurrentFilePath
-        {
-            get
-            {
-                lock (SyncRoot)
-                {
-                    return _currentFilePath;
-                }
-            }
-        }
 
         public static void InitializeFileOutput()
         {
-            InitializeFileOutput(GetDefaultLogDirectoryPath());
-        }
-
-        private static void InitializeFileOutput(string logDirectoryPath)
-        {
+            var logDirectoryPath = GetDefaultLogDirectoryPath();
             ArgumentException.ThrowIfNullOrWhiteSpace(logDirectoryPath);
 
-            lock (SyncRoot)
+            // This is currently called once during application startup. Add explicit state handling
+            // if initialization becomes concurrent or repeatable.
+            Directory.CreateDirectory(logDirectoryPath);
+
+            var filePath = Path.Combine(logDirectoryPath, CreateLogFileName());
+            var stream = new FileStream(filePath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+            _writer = new StreamWriter(stream, Encoding.UTF8)
             {
-                if (_writer is not null)
-                {
-                    throw new InvalidOperationException("Log file output has already been initialized.");
-                }
+                AutoFlush = true,
+            };
 
-                Directory.CreateDirectory(logDirectoryPath);
-
-                var filePath = Path.Combine(logDirectoryPath, CreateLogFileName());
-                var stream = new FileStream(filePath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
-                _writer = new StreamWriter(stream, Encoding.UTF8)
-                {
-                    AutoFlush = true,
-                };
-                _currentFilePath = filePath;
-                _isShutDown = false;
-            }
+            Write(LogLevel.Info, "Application", $"{DefaultApplicationName} starting. LogFile={filePath}");
         }
 
         public static void Trace(string category, string message)
@@ -100,16 +77,14 @@ namespace HaloCreek.Logging
             ArgumentException.ThrowIfNullOrWhiteSpace(category);
             ArgumentNullException.ThrowIfNull(message);
 
-            lock (SyncRoot)
+            lock (WriterLock)
             {
-                if (_isShutDown)
-                {
-                    return;
-                }
-
                 if (_writer is null)
                 {
-                    throw new InvalidOperationException("Log file output has not been initialized.");
+                    // Calls outside the normal application lifetime are intentionally ignored.
+                    // If callers must distinguish uninitialized from disposed, replace this with
+                    // an explicit enum state.
+                    return;
                 }
 
                 _writer.WriteLine(FormatLine(level, category, message));
@@ -118,18 +93,16 @@ namespace HaloCreek.Logging
 
         public static void Shutdown()
         {
-            lock (SyncRoot)
+            lock (WriterLock)
             {
-                if (_writer is null)
-                {
-                    _isShutDown = true;
-                    return;
-                }
+                var writer = _writer;
+                System.Diagnostics.Debug.Assert(
+                    writer is not null,
+                    "Log.Shutdown should only be called once after file output is initialized.");
 
-                _writer.Flush();
-                _writer.Dispose();
+                writer!.Flush();
+                writer.Dispose();
                 _writer = null;
-                _isShutDown = true;
             }
         }
 
