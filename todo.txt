@@ -2,3 +2,7 @@
 workspace 添加cache 记录最近打开的若干workspace 供选择
 workspace normalize/选择入口明确 reject WSL UNC 避免错配错一半
 resume with prompt
+Launch会卡住UI半天
+带着孤儿关机 再次启动会炸掉wsl 需要wsl --shutdown
+tmux复制行为是鼠标左键选择就复制 但是复制之后会到底下我不喜欢 改成在原地
+现在想复制历史session非常不方便 因为复制到一半会被异步读取刷新掉 改成别的页签异步读取 在这个页签手动refresh

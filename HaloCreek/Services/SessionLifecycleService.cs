@@ -5,13 +5,14 @@ using HaloCreek.Models;
 
 namespace HaloCreek.Services
 {
-    public sealed class SessionLifecycleService
+    public sealed class SessionLifecycleService : IDisposable
     {
         private readonly object _sessionsLock = new();
         private readonly Dictionary<string, OngoingSessionInfo> _sessionsById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
         private readonly TerminalService _terminalService;
         private string? _frontSessionId;
+        private bool _isDisposed;
 
         public SessionLifecycleService(
             TmuxService tmuxService,
@@ -24,6 +25,17 @@ namespace HaloCreek.Services
 
         // 只向外部汇报session或其状态发生了变化 先不实现复杂的消息通知 卡了再优化
         public event EventHandler? SessionsChanged;
+
+        public void Dispose()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            _tmuxService.StateChanged -= HandleTmuxStateChanged;
+        }
 
         // TODO 可以考虑这里的部分错误throw 之后再说
         public SessionLaunchResult Launch(

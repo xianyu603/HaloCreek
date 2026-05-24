@@ -3,19 +3,28 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using HaloCreek.Infrastructure;
+using HaloCreek.Models;
 
 namespace HaloCreek.Services
 {
-    public sealed class TmuxService
+    public sealed class TmuxService : IDisposable
     {
         private const string HaloCreekTempDirectory = "/tmp/halocreek";
+        private static readonly TimeSpan WatchPollInterval = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(10);
 
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly string _frontClientId;
         private readonly string _frontClientTtyMarkerPath;
         private readonly string _keeperSessionId;
+        private readonly object _watchLock = new();
+        private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
+        private readonly Timer _watchTimer;
         private string? _frontSessionId;
+        private bool _isWatchProbeRunning;
+        private bool _isDisposed;
 
         public TmuxService(PlatformInfrastructure platformInfrastructure)
         {
@@ -27,6 +36,11 @@ namespace HaloCreek.Services
                 + "/front-client-"
                 + _frontClientId
                 + ".tty";
+            _watchTimer = new Timer(
+                OnWatchTimerTick,
+                state: null,
+                Timeout.InfiniteTimeSpan,
+                Timeout.InfiniteTimeSpan);
             EnsureKeeperSession();
         }
 
@@ -110,6 +124,23 @@ namespace HaloCreek.Services
             TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
         }
 
+        public void Dispose()
+        {
+            lock (_watchLock)
+            {
+                if (_isDisposed)
+                {
+                    return;
+                }
+
+                _isDisposed = true;
+                _watchedSessions.Clear();
+                _watchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            }
+
+            _watchTimer.Dispose();
+        }
+
         private void SwitchFrontClientCore(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
@@ -136,16 +167,135 @@ namespace HaloCreek.Services
         public void StartWatching(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+            lock (_watchLock)
+            {
+                ObjectDisposedException.ThrowIf(_isDisposed, this);
+
+                _watchedSessions[identifier] = new WatchedSessionState();
+                if (!_isWatchProbeRunning)
+                {
+                    _watchTimer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+                }
+            }
         }
 
         public void StopWatching(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+            lock (_watchLock)
+            {
+                if (_isDisposed)
+                {
+                    return;
+                }
+
+                _watchedSessions.Remove(identifier);
+                if (_watchedSessions.Count == 0)
+                {
+                    _watchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                }
+            }
         }
 
         private void OnStateChanged(TmuxSessionStateChangedEventArgs args)
         {
             StateChanged?.Invoke(this, args);
+        }
+
+        private void OnWatchTimerTick(object? state)
+        {
+            string[] identifiers;
+            lock (_watchLock)
+            {
+                if (_isDisposed || _isWatchProbeRunning || _watchedSessions.Count == 0)
+                {
+                    return;
+                }
+
+                _isWatchProbeRunning = true;
+                identifiers = _watchedSessions.Keys.ToArray();
+            }
+
+            try
+            {
+                foreach (var identifier in identifiers)
+                {
+                    ProbeAndPublishWatchedState(identifier);
+                }
+            }
+            finally
+            {
+                lock (_watchLock)
+                {
+                    _isWatchProbeRunning = false;
+                    if (!_isDisposed && _watchedSessions.Count > 0)
+                    {
+                        _watchTimer.Change(WatchPollInterval, Timeout.InfiniteTimeSpan);
+                    }
+                }
+            }
+        }
+
+        private void ProbeAndPublishWatchedState(string identifier)
+        {
+            var probeSucceeded = TryRunTmuxCommand(
+                new[] { "capture-pane", "-p", "-t", identifier, "-S", "-200" },
+                out var output);
+
+            var now = DateTimeOffset.UtcNow;
+            var snapshot = probeSucceeded
+                ? NormalizeProcessOutput(output)
+                : string.Empty;
+            var newState = OngoingSessionState.Unknown;
+            var shouldNotify = false;
+
+            lock (_watchLock)
+            {
+                if (_isDisposed
+                    || !_watchedSessions.TryGetValue(identifier, out var watchedSession))
+                {
+                    return;
+                }
+
+                if (probeSucceeded)
+                {
+                    if (watchedSession.PaneSnapshot is null
+                        || !string.Equals(watchedSession.PaneSnapshot, snapshot, StringComparison.Ordinal))
+                    {
+                        watchedSession.PaneSnapshot = snapshot;
+                        watchedSession.LastOutputChangedAt = now;
+                        newState = OngoingSessionState.BackgroundRunning;
+                    }
+                    else
+                    {
+                        newState = now - watchedSession.LastOutputChangedAt <= BackgroundIdleThreshold
+                            ? OngoingSessionState.BackgroundRunning
+                            : OngoingSessionState.BackgroundIdle;
+                    }
+                }
+
+                if (watchedSession.State != newState)
+                {
+                    watchedSession.State = newState;
+                    shouldNotify = true;
+                }
+            }
+
+            if (shouldNotify)
+            {
+                OnStateChanged(new TmuxSessionStateChangedEventArgs(identifier, newState));
+            }
+        }
+
+        private sealed class WatchedSessionState
+        {
+            public OngoingSessionState State { get; set; } = OngoingSessionState.Unknown;
+
+            public string? PaneSnapshot { get; set; }
+
+            public DateTimeOffset LastOutputChangedAt { get; set; } = DateTimeOffset.UtcNow;
         }
 
         private void SetSessionMetadata(

@@ -1,3 +1,4 @@
+using System;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -23,16 +24,18 @@ namespace HaloCreek
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var mainWindow = new MainWindow();
-                var mainWindowViewModel = CreateMainWindowViewModel(mainWindow);
-                mainWindow.DataContext = mainWindowViewModel;
-                mainWindow.Opened += async (_, _) => await mainWindowViewModel.LoadConfigAndApplyDefaultWorkspaceAsync();
+                var appServices = CreateAppServices(mainWindow);
+                mainWindow.DataContext = appServices.MainWindowViewModel;
+                mainWindow.Opened += async (_, _) =>
+                    await appServices.MainWindowViewModel.LoadConfigAndApplyDefaultWorkspaceAsync();
+                desktop.Exit += (_, _) => appServices.Dispose();
                 desktop.MainWindow = mainWindow;
             }
 
             base.OnFrameworkInitializationCompleted();
         }
 
-        private static MainWindowViewModel CreateMainWindowViewModel(MainWindow mainWindow)
+        private static AppServices CreateAppServices(MainWindow mainWindow)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
             var configService = new ConfigService();
@@ -63,7 +66,46 @@ namespace HaloCreek
                 git,
                 workspaceFooter);
 
-            return mainWindowViewModel;
+            return new AppServices(
+                mainWindowViewModel,
+                sessionLifecycleService,
+                sessionHistoryRefreshService,
+                tmuxService);
+        }
+
+        private sealed class AppServices : IDisposable
+        {
+            private readonly SessionLifecycleService _sessionLifecycleService;
+            private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
+            private readonly TmuxService _tmuxService;
+            private bool _isDisposed;
+
+            public AppServices(
+                MainWindowViewModel mainWindowViewModel,
+                SessionLifecycleService sessionLifecycleService,
+                SessionHistoryRefreshService sessionHistoryRefreshService,
+                TmuxService tmuxService)
+            {
+                MainWindowViewModel = mainWindowViewModel;
+                _sessionLifecycleService = sessionLifecycleService;
+                _sessionHistoryRefreshService = sessionHistoryRefreshService;
+                _tmuxService = tmuxService;
+            }
+
+            public MainWindowViewModel MainWindowViewModel { get; }
+
+            public void Dispose()
+            {
+                if (_isDisposed)
+                {
+                    return;
+                }
+
+                _isDisposed = true;
+                _sessionLifecycleService.Dispose();
+                _sessionHistoryRefreshService.Dispose();
+                _tmuxService.Dispose();
+            }
         }
     }
 }
