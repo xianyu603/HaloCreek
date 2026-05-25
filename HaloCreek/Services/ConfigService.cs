@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services
@@ -18,6 +19,7 @@ namespace HaloCreek.Services
             AllowTrailingCommas = true,
             PropertyNameCaseInsensitive = true,
             ReadCommentHandling = JsonCommentHandling.Skip,
+            Converters = { new JsonStringEnumConverter() },
         };
 
         private readonly string _globalConfigPath;
@@ -109,7 +111,9 @@ namespace HaloCreek.Services
                 Coalesce(fileConfig.CodexLaunchArguments, baseConfig.CodexLaunchArguments),
                 CoalescePositive(fileConfig.MaxSessionHistoryFiles, baseConfig.MaxSessionHistoryFiles),
                 Coalesce(fileConfig.DiffToolPath, baseConfig.DiffToolPath),
-                Coalesce(fileConfig.DefaultWorkspacePath, baseConfig.DefaultWorkspacePath));
+                Coalesce(fileConfig.DefaultWorkspacePath, baseConfig.DefaultWorkspacePath),
+                Coalesce(fileConfig.GitFileBrowserDoubleClickActionId, baseConfig.GitFileBrowserDoubleClickActionId),
+                Coalesce(fileConfig.GitFileBrowserActions, baseConfig.GitFileBrowserActions));
         }
 
         private static string Coalesce(string? value, string fallback)
@@ -122,6 +126,15 @@ namespace HaloCreek.Services
         private static IReadOnlyList<string> Coalesce(
             IReadOnlyList<string?>? values,
             IReadOnlyList<string> fallback)
+        {
+            return values is null
+                ? fallback
+                : values.Where(value => value is not null).Select(value => value!).ToArray();
+        }
+
+        private static IReadOnlyList<GitFileBrowserActionConfig> Coalesce(
+            IReadOnlyList<GitFileBrowserActionConfig?>? values,
+            IReadOnlyList<GitFileBrowserActionConfig> fallback)
         {
             return values is null
                 ? fallback
@@ -146,6 +159,10 @@ namespace HaloCreek.Services
             public string? DiffToolPath { get; init; }
 
             public string? DefaultWorkspacePath { get; init; }
+
+            public string? GitFileBrowserDoubleClickActionId { get; init; }
+
+            public List<GitFileBrowserActionConfig?>? GitFileBrowserActions { get; init; }
         }
     }
 }

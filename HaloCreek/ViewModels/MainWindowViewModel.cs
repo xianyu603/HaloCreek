@@ -39,6 +39,7 @@ namespace HaloCreek.ViewModels
             PromptEditor.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
             HistorySessions.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
             HistorySessions.SetReeditInitialPromptDispatcher(ReeditInitialPrompt);
+            Git.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
         }
 
         public PromptEditorViewModel PromptEditor { get; }

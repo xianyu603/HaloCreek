@@ -8,44 +8,53 @@
           Margin="20"
           RowSpacing="16">
         <Grid Grid.Row="0"
-              ColumnDefinitions="Auto,*,Auto"
+              ColumnDefinitions="Auto,*,Auto,Auto"
               ColumnSpacing="8">
-            <StackPanel Grid.Column="0"
-                        Orientation="Horizontal"
-                        Spacing="8">
-                <Button Content="OpenDiff"
-                        MinWidth="84"
-                        Height="36"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        IsEnabled="False"/>
-                <Button Content="Commit"
-                        MinWidth="84"
-                        Height="36"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        IsEnabled="False"/>
-                <Button Content="ExploreTo"
-                        MinWidth="84"
-                        Height="36"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        IsEnabled="False"/>
-                <Button Content="Open"
-                        MinWidth="84"
-                        Height="36"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        IsEnabled="False"/>
-                <Button Content="Edit"
-                        MinWidth="84"
-                        Height="36"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        IsEnabled="False"/>
-            </StackPanel>
+            <ItemsControl Grid.Column="0"
+                          ItemsSource="{Binding LeftActionButtons}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:GitFileActionButtonViewModel"
+                                  x:CompileBindings="False">
+                        <Button Content="{Binding Label}"
+                                MinWidth="84"
+                                Height="36"
+                                Margin="0,0,8,0"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                Command="{Binding DataContext.RunActionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
-            <Button Grid.Column="2"
+            <ItemsControl Grid.Column="2"
+                          ItemsSource="{Binding RightActionButtons}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:GitFileActionButtonViewModel"
+                                  x:CompileBindings="False">
+                        <Button Content="{Binding Label}"
+                                MinWidth="84"
+                                Height="36"
+                                Margin="0,0,8,0"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                Command="{Binding DataContext.RunActionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Button Grid.Column="3"
                     Content="Refresh"
                     MinWidth="84"
                     Height="36"
@@ -88,11 +97,13 @@
                     </Grid>
                 </Border>
 
-                <ListBox Grid.Row="1"
+                <ListBox x:Name="ChangesList"
+                         Grid.Row="1"
                          ItemsSource="{Binding Changes}"
                          SelectedItem="{Binding SelectedChange, Mode=TwoWay}"
                          SelectionMode="Single"
                          IsVisible="{Binding HasChanges}"
+                         DoubleTapped="ChangesList_OnDoubleTapped"
                          BorderThickness="0"
                          Background="White"
                          Padding="0"

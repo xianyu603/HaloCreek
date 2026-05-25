@@ -55,7 +55,7 @@ namespace HaloCreek
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
                 configService);
-            var git = new GitViewModel(gitService);
+            var git = new GitViewModel(gitService, configService);
             var workspaceFooter = new WorkspaceFooterViewModel(platformInfrastructure);
 
             var mainWindowViewModel = new MainWindowViewModel(
