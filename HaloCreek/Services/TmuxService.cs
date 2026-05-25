@@ -107,14 +107,16 @@ namespace HaloCreek.Services
         public void Exit(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-            if (string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
+            _ = Task.Run(() =>
             {
-                SwitchFrontClientCore(_keeperSessionId);
-                _frontSessionId = null;
-            }
-
-            TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
+                // TODO: Add lifecycle boundary handling for launch work that outlives TmuxService.
+                if (string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
+                {
+                    SwitchFrontClientCore(_keeperSessionId);
+                    _frontSessionId = null;
+                }
+                TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
+            });
         }
 
         public TerminalCommandSpec GetFrontClientStartupCommand(string initialIdentifier)
