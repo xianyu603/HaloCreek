@@ -7,6 +7,7 @@ using HaloCreek.Services;
 namespace HaloCreek.Services.SessionHistory
 {
     // 因为占用了系统资源(timer) 所以要写IDisposable
+    // TODO 这个文件及相关代码需要大改 首先对历史文件应该有缓存(缓存checksum 文件没有变更就不要更新) 然后内容没变时不应该刷UI
     public sealed class SessionHistoryRefreshService : IDisposable
     {
         private static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromSeconds(10);

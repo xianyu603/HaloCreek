@@ -135,7 +135,6 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _sessionLifecycleService.BringToFront(session.Id);
-            RefreshOngoingSessions();
             _statusDispatcher?.Invoke("Bring to front requested.");
         }
 
@@ -147,7 +146,6 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _sessionLifecycleService.Exit(session.Id);
-            RefreshOngoingSessions();
             _statusDispatcher?.Invoke("Session exit requested.");
         }
 
@@ -158,6 +156,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void HandleSessionsChanged(object? sender, EventArgs e)
         {
+            // 走一下post防同步重入 现在已经不会从别的线程到这了
             Dispatcher.UIThread.Post(RefreshOngoingSessions);
         }
     }

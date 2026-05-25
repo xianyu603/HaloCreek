@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia.Threading;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services
 {
     public sealed class SessionLifecycleService : IDisposable
     {
-        private readonly object _sessionsLock = new();
+        // 正确性前提是所有共享状态的直接操作都来自同一个 UI 线程。
         private readonly Dictionary<string, OngoingSessionInfo> _sessionsById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
         private readonly TerminalService _terminalService;
@@ -43,6 +44,8 @@ namespace HaloCreek.Services
             string promptText,
             AppConfig config)
         {
+            RequireUiThread();
+
             if (string.IsNullOrWhiteSpace(workspacePath))
             {
                 return new SessionLaunchResult(false, "No workspace selected.", null);
@@ -80,10 +83,7 @@ namespace HaloCreek.Services
                 now,
                 OngoingSessionState.BackgroundRunning);
 
-            lock (_sessionsLock)
-            {
-                _sessionsById.Add(identifier, session);
-            }
+            _sessionsById.Add(identifier, session);
 
             _tmuxService.StartWatching(identifier);
             SessionsChanged?.Invoke(this, EventArgs.Empty);
@@ -96,6 +96,8 @@ namespace HaloCreek.Services
             string currentWorkspacePath,
             AppConfig config)
         {
+            RequireUiThread();
+
             if (session is null)
             {
                 return new SessionResumeResult(false, "No session selected.");
@@ -138,10 +140,7 @@ namespace HaloCreek.Services
                 now,
                 OngoingSessionState.BackgroundRunning);
 
-            lock (_sessionsLock)
-            {
-                _sessionsById.Add(identifier, ongoingSession);
-            }
+            _sessionsById.Add(identifier, ongoingSession);
 
             _tmuxService.StartWatching(identifier);
             SessionsChanged?.Invoke(this, EventArgs.Empty);
@@ -151,44 +150,41 @@ namespace HaloCreek.Services
 
         public IReadOnlyList<OngoingSessionInfo> GetOngoingSessions(string? workspacePath)
         {
-            lock (_sessionsLock)
-            {
-                var sessions = _sessionsById.Values.AsEnumerable();
-                if (!string.IsNullOrWhiteSpace(workspacePath))
-                {
-                    sessions = sessions.Where(session =>
-                        string.Equals(session.WorkspacePath, workspacePath, StringComparison.Ordinal));
-                }
+            RequireUiThread();
 
-                return sessions
-                    .OrderBy(session => session.StartedAt)
-                    .ToArray();
+            var sessions = _sessionsById.Values.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(workspacePath))
+            {
+                sessions = sessions.Where(session =>
+                    string.Equals(session.WorkspacePath, workspacePath, StringComparison.Ordinal));
             }
+
+            return sessions
+                .OrderBy(session => session.StartedAt)
+                .ToArray();
         }
 
         public void BringToFront(string sessionId)
         {
+            RequireUiThread();
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
             string? previousFrontSessionId = null;
-            lock (_sessionsLock)
+            if (!_sessionsById.ContainsKey(sessionId))
             {
-                if (!_sessionsById.ContainsKey(sessionId))
-                {
-                    return;
-                }
+                return;
+            }
 
-                if (!string.IsNullOrWhiteSpace(_frontSessionId)
-                    && !string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal)
-                    && _sessionsById.TryGetValue(_frontSessionId, out var previousFrontSession))
+            if (!string.IsNullOrWhiteSpace(_frontSessionId)
+                && !string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal)
+                && _sessionsById.TryGetValue(_frontSessionId, out var previousFrontSession))
+            {
+                previousFrontSessionId = _frontSessionId;
+                _sessionsById[previousFrontSessionId] = previousFrontSession with
                 {
-                    previousFrontSessionId = _frontSessionId;
-                    _sessionsById[previousFrontSessionId] = previousFrontSession with
-                    {
-                        State = OngoingSessionState.Unknown
-                    };
-                    _frontSessionId = null;
-                }
+                    State = OngoingSessionState.Unknown
+                };
+                _frontSessionId = null;
             }
 
             if (previousFrontSessionId is not null)
@@ -201,45 +197,37 @@ namespace HaloCreek.Services
             _terminalService.EnsureFrontClient(startupCommand);
             _tmuxService.SwitchFrontClient(sessionId);
 
-            lock (_sessionsLock)
+            if (!_sessionsById.TryGetValue(sessionId, out var targetSession))
             {
-                if (!_sessionsById.TryGetValue(sessionId, out var targetSession))
-                {
-                    return;
-                }
-
-                _sessionsById[sessionId] = targetSession with
-                {
-                    State = OngoingSessionState.Front
-                };
-                _frontSessionId = sessionId;
+                return;
             }
+
+            _sessionsById[sessionId] = targetSession with
+            {
+                State = OngoingSessionState.Front
+            };
+            _frontSessionId = sessionId;
 
             SessionsChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void Exit(string sessionId)
         {
+            RequireUiThread();
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
-            lock (_sessionsLock)
+            if (!_sessionsById.ContainsKey(sessionId))
             {
-                if (!_sessionsById.ContainsKey(sessionId))
-                {
-                    return;
-                }
+                return;
             }
 
             _tmuxService.StopWatching(sessionId);
             _tmuxService.Exit(sessionId);
 
-            lock (_sessionsLock)
+            _sessionsById.Remove(sessionId);
+            if (string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal))
             {
-                _sessionsById.Remove(sessionId);
-                if (string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal))
-                {
-                    _frontSessionId = null;
-                }
+                _frontSessionId = null;
             }
 
             SessionsChanged?.Invoke(this, EventArgs.Empty);
@@ -247,11 +235,9 @@ namespace HaloCreek.Services
 
         public void Cleanup()
         {
-            string[] sessionIds;
-            lock (_sessionsLock)
-            {
-                sessionIds = _sessionsById.Keys.ToArray();
-            }
+            RequireUiThread();
+
+            var sessionIds = _sessionsById.Keys.ToArray();
 
             foreach (var sessionId in sessionIds)
             {
@@ -259,11 +245,8 @@ namespace HaloCreek.Services
                 _tmuxService.Exit(sessionId);
             }
 
-            lock (_sessionsLock)
-            {
-                _sessionsById.Clear();
-                _frontSessionId = null;
-            }
+            _sessionsById.Clear();
+            _frontSessionId = null;
 
             _tmuxService.Cleanup();
             SessionsChanged?.Invoke(this, EventArgs.Empty);
@@ -271,34 +254,49 @@ namespace HaloCreek.Services
 
         private void HandleTmuxStateChanged(object? sender, TmuxSessionStateChangedEventArgs args)
         {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                // 当前唯一允许的异步入口是 tmux 状态回调；修改 session 状态前必须先投递回 UI 线程。
+                Dispatcher.UIThread.Post(() => HandleTmuxStateChanged(sender, args));
+                return;
+            }
+
+            RequireUiThread();
+
             if (args.State == OngoingSessionState.Front)
             {
                 return;
             }
 
             var changed = false;
-            lock (_sessionsLock)
+            if (!_sessionsById.TryGetValue(args.Identifier, out var session)
+                || string.Equals(_frontSessionId, args.Identifier, StringComparison.Ordinal)
+                || session.State == OngoingSessionState.Front)
             {
-                if (!_sessionsById.TryGetValue(args.Identifier, out var session)
-                    || string.Equals(_frontSessionId, args.Identifier, StringComparison.Ordinal)
-                    || session.State == OngoingSessionState.Front)
-                {
-                    return;
-                }
+                return;
+            }
 
-                if (session.State != args.State)
+            if (session.State != args.State)
+            {
+                _sessionsById[args.Identifier] = session with
                 {
-                    _sessionsById[args.Identifier] = session with
-                    {
-                        State = args.State
-                    };
-                    changed = true;
-                }
+                    State = args.State
+                };
+                changed = true;
             }
 
             if (changed)
             {
                 SessionsChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private static void RequireUiThread()
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                throw new InvalidOperationException(
+                    "SessionLifecycleService must be called from the UI thread.");
             }
         }
     }
