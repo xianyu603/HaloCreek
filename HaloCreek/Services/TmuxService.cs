@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using HaloCreek.Infrastructure;
 using HaloCreek.Models;
 
@@ -34,7 +35,7 @@ namespace HaloCreek.Services
     public sealed class TmuxService : IDisposable
     {
         private const string HaloCreekTempDirectory = "/tmp/halocreek";
-        private static readonly TimeSpan WatchPollInterval = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan WatchPollInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(2);
 
         private readonly PlatformInfrastructure _platformInfrastructure;
@@ -90,10 +91,14 @@ namespace HaloCreek.Services
                 .Concat(request.Arguments)
                 .ToArray();
 
-            RunTmuxCommand(arguments, "launch tmux session");
+            _ = Task.Run(() =>
+            {
+                // TODO: Add lifecycle boundary handling for launch work that outlives TmuxService.
+                RunTmuxCommand(arguments, "launch tmux session");
+                TryRunTmuxCommand(new[] { "set-option", "-t", identifier, "mouse", "on" }, out _);
+                SetSessionMetadata(identifier, wslWorkspacePath, request.Title);
+            });
 
-            TryRunTmuxCommand(new[] { "set-option", "-t", identifier, "mouse", "on" }, out _);
-            SetSessionMetadata(identifier, wslWorkspacePath, request.Title);
             return identifier;
         }
 
@@ -298,7 +303,7 @@ namespace HaloCreek.Services
                     }
                     else
                     {
-                        newState = now - watchedSession.LastOutputChangedAt <= BackgroundIdleThreshold
+                        newState = now - watchedSession.LastOutputChangedAt < BackgroundIdleThreshold
                             ? OngoingSessionState.BackgroundRunning
                             : OngoingSessionState.BackgroundIdle;
                     }
