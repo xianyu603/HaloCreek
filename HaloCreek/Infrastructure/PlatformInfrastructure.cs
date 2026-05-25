@@ -158,6 +158,25 @@ namespace HaloCreek.Infrastructure
             return string.Equals(normalizedLeft, normalizedRight, comparison);
         }
 
+        public static string NormalizePathForCurrentPlatform(string path)
+        {
+            ArgumentNullException.ThrowIfNull(path);
+
+            return OperatingSystem.IsWindows()
+                ? path.Trim().Replace('/', '\\')
+                : path.Trim().Replace('\\', '/');
+        }
+
+        public static string CombinePathForCurrentPlatform(string rootPath, string relativePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+
+            return Path.Combine(
+                NormalizePathForCurrentPlatform(rootPath),
+                NormalizePathForCurrentPlatform(relativePath));
+        }
+
         public bool TryGetWslEnvironmentVariable(string name, out string value)
         {
             value = string.Empty;

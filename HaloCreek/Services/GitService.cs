@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using HaloCreek.Infrastructure;
+using HaloCreek.Logging;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services
@@ -111,23 +113,41 @@ namespace HaloCreek.Services
 
             try
             {
+                var executable = action.Executable.Trim();
+                var resolvedArguments = arguments
+                    .Select(argument => ReplaceActionTokens(
+                        argument,
+                        normalizedWorkspacePath,
+                        selectedChange))
+                    .ToArray();
+
+                Log.Info(
+                    "Git",
+                    $"Starting configured action. Action={QuoteForLog(actionName)} "
+                    + $"Executable={QuoteForLog(executable)} "
+                    + $"WorkingDirectory={QuoteForLog(normalizedWorkspacePath)} "
+                    + $"SelectedPath={QuoteForLog(ResolveSelectedPath(normalizedWorkspacePath, selectedChange))} "
+                    + $"Arguments={FormatActionArgumentsForLog(arguments, resolvedArguments)}");
+
                 using var process = new Process();
                 process.StartInfo = new ProcessStartInfo
                 {
-                    FileName = action.Executable.Trim(),
+                    FileName = executable,
                     WorkingDirectory = normalizedWorkspacePath,
                     UseShellExecute = false,
                 };
 
-                foreach (var argument in arguments)
+                foreach (var argument in resolvedArguments)
                 {
-                    process.StartInfo.ArgumentList.Add(ReplaceActionTokens(
-                        argument,
-                        normalizedWorkspacePath,
-                        selectedChange));
+                    process.StartInfo.ArgumentList.Add(argument);
                 }
 
                 process.Start();
+                Log.Info(
+                    "Git",
+                    $"Started configured action. Action={QuoteForLog(actionName)} "
+                    + $"Executable={QuoteForLog(executable)} "
+                    + $"ProcessId={process.Id}");
                 return new GitOperationResult(true, $"Started {actionName}.");
             }
             catch (Exception ex) when (ex is Win32Exception
@@ -137,6 +157,7 @@ namespace HaloCreek.Services
                 or ArgumentException
                 or NotSupportedException)
             {
+                Log.Error("Git", ex, $"Failed to start configured action. Action={QuoteForLog(actionName)}");
                 return new GitOperationResult(false, $"Failed to start {actionName}: {ex.Message}");
             }
         }
@@ -227,26 +248,22 @@ namespace HaloCreek.Services
             string workspacePath,
             GitChangeInfo? selectedChange)
         {
-            var selectedRelativePath = selectedChange?.RelativePath ?? string.Empty;
-            var selectedOriginalRelativePath = selectedChange?.OriginalRelativePath ?? string.Empty;
-
             return argument
-                .Replace("{WorkspaceRoot}", workspacePath, StringComparison.Ordinal)
-                .Replace("{SelectedRelativePath}", selectedRelativePath, StringComparison.Ordinal)
+                .Replace(
+                    "{WorkspaceRoot}",
+                    PlatformInfrastructure.NormalizePathForCurrentPlatform(workspacePath),
+                    StringComparison.Ordinal)
                 .Replace(
                     "{SelectedPath}",
-                    string.IsNullOrEmpty(selectedRelativePath)
-                        ? string.Empty
-                        : Path.Combine(workspacePath, selectedRelativePath),
-                    StringComparison.Ordinal)
-                .Replace("{SelectedOriginalRelativePath}", selectedOriginalRelativePath, StringComparison.Ordinal)
-                .Replace(
-                    "{SelectedOriginalPath}",
-                    string.IsNullOrEmpty(selectedOriginalRelativePath)
-                        ? string.Empty
-                        : Path.Combine(workspacePath, selectedOriginalRelativePath),
-                    StringComparison.Ordinal)
-                .Replace("{SelectedDisplayPath}", selectedChange?.DisplayPath ?? string.Empty, StringComparison.Ordinal);
+                    ResolveSelectedPath(workspacePath, selectedChange),
+                    StringComparison.Ordinal);
+        }
+
+        private static string ResolveSelectedPath(string workspacePath, GitChangeInfo? selectedChange)
+        {
+            return string.IsNullOrEmpty(selectedChange?.RelativePath)
+                ? string.Empty
+                : PlatformInfrastructure.CombinePathForCurrentPlatform(workspacePath, selectedChange.RelativePath);
         }
 
         private static string GetActionName(GitFileBrowserActionConfig action)
@@ -262,6 +279,23 @@ namespace HaloCreek.Services
             }
 
             return "configured action";
+        }
+
+        private static string FormatActionArgumentsForLog(
+            IReadOnlyList<string> originalArguments,
+            IReadOnlyList<string> resolvedArguments)
+        {
+            return string.Join(
+                ", ",
+                originalArguments.Select((argument, index) =>
+                    $"[{index}]Raw={QuoteForLog(argument)} Resolved={QuoteForLog(resolvedArguments[index])}"));
+        }
+
+        private static string QuoteForLog(string? value)
+        {
+            return value is null
+                ? "<null>"
+                : $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
         }
 
         private static bool IsStaged(char indexStatus)

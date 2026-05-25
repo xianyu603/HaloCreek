@@ -72,7 +72,7 @@ namespace HaloCreek.Models
 
         private static bool UsesSelectedToken(string argument)
         {
-            return argument?.Contains("{Selected", StringComparison.Ordinal) == true;
+            return argument?.Contains("{SelectedPath}", StringComparison.Ordinal) == true;
         }
     }
 
