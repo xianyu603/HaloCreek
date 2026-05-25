@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Models;
 using HaloCreek.Services;
 
@@ -19,6 +20,7 @@ namespace HaloCreek.ViewModels.Tabs
         public GitViewModel(GitService gitService)
         {
             _gitService = gitService;
+            RefreshCommand = new RelayCommand(RefreshChanges);
         }
 
         public string? WorkspacePath
@@ -32,6 +34,8 @@ namespace HaloCreek.ViewModels.Tabs
             get => _changes;
             private set => SetProperty(ref _changes, value);
         }
+
+        public IRelayCommand RefreshCommand { get; }
 
         public void SetWorkspacePath(string workspacePath)
         {
