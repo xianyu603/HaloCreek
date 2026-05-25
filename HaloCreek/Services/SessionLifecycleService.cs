@@ -8,6 +8,8 @@ namespace HaloCreek.Services
 {
     public sealed class SessionLifecycleService : IDisposable
     {
+        private const int FirstPromptSummaryMaxLength = 20;
+
         // 正确性前提是所有共享状态的直接操作都来自同一个 UI 线程。
         private readonly Dictionary<string, OngoingSessionInfo> _sessionsById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
@@ -87,6 +89,12 @@ namespace HaloCreek.Services
                 return new SessionLaunchResult(false, "Config is not available.", null);
             }
 
+            var title = BuildFirstPromptSummary(promptText);
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                title = "Codex session";
+            }
+
             string identifier;
             try
             {
@@ -94,7 +102,7 @@ namespace HaloCreek.Services
                     workspacePath,
                     config.CodexExecutableName,
                     config.CodexLaunchArguments.Concat(new[] { promptText }).ToArray(),
-                    "Codex session"));
+                    title));
             }
             catch (InvalidOperationException ex)
             {
@@ -104,7 +112,7 @@ namespace HaloCreek.Services
             var now = DateTimeOffset.Now;
             var session = new OngoingSessionInfo(
                 identifier,
-                "Codex session",
+                title,
                 workspacePath,
                 now,
                 OngoingSessionState.BackgroundRunning);
@@ -144,6 +152,12 @@ namespace HaloCreek.Services
                 return new SessionResumeResult(false, "Config is not available.");
             }
 
+            var title = BuildFirstPromptSummary(session.InitialPrompt);
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                title = "Codex resume session";
+            }
+
             string identifier;
             try
             {
@@ -151,7 +165,7 @@ namespace HaloCreek.Services
                     currentWorkspacePath,
                     config.CodexExecutableName,
                     config.CodexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
-                    "Codex resume session"));
+                    title));
             }
             catch (InvalidOperationException ex)
             {
@@ -161,7 +175,7 @@ namespace HaloCreek.Services
             var now = DateTimeOffset.Now;
             var ongoingSession = new OngoingSessionInfo(
                 identifier,
-                "Codex resume session",
+                title,
                 currentWorkspacePath,
                 now,
                 OngoingSessionState.BackgroundRunning);
@@ -296,6 +310,25 @@ namespace HaloCreek.Services
             {
                 SessionsChanged?.Invoke(this, EventArgs.Empty);
             }
+        }
+
+        private static string BuildFirstPromptSummary(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            var summary = string.Join(
+                " ",
+                text.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+            if (summary.Length > FirstPromptSummaryMaxLength)
+            {
+                summary = summary[..FirstPromptSummaryMaxLength];
+            }
+
+            return summary;
         }
 
         private static void RequireUiThread()
