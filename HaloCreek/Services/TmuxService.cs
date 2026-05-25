@@ -7,6 +7,28 @@ using System.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Models;
 
+
+/*
+ * 用显示状态机维护状态 避免boolean组合状态的问题
+| Trigger | Current State | Action | Next State |
+| --- | --- | --- | --- |
+| `StartWatching` | `Idle` | Add session, schedule immediate timer | `Scheduled` |
+| `StartWatching` | `Scheduled` | Add or reset session, keep timer scheduled | `Scheduled` |
+| `StartWatching` | `Probing` | Add or reset session, let next probe cycle include it | `Probing` |
+| `StartWatching` | `Disposed` | Throw `ObjectDisposedException` | `Disposed` |
+| `StopWatching` | `Idle` | No-op after remove attempt | `Idle` |
+| `StopWatching` | `Scheduled` with sessions left | Remove session, keep timer scheduled | `Scheduled` |
+| `StopWatching` | `Scheduled` with no sessions left | Remove session, stop timer | `Idle` |
+| `StopWatching` | `Probing` | Remove session; in-flight result for it will be ignored | `Probing` |
+| `StopWatching` | `Disposed` | No-op | `Disposed` |
+| Timer tick | `Scheduled` | Copy identifiers, enter probe cycle | `Probing` |
+| Timer tick | `Idle` / `Probing` / `Disposed` | Ignore | Unchanged |
+| Probe finish | `Probing` with sessions left | Schedule next timer | `Scheduled` |
+| Probe finish | `Probing` with no sessions left | Keep timer stopped | `Idle` |
+| Probe finish | `Disposed` | Keep timer stopped | `Disposed` |
+| `Dispose` | Any state | Clear sessions, stop timer | `Disposed` |
+*/
+
 namespace HaloCreek.Services
 {
     public sealed class TmuxService : IDisposable
@@ -19,12 +41,11 @@ namespace HaloCreek.Services
         private readonly string _frontClientId;
         private readonly string _frontClientTtyMarkerPath;
         private readonly string _keeperSessionId;
-        private readonly object _watchLock = new();
+        private readonly object _watchStateLock = new();
         private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
         private readonly Timer _watchTimer;
         private string? _frontSessionId;
-        private bool _isWatchProbeRunning;
-        private bool _isDisposed;
+        private WatchState _watchState;
 
         public TmuxService(PlatformInfrastructure platformInfrastructure)
         {
@@ -126,14 +147,14 @@ namespace HaloCreek.Services
 
         public void Dispose()
         {
-            lock (_watchLock)
+            lock (_watchStateLock)
             {
-                if (_isDisposed)
+                if (_watchState == WatchState.Disposed)
                 {
                     return;
                 }
 
-                _isDisposed = true;
+                _watchState = WatchState.Disposed;
                 _watchedSessions.Clear();
                 _watchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
@@ -168,13 +189,17 @@ namespace HaloCreek.Services
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
-            lock (_watchLock)
+            lock (_watchStateLock)
             {
-                ObjectDisposedException.ThrowIf(_isDisposed, this);
+                if (_watchState == WatchState.Disposed)
+                {
+                    throw new ObjectDisposedException(nameof(TmuxService));
+                }
 
                 _watchedSessions[identifier] = new WatchedSessionState();
-                if (!_isWatchProbeRunning)
+                if (_watchState == WatchState.Idle)
                 {
+                    _watchState = WatchState.Scheduled;
                     _watchTimer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
                 }
             }
@@ -184,16 +209,18 @@ namespace HaloCreek.Services
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
-            lock (_watchLock)
+            lock (_watchStateLock)
             {
-                if (_isDisposed)
+                if (_watchState == WatchState.Disposed)
                 {
                     return;
                 }
 
                 _watchedSessions.Remove(identifier);
-                if (_watchedSessions.Count == 0)
+                if (_watchedSessions.Count == 0
+                    && _watchState == WatchState.Scheduled)
                 {
+                    _watchState = WatchState.Idle;
                     _watchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                 }
             }
@@ -207,14 +234,14 @@ namespace HaloCreek.Services
         private void OnWatchTimerTick(object? state)
         {
             string[] identifiers;
-            lock (_watchLock)
+            lock (_watchStateLock)
             {
-                if (_isDisposed || _isWatchProbeRunning || _watchedSessions.Count == 0)
+                if (_watchState != WatchState.Scheduled)
                 {
                     return;
                 }
 
-                _isWatchProbeRunning = true;
+                _watchState = WatchState.Probing;
                 identifiers = _watchedSessions.Keys.ToArray();
             }
 
@@ -227,12 +254,17 @@ namespace HaloCreek.Services
             }
             finally
             {
-                lock (_watchLock)
+                lock (_watchStateLock)
                 {
-                    _isWatchProbeRunning = false;
-                    if (!_isDisposed && _watchedSessions.Count > 0)
+                    if (_watchState == WatchState.Probing
+                        && _watchedSessions.Count > 0)
                     {
+                        _watchState = WatchState.Scheduled;
                         _watchTimer.Change(WatchPollInterval, Timeout.InfiniteTimeSpan);
+                    }
+                    else if (_watchState == WatchState.Probing)
+                    {
+                        _watchState = WatchState.Idle;
                     }
                 }
             }
@@ -251,9 +283,9 @@ namespace HaloCreek.Services
             var newState = OngoingSessionState.Unknown;
             var shouldNotify = false;
 
-            lock (_watchLock)
+            lock (_watchStateLock)
             {
-                if (_isDisposed
+                if (_watchState == WatchState.Disposed
                     || !_watchedSessions.TryGetValue(identifier, out var watchedSession))
                 {
                     return;
@@ -287,6 +319,14 @@ namespace HaloCreek.Services
             {
                 OnStateChanged(new TmuxSessionStateChangedEventArgs(identifier, newState));
             }
+        }
+
+        private enum WatchState
+        {
+            Idle,
+            Scheduled,
+            Probing,
+            Disposed
         }
 
         private sealed class WatchedSessionState
