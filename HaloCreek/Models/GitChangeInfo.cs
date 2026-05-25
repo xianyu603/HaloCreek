@@ -32,4 +32,8 @@ namespace HaloCreek.Models
     public sealed record GitChangesResult(
         IReadOnlyList<GitChangeInfo> Changes,
         string Message);
+
+    public sealed record GitOperationResult(
+        bool Succeeded,
+        string Message);
 }

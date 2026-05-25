@@ -68,18 +68,77 @@ namespace HaloCreek.Services
             return new GitChangesResult(changes, loadedMessage);
         }
 
-        public bool TryOpenDiffTool(string workspacePath, GitChangeInfo change)
+        public GitOperationResult TryRunConfiguredAction(
+            string? workspacePath,
+            GitChangeInfo? selectedChange,
+            GitFileBrowserActionConfig action)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
-            ArgumentNullException.ThrowIfNull(change);
+            ArgumentNullException.ThrowIfNull(action);
 
-            return false;
-        }
+            var actionName = GetActionName(action);
+            if (string.IsNullOrWhiteSpace(workspacePath))
+            {
+                return new GitOperationResult(false, $"No workspace selected for {actionName}.");
+            }
 
-        public bool TryCommit(string workspacePath)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
-            return false;
+            string normalizedWorkspacePath;
+            try
+            {
+                normalizedWorkspacePath = Path.GetFullPath(workspacePath.Trim());
+            }
+            catch (Exception ex) when (ex is ArgumentException
+                or NotSupportedException
+                or PathTooLongException)
+            {
+                return new GitOperationResult(false, $"Invalid workspace path for {actionName}: {workspacePath}");
+            }
+
+            if (string.IsNullOrWhiteSpace(action.Executable))
+            {
+                return new GitOperationResult(false, $"Executable is empty for {actionName}.");
+            }
+
+            if (action.RequiresSelectedChange && selectedChange is null)
+            {
+                return new GitOperationResult(false, $"{actionName} requires a selected Git change.");
+            }
+
+            var arguments = action.Arguments ?? Array.Empty<string>();
+            if (arguments.Any(argument => argument is null))
+            {
+                return new GitOperationResult(false, $"Argument is null for {actionName}.");
+            }
+
+            try
+            {
+                using var process = new Process();
+                process.StartInfo = new ProcessStartInfo
+                {
+                    FileName = action.Executable.Trim(),
+                    WorkingDirectory = normalizedWorkspacePath,
+                    UseShellExecute = false,
+                };
+
+                foreach (var argument in arguments)
+                {
+                    process.StartInfo.ArgumentList.Add(ReplaceActionTokens(
+                        argument,
+                        normalizedWorkspacePath,
+                        selectedChange));
+                }
+
+                process.Start();
+                return new GitOperationResult(true, $"Started {actionName}.");
+            }
+            catch (Exception ex) when (ex is Win32Exception
+                or InvalidOperationException
+                or IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
+            {
+                return new GitOperationResult(false, $"Failed to start {actionName}: {ex.Message}");
+            }
         }
 
         private static GitCommandResult RunGitStatus(string workspacePath)
@@ -161,6 +220,48 @@ namespace HaloCreek.Services
         private static bool RequiresOriginalPath(char indexStatus, char workTreeStatus)
         {
             return indexStatus is 'R' or 'C' || workTreeStatus is 'R' or 'C';
+        }
+
+        private static string ReplaceActionTokens(
+            string argument,
+            string workspacePath,
+            GitChangeInfo? selectedChange)
+        {
+            var selectedRelativePath = selectedChange?.RelativePath ?? string.Empty;
+            var selectedOriginalRelativePath = selectedChange?.OriginalRelativePath ?? string.Empty;
+
+            return argument
+                .Replace("{WorkspaceRoot}", workspacePath, StringComparison.Ordinal)
+                .Replace("{SelectedRelativePath}", selectedRelativePath, StringComparison.Ordinal)
+                .Replace(
+                    "{SelectedPath}",
+                    string.IsNullOrEmpty(selectedRelativePath)
+                        ? string.Empty
+                        : Path.Combine(workspacePath, selectedRelativePath),
+                    StringComparison.Ordinal)
+                .Replace("{SelectedOriginalRelativePath}", selectedOriginalRelativePath, StringComparison.Ordinal)
+                .Replace(
+                    "{SelectedOriginalPath}",
+                    string.IsNullOrEmpty(selectedOriginalRelativePath)
+                        ? string.Empty
+                        : Path.Combine(workspacePath, selectedOriginalRelativePath),
+                    StringComparison.Ordinal)
+                .Replace("{SelectedDisplayPath}", selectedChange?.DisplayPath ?? string.Empty, StringComparison.Ordinal);
+        }
+
+        private static string GetActionName(GitFileBrowserActionConfig action)
+        {
+            if (!string.IsNullOrWhiteSpace(action.Id))
+            {
+                return action.Id.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(action.Label))
+            {
+                return action.Label.Trim();
+            }
+
+            return "configured action";
         }
 
         private static bool IsStaged(char indexStatus)

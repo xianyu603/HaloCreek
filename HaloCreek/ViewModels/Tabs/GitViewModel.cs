@@ -178,7 +178,7 @@ namespace HaloCreek.ViewModels.Tabs
                 return;
             }
 
-            ReportConfiguredActionSelected(button.Action);
+            RunConfiguredAction(button.Action, SelectedChange);
         }
 
         private void OpenSelectedChange(GitChangeInfo? change)
@@ -194,12 +194,13 @@ namespace HaloCreek.ViewModels.Tabs
                 return;
             }
 
-            ReportConfiguredActionSelected(_doubleClickAction);
+            RunConfiguredAction(_doubleClickAction, change);
         }
 
-        private void ReportConfiguredActionSelected(GitFileBrowserActionConfig action)
+        private void RunConfiguredAction(GitFileBrowserActionConfig action, GitChangeInfo? selectedChange)
         {
-            _statusDispatcher?.Invoke($"Action selected: {action.Id}. Execution will be implemented in 6-T04.");
+            var result = _gitService.TryRunConfiguredAction(WorkspacePath, selectedChange, action);
+            _statusDispatcher?.Invoke(result.Message);
         }
     }
 }
