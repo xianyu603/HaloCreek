@@ -13,9 +13,9 @@ using HaloCreek.Models;
  * 用显示状态机维护状态 避免boolean组合状态的问题
 | Trigger | Current State | Action | Next State |
 | --- | --- | --- | --- |
-| `StartWatching` | `Idle` | Add session, schedule immediate timer | `Scheduled` |
-| `StartWatching` | `Scheduled` | Add or reset session, keep timer scheduled | `Scheduled` |
-| `StartWatching` | `Probing` | Add or reset session, let next probe cycle include it | `Probing` |
+| `StartWatching` | `Idle` | Add session heartbeat path, schedule immediate timer | `Scheduled` |
+| `StartWatching` | `Scheduled` | Add or reset session heartbeat path, keep timer scheduled | `Scheduled` |
+| `StartWatching` | `Probing` | Add or reset session heartbeat path, let next probe cycle include it | `Probing` |
 | `StartWatching` | `Disposed` | Throw `ObjectDisposedException` | `Disposed` |
 | `StopWatching` | `Idle` | No-op after remove attempt | `Idle` |
 | `StopWatching` | `Scheduled` with sessions left | Remove session, keep timer scheduled | `Scheduled` |
@@ -35,7 +35,7 @@ namespace HaloCreek.Services
     public sealed class TmuxService : IDisposable
     {
         private const string HaloCreekTempDirectory = "/tmp/halocreek";
-        private static int WatchCaptureLineCount = 10;
+        private const string HeartbeatDirectory = HaloCreekTempDirectory + "/heartbeats";
         private static readonly TimeSpan WatchPollInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(2);
 
@@ -96,6 +96,7 @@ namespace HaloCreek.Services
             {
                 // TODO: Add lifecycle boundary handling for launch work that outlives TmuxService.
                 RunTmuxCommand(arguments, "launch tmux session");
+                StartHeartbeatPipe(identifier);
                 TryRunTmuxCommand(new[] { "set-option", "-t", identifier, "mouse", "on" }, out _);
                 SetSessionMetadata(identifier, wslWorkspacePath, request.Title);
             });
@@ -198,7 +199,8 @@ namespace HaloCreek.Services
                     throw new ObjectDisposedException(nameof(TmuxService));
                 }
 
-                _watchedSessions[identifier] = new WatchedSessionState();
+                _watchedSessions[identifier] = new WatchedSessionState(
+                    GetHeartbeatPath(identifier));
                 if (_watchState == WatchState.Idle)
                 {
                     _watchState = WatchState.Scheduled;
@@ -274,17 +276,7 @@ namespace HaloCreek.Services
 
         private void ProbeAndPublishWatchedState(string identifier)
         {
-            var probeSucceeded = TryRunTmuxCommand(
-                new[] { "capture-pane", "-p", "-t", identifier, "-S", "-" + WatchCaptureLineCount },
-                out var output);
-
-            var now = DateTimeOffset.UtcNow;
-            var snapshot = probeSucceeded
-                ? NormalizeProcessOutput(output)
-                : string.Empty;
-            var newState = OngoingSessionState.Unknown;
-            var shouldNotify = false;
-
+            string heartbeatPath;
             lock (_watchStateLock)
             {
                 if (_watchState == WatchState.Disposed
@@ -293,21 +285,26 @@ namespace HaloCreek.Services
                     return;
                 }
 
-                if (probeSucceeded)
+                heartbeatPath = watchedSession.HeartbeatPath;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var heartbeatExists = _platformInfrastructure.TryGetWslFileLastWriteTimeUtc(
+                heartbeatPath,
+                out var heartbeatLastWriteTimeUtc);
+            var newState = heartbeatExists
+                ? now - heartbeatLastWriteTimeUtc < BackgroundIdleThreshold
+                    ? OngoingSessionState.BackgroundRunning
+                    : OngoingSessionState.BackgroundIdle
+                : OngoingSessionState.Unknown;
+            var shouldNotify = false;
+
+            lock (_watchStateLock)
+            {
+                if (_watchState == WatchState.Disposed
+                    || !_watchedSessions.TryGetValue(identifier, out var watchedSession))
                 {
-                    if (watchedSession.PaneSnapshot is null
-                        || !string.Equals(watchedSession.PaneSnapshot, snapshot, StringComparison.Ordinal))
-                    {
-                        watchedSession.PaneSnapshot = snapshot;
-                        watchedSession.LastOutputChangedAt = now;
-                        newState = OngoingSessionState.BackgroundRunning;
-                    }
-                    else
-                    {
-                        newState = now - watchedSession.LastOutputChangedAt < BackgroundIdleThreshold
-                            ? OngoingSessionState.BackgroundRunning
-                            : OngoingSessionState.BackgroundIdle;
-                    }
+                    return;
                 }
 
                 if (watchedSession.State != newState)
@@ -333,11 +330,70 @@ namespace HaloCreek.Services
 
         private sealed class WatchedSessionState
         {
+            public WatchedSessionState(string heartbeatPath)
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(heartbeatPath);
+
+                HeartbeatPath = heartbeatPath;
+            }
+
             public OngoingSessionState State { get; set; } = OngoingSessionState.Unknown;
 
-            public string? PaneSnapshot { get; set; }
+            public string HeartbeatPath { get; }
+        }
 
-            public DateTimeOffset LastOutputChangedAt { get; set; } = DateTimeOffset.UtcNow;
+        private void StartHeartbeatPipe(string identifier)
+        {
+            var heartbeatPath = GetHeartbeatPath(identifier);
+            _platformInfrastructure.TryRunWslCommand(
+                "mkdir",
+                new[] { "-p", HeartbeatDirectory },
+                out _);
+            _platformInfrastructure.TryRunWslCommand(
+                "touch",
+                new[] { heartbeatPath },
+                out _);
+
+            // The helper consumes pane output without storing it. It refreshes the
+            // heartbeat at most once per second, while sparse output still refreshes
+            // on the next non-empty read even if the pane output has no newline.
+            var helperScript = string.Join(
+                " ",
+                "heartbeat=$1;",
+                "last_touch=0;",
+                "while :; do",
+                "chunk=;",
+                "IFS= read -r -n 4096 -t 1 chunk;",
+                "status=$?;",
+                "if [ -n \"$chunk\" ]; then",
+                "now=${EPOCHSECONDS:-$(date +%s)};",
+                "if [ \"$now\" != \"$last_touch\" ]; then",
+                ": > \"$heartbeat\";",
+                "last_touch=$now;",
+                "fi;",
+                "fi;",
+                "if [ \"$status\" -eq 1 ] && [ -z \"$chunk\" ]; then",
+                "break;",
+                "fi;",
+                "done");
+
+            var helperCommand = _platformInfrastructure.BuildWslShellCommand(
+                "bash",
+                new[] { "-c", helperScript, "--", heartbeatPath });
+
+            // MVP boundary: HaloCreek-created sessions are single-window/single-pane.
+            // If the user manually changes panes or kills tmux outside HaloCreek, the
+            // heartbeat may age into idle instead of representing that external change.
+            RunTmuxCommand(
+                new[] { "pipe-pane", "-o", "-t", identifier + ":0.0", helperCommand },
+                "start heartbeat pipe");
+        }
+
+        private static string GetHeartbeatPath(string identifier)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+            return HeartbeatDirectory + "/" + identifier + ".heartbeat";
         }
 
         private void SetSessionMetadata(

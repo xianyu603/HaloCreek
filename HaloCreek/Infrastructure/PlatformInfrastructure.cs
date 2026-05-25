@@ -209,6 +209,44 @@ namespace HaloCreek.Infrastructure
             return candidates;
         }
 
+        public bool TryGetWslFileLastWriteTimeUtc(
+            string wslPath,
+            out DateTimeOffset lastWriteTimeUtc)
+        {
+            lastWriteTimeUtc = default;
+
+            if (string.IsNullOrWhiteSpace(wslPath))
+            {
+                return false;
+            }
+
+            foreach (var candidatePath in GetReadableWslPathCandidates(wslPath))
+            {
+                try
+                {
+                    if (!File.Exists(candidatePath))
+                    {
+                        continue;
+                    }
+
+                    lastWriteTimeUtc = new DateTimeOffset(
+                        File.GetLastWriteTimeUtc(candidatePath),
+                        TimeSpan.Zero);
+                    return true;
+                }
+                catch (Exception ex) when (ex is IOException
+                    or NotSupportedException
+                    or UnauthorizedAccessException
+                    or ArgumentException
+                    or PathTooLongException)
+                {
+                    continue;
+                }
+            }
+
+            return false;
+        }
+
         public Process? LaunchWslTerminalCommand(
             string workspacePath,
             string executableName,
