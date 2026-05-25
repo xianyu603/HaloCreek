@@ -36,6 +36,32 @@ namespace HaloCreek.Services
 
             _isDisposed = true;
             _tmuxService.StateChanged -= HandleTmuxStateChanged;
+
+            var sessionIds = _sessionsById.Keys.ToArray();
+
+            foreach (var sessionId in sessionIds)
+            {
+                try
+                {
+                    _tmuxService.StopWatching(sessionId);
+                }
+                catch (Exception)
+                {
+                    // Application shutdown must continue even if tmux cleanup fails.
+                }
+
+                try
+                {
+                    _tmuxService.Exit(sessionId);
+                }
+                catch (Exception)
+                {
+                    // Application shutdown must continue even if tmux cleanup fails.
+                }
+            }
+
+            _sessionsById.Clear();
+            _frontSessionId = null;
         }
 
         // TODO 可以考虑这里的部分错误throw 之后再说
@@ -230,25 +256,6 @@ namespace HaloCreek.Services
                 _frontSessionId = null;
             }
 
-            SessionsChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        public void Cleanup()
-        {
-            RequireUiThread();
-
-            var sessionIds = _sessionsById.Keys.ToArray();
-
-            foreach (var sessionId in sessionIds)
-            {
-                _tmuxService.StopWatching(sessionId);
-                _tmuxService.Exit(sessionId);
-            }
-
-            _sessionsById.Clear();
-            _frontSessionId = null;
-
-            _tmuxService.Cleanup();
             SessionsChanged?.Invoke(this, EventArgs.Empty);
         }
 

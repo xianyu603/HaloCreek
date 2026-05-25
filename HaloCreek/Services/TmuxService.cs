@@ -26,7 +26,7 @@ using HaloCreek.Models;
 | Probe finish | `Probing` with sessions left | Schedule next timer | `Scheduled` |
 | Probe finish | `Probing` with no sessions left | Keep timer stopped | `Idle` |
 | Probe finish | `Disposed` | Keep timer stopped | `Disposed` |
-| `Dispose` | Any state | Clear sessions, stop timer | `Disposed` |
+| `Dispose` | Any state | Clear sessions, stop timer, best effort kill keeper session | `Disposed` |
 */
 
 namespace HaloCreek.Services
@@ -139,12 +139,6 @@ namespace HaloCreek.Services
             _frontSessionId = identifier;
         }
 
-        public void Cleanup()
-        {
-            _frontSessionId = null;
-            TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
-        }
-
         public void Dispose()
         {
             lock (_watchStateLock)
@@ -156,10 +150,12 @@ namespace HaloCreek.Services
 
                 _watchState = WatchState.Disposed;
                 _watchedSessions.Clear();
+                _frontSessionId = null;
                 _watchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
 
             _watchTimer.Dispose();
+            TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
         }
 
         private void SwitchFrontClientCore(string identifier)

@@ -102,8 +102,8 @@ namespace HaloCreek
                 }
 
                 _isDisposed = true;
-                _sessionLifecycleService.Dispose();
                 _sessionHistoryRefreshService.Dispose();
+                _sessionLifecycleService.Dispose();
                 _tmuxService.Dispose();
             }
         }
