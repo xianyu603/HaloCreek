@@ -50,8 +50,8 @@
 - 执行 `git -C <workspace> status --porcelain=v1 -z`。
 - 解析 staged / unstaged 两列状态、rename/copy 原路径和目标路径。
 - 输出按路径排序的 `GitChangeInfo`。
-- 返回显式查询结果，例如 `GitChangesResult(Changes, Status, Message)`，用于区分 loaded / no workspace / not git repository / command failed。
-- 命令失败时允许 `Changes` 为空，但 `Status` 和 `Message` 必须说明失败原因；不要把失败静默伪装成“无变更”。
+- 返回显式查询结果，例如 `GitChangesResult(Changes, Message)`，用于承载修改列表和用户可见的调试/状态提示。
+- 命令失败时允许 `Changes` 为空，但 `Message` 必须说明失败原因；不要把失败静默伪装成“无变更”。
 
 `GitService.TryOpenDiffTool(...)`：
 

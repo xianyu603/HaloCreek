@@ -19,7 +19,6 @@ namespace HaloCreek.Services
             {
                 return new GitChangesResult(
                     Array.Empty<GitChangeInfo>(),
-                    GitChangesStatus.NoWorkspace,
                     "Select a workspace to view Git changes.");
             }
 
@@ -34,7 +33,6 @@ namespace HaloCreek.Services
             {
                 return new GitChangesResult(
                     Array.Empty<GitChangeInfo>(),
-                    GitChangesStatus.InvalidWorkspace,
                     $"Invalid workspace path: {workspacePath}");
             }
 
@@ -42,7 +40,6 @@ namespace HaloCreek.Services
             {
                 return new GitChangesResult(
                     Array.Empty<GitChangeInfo>(),
-                    GitChangesStatus.InvalidWorkspace,
                     $"Workspace path does not exist: {normalizedWorkspacePath}");
             }
 
@@ -52,18 +49,12 @@ namespace HaloCreek.Services
                 var message = string.IsNullOrWhiteSpace(commandResult.ErrorMessage)
                     ? "Git status failed."
                     : commandResult.ErrorMessage.Trim();
-                var isNotGitRepository = message.Contains(
-                    "not a git repository",
-                    StringComparison.OrdinalIgnoreCase);
-                var status = isNotGitRepository
-                    ? GitChangesStatus.NotGitRepository
-                    : GitChangesStatus.CommandFailed;
-                if (isNotGitRepository)
+                if (message.Contains("not a git repository", StringComparison.OrdinalIgnoreCase))
                 {
                     message = "Current workspace is not a Git repository.";
                 }
 
-                return new GitChangesResult(Array.Empty<GitChangeInfo>(), status, message);
+                return new GitChangesResult(Array.Empty<GitChangeInfo>(), message);
             }
 
             var changes = ParsePorcelainStatus(commandResult.Output)
@@ -74,7 +65,7 @@ namespace HaloCreek.Services
                 ? "No Git changes for current workspace."
                 : $"Loaded {changes.Length} Git changes.";
 
-            return new GitChangesResult(changes, GitChangesStatus.Loaded, loadedMessage);
+            return new GitChangesResult(changes, loadedMessage);
         }
 
         public bool TryOpenDiffTool(string workspacePath, GitChangeInfo change)

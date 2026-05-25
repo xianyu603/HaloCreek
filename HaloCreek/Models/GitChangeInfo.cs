@@ -31,16 +31,5 @@ namespace HaloCreek.Models
 
     public sealed record GitChangesResult(
         IReadOnlyList<GitChangeInfo> Changes,
-        GitChangesStatus Status,
         string Message);
-
-    // TODO 这个太啰嗦了 删掉
-    public enum GitChangesStatus
-    {
-        Loaded,
-        NoWorkspace,
-        InvalidWorkspace,
-        NotGitRepository,
-        CommandFailed
-    }
 }
