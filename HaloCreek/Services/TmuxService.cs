@@ -35,6 +35,7 @@ namespace HaloCreek.Services
     public sealed class TmuxService : IDisposable
     {
         private const string HaloCreekTempDirectory = "/tmp/halocreek";
+        private static int WatchCaptureLineCount = 10;
         private static readonly TimeSpan WatchPollInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(2);
 
@@ -274,7 +275,7 @@ namespace HaloCreek.Services
         private void ProbeAndPublishWatchedState(string identifier)
         {
             var probeSucceeded = TryRunTmuxCommand(
-                new[] { "capture-pane", "-p", "-t", identifier, "-S", "-200" },
+                new[] { "capture-pane", "-p", "-t", identifier, "-S", "-" + WatchCaptureLineCount },
                 out var output);
 
             var now = DateTimeOffset.UtcNow;
