@@ -5,7 +5,4 @@ resume with prompt
 Launch会卡住UI半天
 带着孤儿关机 再次启动会炸掉wsl 需要wsl --shutdown
 tmux复制行为是鼠标左键选择就复制 但是复制之后会到底下我不喜欢 改成在原地
-现在想复制历史session非常不方便 因为复制到一半会被异步读取刷新掉 改成别的页签异步读取 在这个页签手动refresh?
-tmux service的lock有些看不懂了 或者说对于lock究竟啥时候需要 agent写的很难理解
-lock之后需要想想怎么让维护性更高
-先处理dispose的事情
+on going session摘要

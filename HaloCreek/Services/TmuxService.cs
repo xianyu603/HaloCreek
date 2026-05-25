@@ -35,7 +35,7 @@ namespace HaloCreek.Services
     {
         private const string HaloCreekTempDirectory = "/tmp/halocreek";
         private static readonly TimeSpan WatchPollInterval = TimeSpan.FromSeconds(2);
-        private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(2);
 
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly string _frontClientId;
