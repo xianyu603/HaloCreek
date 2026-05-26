@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using HaloCreek.Services;
 
@@ -16,6 +17,8 @@ namespace HaloCreek.Services.SessionHistory
 
         public SessionHistoryResult GetSessions(string? workspacePath)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
             var config = _configService.LoadEffectiveConfig(workspacePath);
             var result = _reader.ReadSessions(workspacePath, config);
 

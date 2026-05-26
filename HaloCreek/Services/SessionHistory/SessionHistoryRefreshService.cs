@@ -12,14 +12,21 @@ namespace HaloCreek.Services.SessionHistory
     {
         private static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromSeconds(10);
 
+        private enum RefreshState
+        {
+            Idle,
+            Scheduled,
+            Refreshing,
+            Disposed
+        }
+
         private readonly SessionHistoryQueryService _queryService;
         private readonly TimeSpan _refreshInterval;
         private readonly Timer _refreshTimer;
         private readonly object _lock = new();
         private Action<SessionHistoryRefreshResult>? _refreshCompleted;
         private string? _workspacePath;
-        private bool _isRefreshRunning;
-        private bool _isDisposed;
+        private RefreshState _state = RefreshState.Idle;
 
         public SessionHistoryRefreshService(
             SessionHistoryQueryService queryService,
@@ -46,21 +53,38 @@ namespace HaloCreek.Services.SessionHistory
 
         public void SetWorkspacePath(string? workspacePath)
         {
+            var shouldStartRefresh = false;
+            string? refreshWorkspacePath = null;
+
             lock (_lock)
             {
-                ObjectDisposedException.ThrowIf(_isDisposed, this);// 契约 还想让我setworkspace不应该在那之前销毁我
+                ObjectDisposedException.ThrowIf(_state == RefreshState.Disposed, this);// 契约 还想让我setworkspace不应该在那之前销毁我
 
                 _workspacePath = workspacePath;
+                _refreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
                 if (string.IsNullOrWhiteSpace(workspacePath))
                 {
-                    _refreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                    if (_state != RefreshState.Refreshing)
+                    {
+                        _state = RefreshState.Idle;
+                    }
+
                     return;
                 }
 
-                _refreshTimer.Change(_refreshInterval, _refreshInterval);
+                if (_state != RefreshState.Refreshing)
+                {
+                    _state = RefreshState.Refreshing;
+                    refreshWorkspacePath = workspacePath;
+                    shouldStartRefresh = true;
+                }
             }
-            _ = RefreshAsync();
+
+            if (shouldStartRefresh)
+            {
+                _ = RefreshAsync(refreshWorkspacePath!);
+            }
         }
 
         public void SetRefreshCompletedHandler(Action<SessionHistoryRefreshResult> refreshCompleted)
@@ -72,12 +96,11 @@ namespace HaloCreek.Services.SessionHistory
         {
             lock (_lock)
             {
-                if (_isDisposed)
+                if (_state == RefreshState.Disposed)
                 {
-                    return;
+                    return;// 入乡随俗
                 }
-
-                _isDisposed = true;
+                _state = RefreshState.Disposed;
                 _refreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
 
@@ -86,30 +109,32 @@ namespace HaloCreek.Services.SessionHistory
 
         private void OnRefreshTimerTick(object? state)
         {
-            _ = RefreshAsync();
-        }
+            string? refreshWorkspacePath;
 
-        private async Task RefreshAsync()
-        {
-            string? workspacePath;
             lock (_lock)
             {
-                if (_isDisposed || _isRefreshRunning)
+                if (_state != RefreshState.Scheduled)
                 {
-                    // TODO 这里应当加日志
                     return;
                 }
+
+                _refreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
                 if (string.IsNullOrWhiteSpace(_workspacePath))
                 {
-                    // 为空不刷新
+                    _state = RefreshState.Idle;
                     return;
                 }
 
-                _isRefreshRunning = true;
-                workspacePath = _workspacePath;
+                _state = RefreshState.Refreshing;
+                refreshWorkspacePath = _workspacePath;
             }
 
+            _ = RefreshAsync(refreshWorkspacePath);
+        }
+
+        private async Task RefreshAsync(string workspacePath)
+        {
             SessionHistoryRefreshResult refreshResult;
 
             try
@@ -133,25 +158,46 @@ namespace HaloCreek.Services.SessionHistory
             SessionHistoryRefreshResult refreshResult)
         {
             var shouldNotify = false;
+            var shouldStartNextRefresh = false;
+            string? nextRefreshWorkspacePath = null;
 
             lock (_lock)
             {
-                if (_isDisposed)
+                if (_state == RefreshState.Disposed)
                 {
                     return;
                 }
 
-                _isRefreshRunning = false;
                 shouldNotify = string.Equals(
                     _workspacePath,
                     refreshWorkspacePath,
                     StringComparison.Ordinal);
+
+                if (string.IsNullOrWhiteSpace(_workspacePath))
+                {
+                    _state = RefreshState.Idle;
+                }
+                else if (shouldNotify)
+                {
+                    _state = RefreshState.Scheduled;
+                    _refreshTimer.Change(_refreshInterval, Timeout.InfiniteTimeSpan);
+                }
+                else
+                {
+                    _state = RefreshState.Refreshing;
+                    nextRefreshWorkspacePath = _workspacePath;
+                    shouldStartNextRefresh = true;
+                }
             }
 
             if (shouldNotify)
             {
-                var refreshCompleted = _refreshCompleted;
-                Dispatcher.UIThread.Post(() => refreshCompleted?.Invoke(refreshResult));
+                Dispatcher.UIThread.Post(() => _refreshCompleted?.Invoke(refreshResult));
+            }
+
+            if (shouldStartNextRefresh)
+            {
+                _ = RefreshAsync(nextRefreshWorkspacePath!);
             }
         }
     }
