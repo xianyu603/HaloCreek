@@ -27,7 +27,7 @@ using HaloCreek.Models;
 | Probe finish | `Probing` with sessions left | Schedule next timer | `Scheduled` |
 | Probe finish | `Probing` with no sessions left | Keep timer stopped | `Idle` |
 | Probe finish | `Disposed` | Keep timer stopped | `Disposed` |
-| `Dispose` | Any state | Clear sessions, stop timer, best effort kill keeper session | `Disposed` |
+| `Dispose` | Any state | Clear sessions, stop timer, wait pending exit tasks, best effort kill keeper session | `Disposed` |
 */
 
 namespace HaloCreek.Services
@@ -44,7 +44,9 @@ namespace HaloCreek.Services
         private readonly string _frontClientTtyMarkerPath;
         private readonly string _keeperSessionId;
         private readonly object _watchStateLock = new();
+        private readonly object _exitTasksLock = new();
         private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
+        private readonly List<Task> _exitTasks = new();
         private readonly Timer _watchTimer;
         private string? _frontSessionId;
         private WatchState _watchState;
@@ -107,9 +109,8 @@ namespace HaloCreek.Services
         public void Exit(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-            _ = Task.Run(() =>
+            var task = Task.Run(() =>
             {
-                // TODO: Add lifecycle boundary handling for launch work that outlives TmuxService.
                 if (string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
                 {
                     SwitchFrontClientCore(_keeperSessionId);
@@ -117,6 +118,11 @@ namespace HaloCreek.Services
                 }
                 TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
             });
+
+            lock (_exitTasksLock)
+            {
+                _exitTasks.Add(task);
+            }
         }
 
         public TerminalCommandSpec GetFrontClientStartupCommand(string initialIdentifier)
@@ -164,6 +170,7 @@ namespace HaloCreek.Services
             }
 
             _watchTimer.Dispose();
+            WaitForExitTasksToComplete();
             TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
         }
 
@@ -431,6 +438,28 @@ namespace HaloCreek.Services
             RunTmuxCommand(
                 new[] { "new-session", "-d", "-s", _keeperSessionId, "-c", "/", "--", "bash" },
                 "launch tmux keeper session");
+        }
+
+        private void WaitForExitTasksToComplete()
+        {
+            Task[] tasks;
+            lock (_exitTasksLock)
+            {
+                tasks = _exitTasks.ToArray();
+                _exitTasks.Clear();
+            }
+
+            foreach (var task in tasks)
+            {
+                try
+                {
+                    task.Wait();
+                }
+                catch (AggregateException)
+                {
+                    // Application shutdown must continue even if tmux cleanup fails.
+                }
+            }
         }
 
         private void RunTmuxCommand(
