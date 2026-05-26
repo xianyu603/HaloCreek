@@ -20,6 +20,7 @@ namespace HaloCreek.Services.SessionHistory
         };
 
         private readonly PlatformInfrastructure _platformInfrastructure;
+        private readonly Dictionary<string, CachedSessionFile> _fileCache = new(GetFilePathComparer());
 
         public CodexSessionHistoryReader(PlatformInfrastructure platformInfrastructure)
         {
@@ -41,27 +42,29 @@ namespace HaloCreek.Services.SessionHistory
                 return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
             }
 
+            var sessionFiles = EnumerateLatestSessionFiles(
+                sessionHistoryRootPath,
+                config.MaxSessionHistoryFiles);
+
             var sessions = new List<HistorySessionInfo>();
             var skippedFileCount = 0;
-            foreach (var sessionFilePath in EnumerateLatestSessionFiles(
-                sessionHistoryRootPath,
-                config.MaxSessionHistoryFiles))
+            PruneFileCache(sessionFiles);
+
+            foreach (var sessionFile in sessionFiles)
             {
-                try
-                {
-                    var session = ReadSessionFile(sessionFilePath, workspacePath);
-                    if (session is not null)
-                    {
-                        sessions.Add(session);
-                    }
-                }
-                catch (Exception ex) when (ex is JsonException
-                    or IOException
-                    or InvalidDataException
-                    or NotSupportedException
-                    or UnauthorizedAccessException)
+                var cachedSessionFile = GetCachedSessionFile(sessionFile);
+                if (!cachedSessionFile.WasParsedSuccessfully)
                 {
                     skippedFileCount++;
+                    continue;
+                }
+
+                if (cachedSessionFile.Session is not null
+                    && PlatformInfrastructure.AreWorkspacePathsEquivalent(
+                        cachedSessionFile.Session.WorkspacePath,
+                        workspacePath))
+                {
+                    sessions.Add(cachedSessionFile.Session);
                 }
             }
 
@@ -173,7 +176,7 @@ namespace HaloCreek.Services.SessionHistory
                 + string.Join(separator.ToString(), segments);
         }
 
-        private static IEnumerable<string> EnumerateLatestSessionFiles(
+        private static IReadOnlyList<SessionFileMetadata> EnumerateLatestSessionFiles(
             string sessionHistoryRootPath,
             int maxSessionHistoryFiles)
         {
@@ -187,18 +190,69 @@ namespace HaloCreek.Services.SessionHistory
                     .Select(path => new FileInfo(path))
                     .OrderByDescending(file => file.LastWriteTimeUtc)
                     .Take(maxSessionHistoryFiles)
-                    .Select(file => file.FullName)
+                    .Select(file => new SessionFileMetadata(
+                        file.FullName,
+                        file.LastWriteTimeUtc,
+                        file.Length))
                     .ToArray();
             }
             catch (Exception ex) when (ex is IOException
                 or NotSupportedException
                 or UnauthorizedAccessException)
             {
-                return Array.Empty<string>();
+                return Array.Empty<SessionFileMetadata>();
             }
         }
 
-        private static HistorySessionInfo? ReadSessionFile(string sessionFilePath, string workspacePath)
+        private CachedSessionFile GetCachedSessionFile(SessionFileMetadata sessionFile)
+        {
+            if (_fileCache.TryGetValue(sessionFile.FilePath, out var cachedSessionFile)
+                && cachedSessionFile.Metadata.HasSameContentAs(sessionFile))
+            {
+                return cachedSessionFile;
+            }
+
+            try
+            {
+                cachedSessionFile = new CachedSessionFile(
+                    sessionFile,
+                    ReadSessionFile(sessionFile.FilePath),
+                    WasParsedSuccessfully: true);
+            }
+            catch (Exception ex) when (ex is JsonException
+                or IOException
+                or InvalidDataException
+                or NotSupportedException
+                or UnauthorizedAccessException)
+            {
+                cachedSessionFile = new CachedSessionFile(
+                    sessionFile,
+                    Session: null,
+                    WasParsedSuccessfully: false);
+            }
+
+            _fileCache[sessionFile.FilePath] = cachedSessionFile;
+            return cachedSessionFile;
+        }
+
+        private void PruneFileCache(IReadOnlyList<SessionFileMetadata> sessionFiles)
+        {
+            // 删掉之前缓存 但是本轮没有枚举的cache
+            var activePaths = new HashSet<string>(
+                sessionFiles.Select(sessionFile => sessionFile.FilePath),
+                _fileCache.Comparer);
+            var cachedPaths = _fileCache.Keys.ToArray();
+
+            foreach (var cachedPath in cachedPaths)
+            {
+                if (!activePaths.Contains(cachedPath))
+                {
+                    _fileCache.Remove(cachedPath);
+                }
+            }
+        }
+
+        private static HistorySessionInfo ReadSessionFile(string sessionFilePath)
         {
             string? id = null;
             string? sessionWorkspacePath = null;
@@ -272,11 +326,6 @@ namespace HaloCreek.Services.SessionHistory
             if (lastUpdatedAt is null)
             {
                 throw new InvalidDataException("Session last updated timestamp is missing.");
-            }
-
-            if (!PlatformInfrastructure.AreWorkspacePathsEquivalent(sessionWorkspacePath, workspacePath))
-            {
-                return null;
             }
 
             return new HistorySessionInfo(
@@ -449,5 +498,29 @@ namespace HaloCreek.Services.SessionHistory
             var value = property.GetString();
             return DateTimeOffset.TryParse(value, out timestamp);
         }
+
+        private static StringComparer GetFilePathComparer()
+        {
+            return OperatingSystem.IsWindows()
+                ? StringComparer.OrdinalIgnoreCase
+                : StringComparer.Ordinal;
+        }
+
+        private sealed record SessionFileMetadata(
+            string FilePath,
+            DateTime LastWriteTimeUtc,
+            long Length)
+        {
+            public bool HasSameContentAs(SessionFileMetadata other)
+            {
+                return LastWriteTimeUtc == other.LastWriteTimeUtc
+                    && Length == other.Length;
+            }
+        }
+
+        private sealed record CachedSessionFile(
+            SessionFileMetadata Metadata,
+            HistorySessionInfo? Session,
+            bool WasParsedSuccessfully);
     }
 }
