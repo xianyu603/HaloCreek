@@ -14,6 +14,8 @@ namespace HaloCreek
 {
     public partial class App : Application
     {
+        private const string StartupWorkspacePath = @"D:\work\HaloCreek";
+
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -26,8 +28,6 @@ namespace HaloCreek
                 var mainWindow = new MainWindow();
                 var appServices = CreateAppServices(mainWindow);
                 mainWindow.DataContext = appServices.MainWindowViewModel;
-                mainWindow.Opened += async (_, _) =>
-                    await appServices.MainWindowViewModel.LoadConfigAndApplyDefaultWorkspaceAsync();
                 desktop.Exit += (_, _) => appServices.Dispose();
                 desktop.MainWindow = mainWindow;
             }
@@ -38,6 +38,7 @@ namespace HaloCreek
         private static AppServices CreateAppServices(MainWindow mainWindow)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
+            var startupWorkspacePath = ResolveStartupWorkspacePath(platformInfrastructure);
             var configService = new ConfigService();
             var tmuxService = new TmuxService(platformInfrastructure);
             var terminalService = new TerminalService(platformInfrastructure);
@@ -59,8 +60,7 @@ namespace HaloCreek
             var workspaceFooter = new WorkspaceFooterViewModel(platformInfrastructure);
 
             var mainWindowViewModel = new MainWindowViewModel(
-                platformInfrastructure,
-                configService,
+                startupWorkspacePath,
                 promptEditor,
                 historySessions,
                 git,
@@ -71,6 +71,24 @@ namespace HaloCreek
                 sessionLifecycleService,
                 sessionHistoryRefreshService,
                 tmuxService);
+        }
+
+        private static string ResolveStartupWorkspacePath(PlatformInfrastructure platformInfrastructure)
+        {
+            ArgumentNullException.ThrowIfNull(platformInfrastructure);
+
+            if (platformInfrastructure.TryNormalizeExistingDirectoryPath(StartupWorkspacePath, out var normalizedPath))
+            {
+                return normalizedPath;
+            }
+
+            var homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (platformInfrastructure.TryNormalizeExistingDirectoryPath(homePath, out normalizedPath))
+            {
+                return normalizedPath;
+            }
+
+            return AppContext.BaseDirectory;
         }
 
         private sealed class AppServices : IDisposable

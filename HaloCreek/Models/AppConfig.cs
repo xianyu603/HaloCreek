@@ -9,7 +9,6 @@ namespace HaloCreek.Models
         IReadOnlyList<string> CodexLaunchArguments,
         int MaxSessionHistoryFiles,
         string DiffToolPath,
-        string DefaultWorkspacePath,
         string GitFileBrowserDoubleClickActionId,
         IReadOnlyList<GitFileBrowserActionConfig> GitFileBrowserActions)
     {
@@ -17,7 +16,6 @@ namespace HaloCreek.Models
             "codex",
             Array.Empty<string>(),
             100,
-            string.Empty,
             string.Empty,
             "Open",
             new[]
@@ -57,6 +55,13 @@ namespace HaloCreek.Models
                     GitFileBrowserActionPlacement.Right,
                     "TortoiseGitProc.exe",
                     new[] { "/command:commit", "/path:{WorkspaceRoot}" }),
+                new GitFileBrowserActionConfig(
+                    "ShowLog",
+                    "Show Log",
+                    true,
+                    GitFileBrowserActionPlacement.Right,
+                    "TortoiseGitProc.exe",
+                    new[] { "/command:log", "/path:{WorkspaceRoot}" }),
             });
     }
 

@@ -36,8 +36,10 @@ namespace HaloCreek.Services
             _globalConfigPath = globalConfigPath;
         }
 
-        public AppConfig LoadEffectiveConfig(string? workspacePath)
+        public AppConfig LoadEffectiveConfig(string workspacePath)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
             var config = ApplyConfigFile(AppConfig.DefaultForMvp1, _globalConfigPath);
             var workspaceConfigPath = TryGetWorkspaceConfigPath(workspacePath);
 
@@ -57,13 +59,8 @@ namespace HaloCreek.Services
             return Path.Combine(appDataPath, AppDirectoryName, ConfigFileName);
         }
 
-        private static string? TryGetWorkspaceConfigPath(string? workspacePath)
+        private static string? TryGetWorkspaceConfigPath(string workspacePath)
         {
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                return null;
-            }
-
             try
             {
                 return Path.Combine(
@@ -111,7 +108,6 @@ namespace HaloCreek.Services
                 Coalesce(fileConfig.CodexLaunchArguments, baseConfig.CodexLaunchArguments),
                 CoalescePositive(fileConfig.MaxSessionHistoryFiles, baseConfig.MaxSessionHistoryFiles),
                 Coalesce(fileConfig.DiffToolPath, baseConfig.DiffToolPath),
-                Coalesce(fileConfig.DefaultWorkspacePath, baseConfig.DefaultWorkspacePath),
                 Coalesce(fileConfig.GitFileBrowserDoubleClickActionId, baseConfig.GitFileBrowserDoubleClickActionId),
                 Coalesce(fileConfig.GitFileBrowserActions, baseConfig.GitFileBrowserActions));
         }
@@ -157,8 +153,6 @@ namespace HaloCreek.Services
             public int? MaxSessionHistoryFiles { get; init; }
 
             public string? DiffToolPath { get; init; }
-
-            public string? DefaultWorkspacePath { get; init; }
 
             public string? GitFileBrowserDoubleClickActionId { get; init; }
 

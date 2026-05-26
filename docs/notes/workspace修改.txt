@@ -1,0 +1,2 @@
+1. 删掉从配置读workspace 配置统一成在workspace确定后读取最终版 启动时workspace先写死成当前项目
+2. %AppData%缓存上一次打开的workspace 每次都打开上次打开的

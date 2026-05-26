@@ -37,7 +37,6 @@ namespace HaloCreek.ViewModels.Tabs
             RefreshCommand = new RelayCommand(RefreshChanges, () => HasWorkspace);
             RunActionCommand = new RelayCommand<GitFileActionButtonViewModel>(RunAction, CanRunAction);
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
-            LoadActionConfig();
         }
 
         public string? WorkspacePath
@@ -123,7 +122,6 @@ namespace HaloCreek.ViewModels.Tabs
 
         public void RefreshChanges()
         {
-            LoadActionConfig();
             var result = _gitService.GetChanges(WorkspacePath);
 
             SelectedChange = null;
@@ -136,7 +134,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void LoadActionConfig()
         {
-            var config = _configService.LoadEffectiveConfig(WorkspacePath);
+            var config = _configService.LoadEffectiveConfig(WorkspacePath!);
             _doubleClickActionId = config.GitFileBrowserDoubleClickActionId;
             _doubleClickAction = config.GitFileBrowserActions.FirstOrDefault(
                 configuredAction => string.Equals(

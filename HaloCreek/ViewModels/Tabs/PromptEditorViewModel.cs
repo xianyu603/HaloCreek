@@ -103,8 +103,8 @@ namespace HaloCreek.ViewModels.Tabs
                 return new SessionLaunchResult(false, "Prompt is empty.", null);
             }
 
-            var config = _configService.LoadEffectiveConfig(WorkspacePath);
-            return _sessionLifecycleService.Launch(WorkspacePath, PromptText, config);
+            var config = _configService.LoadEffectiveConfig(WorkspacePath!);
+            return _sessionLifecycleService.Launch(WorkspacePath!, PromptText, config);
         }
 
         private bool CanLaunchPrompt()

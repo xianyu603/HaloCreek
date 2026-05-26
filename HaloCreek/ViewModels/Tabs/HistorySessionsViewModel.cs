@@ -187,8 +187,8 @@ namespace HaloCreek.ViewModels.Tabs
                 return;
             }
 
-            var config = _configService.LoadEffectiveConfig(WorkspacePath);
-            var result = _sessionLifecycleService.Resume(session, WorkspacePath ?? string.Empty, config);
+            var config = _configService.LoadEffectiveConfig(WorkspacePath!);
+            var result = _sessionLifecycleService.Resume(session, WorkspacePath!, config);
             _statusDispatcher?.Invoke(result.StatusMessage);
         }
 
