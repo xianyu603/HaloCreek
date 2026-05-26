@@ -117,17 +117,32 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void ApplySearch()
         {
-            Sessions = FilterSessions(_loadedSessions, SearchText);
+            var filteredSessions = FilterSessions(_loadedSessions, SearchText);
+            var previousSelection = SelectedSession;
 
-            if (SelectedSession is null)
+            if (!AreVisibleSessionListsEquivalent(Sessions, filteredSessions))
+            {
+                Sessions = filteredSessions;
+            }
+
+            if (previousSelection is null)
             {
                 return;
             }
 
-            var refreshedSelection = Sessions.FirstOrDefault(
-                session => string.Equals(session.Id, SelectedSession.Id, StringComparison.Ordinal));
+            var refreshedSelection = filteredSessions.FirstOrDefault(
+                session => string.Equals(session.Id, previousSelection.Id, StringComparison.Ordinal));
 
-            SelectedSession = refreshedSelection;
+            if (refreshedSelection is null)
+            {
+                SelectedSession = null;
+                return;
+            }
+
+            if (!AreSelectedSessionDetailsEquivalent(previousSelection, refreshedSelection))
+            {
+                SelectedSession = refreshedSelection;
+            }
         }
 
         private static IReadOnlyList<HistorySessionInfo> FilterSessions(
@@ -145,6 +160,47 @@ namespace HaloCreek.ViewModels.Tabs
                 .Where(session =>
                     session.InitialPrompt.Contains(query, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
+        }
+
+        private static bool AreVisibleSessionListsEquivalent(
+            IReadOnlyList<HistorySessionInfo> currentSessions,
+            IReadOnlyList<HistorySessionInfo> refreshedSessions)
+        {
+            if (currentSessions.Count != refreshedSessions.Count)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < currentSessions.Count; index++)
+            {
+                var currentSession = currentSessions[index];
+                var refreshedSession = refreshedSessions[index];
+
+                if (!string.Equals(currentSession.Id, refreshedSession.Id, StringComparison.Ordinal) ||
+                    !AreVisibleSessionFieldsEquivalent(currentSession, refreshedSession))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool AreVisibleSessionFieldsEquivalent(
+            HistorySessionInfo currentSession,
+            HistorySessionInfo refreshedSession)
+        {
+            return string.Equals(currentSession.CreatedAtLocalText, refreshedSession.CreatedAtLocalText, StringComparison.Ordinal) &&
+                string.Equals(currentSession.LastUpdatedAtLocalText, refreshedSession.LastUpdatedAtLocalText, StringComparison.Ordinal) &&
+                string.Equals(currentSession.InitialPromptText, refreshedSession.InitialPromptText, StringComparison.Ordinal) &&
+                string.Equals(currentSession.LatestActivityText, refreshedSession.LatestActivityText, StringComparison.Ordinal);
+        }
+
+        private static bool AreSelectedSessionDetailsEquivalent(
+            HistorySessionInfo currentSession,
+            HistorySessionInfo refreshedSession)
+        {
+            return string.Equals(currentSession.SessionSummaryText, refreshedSession.SessionSummaryText, StringComparison.Ordinal);
         }
 
         private void HandleRefreshCompleted(SessionHistoryRefreshResult refreshResult)
