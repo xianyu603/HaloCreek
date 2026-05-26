@@ -1,3 +1,4 @@
 删掉无参构造函数 精简逻辑 避免业务逻辑静默缺失
 resume with prompt
 带着孤儿关机 再次启动会炸掉wsl 需要wsl --shutdown
+退出时偶现session未关全：tmux exit后立即返回但session异步结束，需等待/轮询确认结束再完成清理
