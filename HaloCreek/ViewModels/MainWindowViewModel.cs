@@ -2,6 +2,7 @@
 
 using System;
 using HaloCreek.Models;
+using HaloCreek.Services;
 using HaloCreek.ViewModels.Components;
 using HaloCreek.ViewModels.Tabs;
 
@@ -11,16 +12,19 @@ namespace HaloCreek.ViewModels
     {
         private const int PromptEditorTabIndex = 0;
 
+        private readonly WorkspaceCacheService _workspaceCacheService;
         private string? _currentWorkspacePath;
         private int _selectedTabIndex;
 
         public MainWindowViewModel(
             string startupWorkspacePath,
+            WorkspaceCacheService workspaceCacheService,
             PromptEditorViewModel promptEditor,
             HistorySessionsViewModel historySessions,
             GitViewModel git,
             WorkspaceFooterViewModel workspaceFooter)
         {
+            _workspaceCacheService = workspaceCacheService ?? throw new ArgumentNullException(nameof(workspaceCacheService));
             PromptEditor = promptEditor;
             HistorySessions = historySessions;
             Git = git;
@@ -31,7 +35,7 @@ namespace HaloCreek.ViewModels
             HistorySessions.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
             HistorySessions.SetReeditInitialPromptDispatcher(ReeditInitialPrompt);
             Git.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
-            ApplyValidatedWorkspacePath(startupWorkspacePath);
+            SetWorkspacePath(startupWorkspacePath, cacheWorkspace: false);
         }
 
         public PromptEditorViewModel PromptEditor { get; }
@@ -56,6 +60,11 @@ namespace HaloCreek.ViewModels
 
         public void ApplyValidatedWorkspacePath(string workspacePath)
         {
+            SetWorkspacePath(workspacePath, cacheWorkspace: true);
+        }
+
+        private void SetWorkspacePath(string workspacePath, bool cacheWorkspace)
+        {
             ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
 
             CurrentWorkspacePath = workspacePath;
@@ -64,6 +73,11 @@ namespace HaloCreek.ViewModels
             HistorySessions.SetWorkspacePath(workspacePath);
             Git.SetWorkspacePath(workspacePath);
             WorkspaceFooter.SetWorkspacePath(workspacePath);
+
+            if (cacheWorkspace)
+            {
+                _workspaceCacheService.TrySaveLastWorkspacePath(workspacePath);
+            }
         }
 
         private void ReeditInitialPrompt(HistorySessionInfo session)

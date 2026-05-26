@@ -14,8 +14,6 @@ namespace HaloCreek
 {
     public partial class App : Application
     {
-        private const string StartupWorkspacePath = @"D:\work\HaloCreek";
-
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -38,7 +36,8 @@ namespace HaloCreek
         private static AppServices CreateAppServices(MainWindow mainWindow)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
-            var startupWorkspacePath = ResolveStartupWorkspacePath(platformInfrastructure);
+            var workspaceCacheService = new WorkspaceCacheService();
+            var startupWorkspacePath = ResolveStartupWorkspacePath(platformInfrastructure, workspaceCacheService);
             var configService = new ConfigService();
             var tmuxService = new TmuxService(platformInfrastructure);
             var terminalService = new TerminalService(platformInfrastructure);
@@ -61,6 +60,7 @@ namespace HaloCreek
 
             var mainWindowViewModel = new MainWindowViewModel(
                 startupWorkspacePath,
+                workspaceCacheService,
                 promptEditor,
                 historySessions,
                 git,
@@ -73,11 +73,15 @@ namespace HaloCreek
                 tmuxService);
         }
 
-        private static string ResolveStartupWorkspacePath(PlatformInfrastructure platformInfrastructure)
+        private static string ResolveStartupWorkspacePath(
+            PlatformInfrastructure platformInfrastructure,
+            WorkspaceCacheService workspaceCacheService)
         {
             ArgumentNullException.ThrowIfNull(platformInfrastructure);
+            ArgumentNullException.ThrowIfNull(workspaceCacheService);
 
-            if (platformInfrastructure.TryNormalizeExistingDirectoryPath(StartupWorkspacePath, out var normalizedPath))
+            var cachedWorkspacePath = workspaceCacheService.LoadLastWorkspacePath();
+            if (platformInfrastructure.TryNormalizeExistingDirectoryPath(cachedWorkspacePath, out var normalizedPath))
             {
                 return normalizedPath;
             }
