@@ -70,7 +70,6 @@
                          ItemsSource="{Binding Sessions}"
                          SelectedItem="{Binding SelectedSession, Mode=TwoWay}"
                          SelectionMode="Single"
-                         IsVisible="{Binding HasSessions}"
                          BorderThickness="0"
                          Background="White"
                          Padding="0"
@@ -142,42 +141,6 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-
-                <Grid Grid.Row="1"
-                      MinHeight="160"
-                      Background="#FFFFFF"
-                      IsVisible="{Binding IsEmptyStateVisible}">
-                    <TextBlock Text="No sessions for current workspace"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Foreground="#64748B"/>
-                </Grid>
-
-                <Grid Grid.Row="1"
-                      Background="#FFFFFF"
-                      IsVisible="False">
-                    <TextBlock Text="Loading sessions..."
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Foreground="#64748B"/>
-                </Grid>
-
-                <Grid Grid.Row="1"
-                      Background="#FFFFFF"
-                      IsVisible="False">
-                    <Border Background="#FEF2F2"
-                            BorderBrush="#FCA5A5"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Padding="12"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            MaxWidth="460">
-                        <TextBlock Text="Could not load session history."
-                                   TextWrapping="Wrap"
-                                   Foreground="#991B1B"/>
-                    </Border>
-                </Grid>
             </Grid>
         </Border>
 

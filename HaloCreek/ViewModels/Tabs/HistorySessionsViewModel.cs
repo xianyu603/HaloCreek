@@ -62,14 +62,7 @@ namespace HaloCreek.ViewModels.Tabs
         public IReadOnlyList<HistorySessionInfo> Sessions
         {
             get => _sessions;
-            private set
-            {
-                if (SetProperty(ref _sessions, value))
-                {
-                    OnPropertyChanged(nameof(HasSessions));
-                    OnPropertyChanged(nameof(IsEmptyStateVisible));
-                }
-            }
+            private set => SetProperty(ref _sessions, value);
         }
 
         public HistorySessionInfo? SelectedSession
@@ -85,10 +78,6 @@ namespace HaloCreek.ViewModels.Tabs
                 }
             }
         }
-
-        public bool HasSessions => Sessions.Count > 0;
-
-        public bool IsEmptyStateVisible => !HasSessions;
 
         public string SelectedSessionSummaryText => SelectedSession?.SessionSummaryText ?? string.Empty;
 
