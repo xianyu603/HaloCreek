@@ -1,6 +1,7 @@
 // agent 开发平台
 
 using System;
+using System.Collections.Generic;
 using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.ViewModels.Components;
@@ -13,6 +14,7 @@ namespace HaloCreek.ViewModels
         private const int PromptEditorTabIndex = 0;
 
         private readonly WorkspaceCacheService _workspaceCacheService;
+        private readonly IReadOnlyList<ViewModelBase> _tabViewModels;
         private string? _currentWorkspacePath;
         private int _selectedTabIndex;
 
@@ -29,6 +31,7 @@ namespace HaloCreek.ViewModels
             HistorySessions = historySessions;
             Git = git;
             WorkspaceFooter = workspaceFooter;
+            _tabViewModels = new ViewModelBase[] { PromptEditor, HistorySessions, Git };
 
             WorkspaceFooter.SetWorkspaceDispatcher(ApplyValidatedWorkspacePath);
             PromptEditor.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
@@ -55,7 +58,16 @@ namespace HaloCreek.ViewModels
         public int SelectedTabIndex
         {
             get => _selectedTabIndex;
-            set => SetProperty(ref _selectedTabIndex, value);
+            set
+            {
+                if (SetProperty(ref _selectedTabIndex, value)
+                    && value >= 0
+                    && value < _tabViewModels.Count
+                    && _tabViewModels[value] is ITabSelectionAware selectedTab)
+                {
+                    selectedTab.OnSelected();
+                }
+            }
         }
 
         public void ApplyValidatedWorkspacePath(string workspacePath)

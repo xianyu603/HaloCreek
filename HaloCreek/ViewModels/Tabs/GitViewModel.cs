@@ -7,7 +7,7 @@ using HaloCreek.Services;
 
 namespace HaloCreek.ViewModels.Tabs
 {
-    public sealed class GitViewModel : ViewModelBase
+    public sealed class GitViewModel : ViewModelBase, ITabSelectionAware
     {
         private const string InitialEmptyStateText = "Select a workspace to view Git changes";
 
@@ -118,6 +118,11 @@ namespace HaloCreek.ViewModels.Tabs
         public void SetStatusDispatcher(Action<string> statusDispatcher)
         {
             _statusDispatcher = statusDispatcher ?? throw new ArgumentNullException(nameof(statusDispatcher));
+        }
+
+        public void OnSelected()
+        {
+            RefreshChanges();
         }
 
         public void RefreshChanges()
