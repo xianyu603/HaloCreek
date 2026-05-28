@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Infrastructure;
 using HaloCreek.Services;
@@ -107,14 +106,7 @@ namespace HaloCreek.ViewModels.Components
 
         private void OnStatusTextChanged(string statusText)
         {
-            // TODO 这个dispatch应该在service层隔离
-            if (Dispatcher.UIThread.CheckAccess())
-            {
-                StatusText = statusText;
-                return;
-            }
-
-            Dispatcher.UIThread.Post(() => StatusText = statusText);
+            StatusText = statusText;
         }
     }
 }

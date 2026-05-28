@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia.Threading;
+using HaloCreek.Logging;
 
 namespace HaloCreek.Services
 {
@@ -9,6 +11,7 @@ namespace HaloCreek.Services
         private readonly object _entriesLock = new();
         private readonly List<ApplicationStatusEntry> _entries = new();
         private long _nextSequence;
+        private bool _isStatusDirty;
         private string _currentStatusText = string.Empty;
 
         public event Action<string>? StatusTextChanged;
@@ -27,27 +30,21 @@ namespace HaloCreek.Services
         {
             ArgumentNullException.ThrowIfNull(handle);
 
-            string? changedStatusText = null;
             lock (_entriesLock)
             {
                 var removedCount = _entries.RemoveAll(entry => entry.Handle.Id == handle.Id);
                 if (removedCount > 0)
                 {
-                    changedStatusText = RecalculateCurrentStatusText();
+                    MarkStatusDirtyLocked();
                 }
             }
-
-            PublishIfChanged(changedStatusText);
         }
 
-        // TODO 存在并发风险 lock解锁之后如果又另一个人直接publish 会导致后计算的被先计算的覆盖掉
-        // 好像需要一个串行的publisher 不能在对外接口里面publish 之后再改
         private ApplicationStatusHandle AddStatus(ApplicationStatusKind kind, string message)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(message);
 
             var handle = new ApplicationStatusHandle(Guid.NewGuid());
-            string? changedStatusText;
 
             lock (_entriesLock)
             {
@@ -56,35 +53,59 @@ namespace HaloCreek.Services
                     kind,
                     message,
                     _nextSequence++));
-                changedStatusText = RecalculateCurrentStatusText();
+                MarkStatusDirtyLocked();
             }
 
-            PublishIfChanged(changedStatusText);
             return handle;
         }
 
-        private string? RecalculateCurrentStatusText()
+        private void MarkStatusDirtyLocked()
         {
-            var nextStatusText = _entries
-                .OrderByDescending(entry => entry.Kind)
-                .ThenByDescending(entry => entry.Sequence)
-                .Select(entry => entry.Message)
-                .FirstOrDefault() ?? string.Empty;
-
-            if (string.Equals(_currentStatusText, nextStatusText, StringComparison.Ordinal))
+            if (_isStatusDirty)
             {
-                return null;
+                return;
             }
 
-            _currentStatusText = nextStatusText;
-            return nextStatusText;
+            _isStatusDirty = true;
+            Dispatcher.UIThread.Post(PublishCurrentStatusTextIfDirty);
         }
 
-        private void PublishIfChanged(string? statusText)
+        private void PublishCurrentStatusTextIfDirty()
         {
-            if (statusText is not null)
+            bool needPublish = false;
+            lock (_entriesLock)
             {
-                StatusTextChanged?.Invoke(statusText);
+                if (!_isStatusDirty)
+                {
+                    return;
+                }
+
+                _isStatusDirty = false;
+                var nextStatusText = _entries
+                    .OrderByDescending(entry => entry.Kind)
+                    .ThenByDescending(entry => entry.Sequence)
+                    .Select(entry => entry.Message)
+                    .FirstOrDefault() ?? string.Empty;
+
+                if (!string.Equals(_currentStatusText, nextStatusText, StringComparison.Ordinal))
+                {
+                    _currentStatusText = nextStatusText;
+                    needPublish = true;
+                }
+            }
+
+            if (!needPublish)
+            {
+                return;
+            }
+
+            try
+            {
+                StatusTextChanged?.Invoke(_currentStatusText);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("ApplicationStatus", ex, "Status text subscriber failed.");
             }
         }
 
