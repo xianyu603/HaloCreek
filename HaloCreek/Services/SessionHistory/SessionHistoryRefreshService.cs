@@ -26,6 +26,7 @@ namespace HaloCreek.Services.SessionHistory
         private readonly object _lock = new();
         private Action<SessionHistoryRefreshResult>? _refreshCompleted;
         private string? _workspacePath;
+        private int _maxSessionHistoryFiles;
         private RefreshState _state = RefreshState.Idle;
 
         public SessionHistoryRefreshService(
@@ -46,21 +47,24 @@ namespace HaloCreek.Services.SessionHistory
                 Timeout.InfiniteTimeSpan);
         }
 
-        public SessionHistoryRefreshService(ISessionHistoryReader reader, ConfigService configService)
-            : this(new SessionHistoryQueryService(reader, configService))
+        public SessionHistoryRefreshService(ISessionHistoryReader reader)
+            : this(new SessionHistoryQueryService(reader))
         {
         }
 
-        public void SetWorkspacePath(string? workspacePath)
+        // TODO 这个接口可以考虑改名 并非SetWorkSpacePath
+        public void SetWorkspacePath(string? workspacePath, int maxSessionHistoryFiles)
         {
             var shouldStartRefresh = false;
             string? refreshWorkspacePath = null;
+            var refreshMaxSessionHistoryFiles = 0;
 
             lock (_lock)
             {
                 ObjectDisposedException.ThrowIf(_state == RefreshState.Disposed, this);// 契约 还想让我setworkspace不应该在那之前销毁我
 
                 _workspacePath = workspacePath;
+                _maxSessionHistoryFiles = maxSessionHistoryFiles;
                 _refreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
                 if (string.IsNullOrWhiteSpace(workspacePath))
@@ -77,13 +81,14 @@ namespace HaloCreek.Services.SessionHistory
                 {
                     _state = RefreshState.Refreshing;
                     refreshWorkspacePath = workspacePath;
+                    refreshMaxSessionHistoryFiles = maxSessionHistoryFiles;
                     shouldStartRefresh = true;
                 }
             }
 
             if (shouldStartRefresh)
             {
-                _ = RefreshAsync(refreshWorkspacePath!);
+                _ = RefreshAsync(refreshWorkspacePath!, refreshMaxSessionHistoryFiles);
             }
         }
 
@@ -110,6 +115,7 @@ namespace HaloCreek.Services.SessionHistory
         private void OnRefreshTimerTick(object? state)
         {
             string? refreshWorkspacePath;
+            int refreshMaxSessionHistoryFiles;
 
             lock (_lock)
             {
@@ -128,19 +134,20 @@ namespace HaloCreek.Services.SessionHistory
 
                 _state = RefreshState.Refreshing;
                 refreshWorkspacePath = _workspacePath;
+                refreshMaxSessionHistoryFiles = _maxSessionHistoryFiles;
             }
 
-            _ = RefreshAsync(refreshWorkspacePath);
+            _ = RefreshAsync(refreshWorkspacePath, refreshMaxSessionHistoryFiles);
         }
 
-        private async Task RefreshAsync(string workspacePath)
+        private async Task RefreshAsync(string workspacePath, int maxSessionHistoryFiles)
         {
             SessionHistoryRefreshResult refreshResult;
 
             try
             {
                 var historyResult = await Task
-                    .Run(() => _queryService.GetSessions(workspacePath))
+                    .Run(() => _queryService.GetSessions(workspacePath, maxSessionHistoryFiles))
                     .ConfigureAwait(false);
 
                 refreshResult = new SessionHistoryRefreshResult(workspacePath, historyResult, null);
@@ -160,6 +167,7 @@ namespace HaloCreek.Services.SessionHistory
             var shouldNotify = false;
             var shouldStartNextRefresh = false;
             string? nextRefreshWorkspacePath = null;
+            var nextMaxSessionHistoryFiles = 0;
 
             lock (_lock)
             {
@@ -186,6 +194,7 @@ namespace HaloCreek.Services.SessionHistory
                 {
                     _state = RefreshState.Refreshing;
                     nextRefreshWorkspacePath = _workspacePath;
+                    nextMaxSessionHistoryFiles = _maxSessionHistoryFiles;
                     shouldStartNextRefresh = true;
                 }
             }
@@ -197,7 +206,7 @@ namespace HaloCreek.Services.SessionHistory
 
             if (shouldStartNextRefresh)
             {
-                _ = RefreshAsync(nextRefreshWorkspacePath!);
+                _ = RefreshAsync(nextRefreshWorkspacePath!, nextMaxSessionHistoryFiles);
             }
         }
     }

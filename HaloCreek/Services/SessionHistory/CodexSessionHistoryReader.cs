@@ -27,11 +27,9 @@ namespace HaloCreek.Services.SessionHistory
             _platformInfrastructure = platformInfrastructure ?? throw new ArgumentNullException(nameof(platformInfrastructure));
         }
 
-        public SessionHistoryResult ReadSessions(string? workspacePath, AppConfig config)
+        public SessionHistoryResult ReadSessions(string? workspacePath, int maxSessionHistoryFiles)
         {
-            ArgumentNullException.ThrowIfNull(config);
-
-            if (string.IsNullOrWhiteSpace(workspacePath) || config.MaxSessionHistoryFiles <= 0)
+            if (string.IsNullOrWhiteSpace(workspacePath) || maxSessionHistoryFiles <= 0)
             {
                 return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
             }
@@ -44,7 +42,7 @@ namespace HaloCreek.Services.SessionHistory
 
             var sessionFiles = EnumerateLatestSessionFiles(
                 sessionHistoryRootPath,
-                config.MaxSessionHistoryFiles);
+                maxSessionHistoryFiles);
 
             var sessions = new List<HistorySessionInfo>();
             var skippedFileCount = 0;

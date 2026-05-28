@@ -70,7 +70,8 @@ namespace HaloCreek.Services
         public SessionLaunchResult Launch(
             string workspacePath,
             string promptText,
-            AppConfig config)
+            string codexExecutableName,
+            IReadOnlyList<string> codexLaunchArguments)
         {
             RequireUiThread();
 
@@ -84,10 +85,12 @@ namespace HaloCreek.Services
                 return new SessionLaunchResult(false, "Prompt is empty.", null);
             }
 
-            if (config is null)
+            if (string.IsNullOrWhiteSpace(codexExecutableName))
             {
-                return new SessionLaunchResult(false, "Config is not available.", null);
+                return new SessionLaunchResult(false, "Codex executable is not available.", null);
             }
+
+            ArgumentNullException.ThrowIfNull(codexLaunchArguments);
 
             var title = BuildFirstPromptSummary(promptText);
             if (string.IsNullOrWhiteSpace(title))
@@ -100,8 +103,8 @@ namespace HaloCreek.Services
             {
                 identifier = _tmuxService.Launch(new TmuxLaunchRequest(
                     workspacePath,
-                    config.CodexExecutableName,
-                    config.CodexLaunchArguments.Concat(new[] { promptText }).ToArray(),
+                    codexExecutableName,
+                    codexLaunchArguments.Concat(new[] { promptText }).ToArray(),
                     title));
             }
             catch (InvalidOperationException ex)
@@ -128,7 +131,8 @@ namespace HaloCreek.Services
         public SessionResumeResult Resume(
             HistorySessionInfo? session,
             string currentWorkspacePath,
-            AppConfig config)
+            string codexExecutableName,
+            IReadOnlyList<string> codexLaunchArguments)
         {
             RequireUiThread();
 
@@ -147,10 +151,12 @@ namespace HaloCreek.Services
                 return new SessionResumeResult(false, "Session id is empty.");
             }
 
-            if (config is null)
+            if (string.IsNullOrWhiteSpace(codexExecutableName))
             {
-                return new SessionResumeResult(false, "Config is not available.");
+                return new SessionResumeResult(false, "Codex executable is not available.");
             }
+
+            ArgumentNullException.ThrowIfNull(codexLaunchArguments);
 
             var title = BuildFirstPromptSummary(session.InitialPrompt);
             if (string.IsNullOrWhiteSpace(title))
@@ -163,8 +169,8 @@ namespace HaloCreek.Services
             {
                 identifier = _tmuxService.Launch(new TmuxLaunchRequest(
                     currentWorkspacePath,
-                    config.CodexExecutableName,
-                    config.CodexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
+                    codexExecutableName,
+                    codexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
                     title));
             }
             catch (InvalidOperationException ex)

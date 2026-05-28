@@ -105,7 +105,11 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             var config = _configService.LoadEffectiveConfig(WorkspacePath!);
-            return _sessionLifecycleService.Launch(WorkspacePath!, PromptText, config);
+            return _sessionLifecycleService.Launch(
+                WorkspacePath!,
+                PromptText,
+                config.CodexExecutableName,
+                config.CodexLaunchArguments);
         }
 
         private bool CanLaunchPrompt()

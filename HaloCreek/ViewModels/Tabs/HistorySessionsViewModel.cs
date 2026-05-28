@@ -90,7 +90,8 @@ namespace HaloCreek.ViewModels.Tabs
             WorkspacePath = workspacePath;
             _loadedSessions = Array.Empty<HistorySessionInfo>();
             ApplySearch();
-            _sessionHistoryRefreshService.SetWorkspacePath(workspacePath);
+            var config = _configService.LoadEffectiveConfig(workspacePath);
+            _sessionHistoryRefreshService.SetWorkspacePath(workspacePath, config.MaxSessionHistoryFiles);
         }
 
         public void SetReeditInitialPromptDispatcher(Action<HistorySessionInfo> reeditInitialPromptDispatcher)
@@ -223,7 +224,11 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             var config = _configService.LoadEffectiveConfig(WorkspacePath!);
-            var result = _sessionLifecycleService.Resume(session, WorkspacePath!, config);
+            var result = _sessionLifecycleService.Resume(
+                session,
+                WorkspacePath!,
+                config.CodexExecutableName,
+                config.CodexLaunchArguments);
             if (result.Started)
             {
                 Log.Info("HistorySessions", result.StatusMessage);
