@@ -44,9 +44,11 @@ namespace HaloCreek.Services
         private readonly string _frontClientTtyMarkerPath;
         private readonly string _keeperSessionId;
         private readonly object _watchStateLock = new();
-        private readonly object _exitTasksLock = new();
+        private readonly object _exitTasksLock = new();// 这个锁似乎没必要? 所有访问目前都是从UI线程发起的
+        private readonly object _launchTasksLock = new();
         private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
         private readonly List<Task> _exitTasks = new();
+        private readonly Dictionary<string, Task> _launchTasks = new(StringComparer.Ordinal);
         private readonly Timer _watchTimer;
         private readonly FrontClientSwitcher _frontClientSwitcher;
         private WatchState _watchState;
@@ -98,14 +100,17 @@ namespace HaloCreek.Services
                 .Concat(request.Arguments)
                 .ToArray();
 
-            _ = Task.Run(() =>
+            var launchTask = Task.Run(() =>
             {
-                // TODO: Add lifecycle boundary handling for launch work that outlives TmuxService.
                 RunTmuxCommand(arguments, "launch tmux session");
                 StartHeartbeatPipe(identifier);
                 TryRunTmuxCommand(new[] { "set-option", "-t", identifier, "mouse", "on" }, out _);
                 SetSessionMetadata(identifier, wslWorkspacePath, request.Title);
             });
+            lock (_launchTasksLock)
+            {
+                _launchTasks[identifier] = launchTask;
+            }
 
             return identifier;
         }
@@ -115,6 +120,7 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
             var task = Task.Run(() =>
             {
+                WaitForLaunchTaskToComplete(identifier);
                 _frontClientSwitcher.SwitchOutIfFront(identifier);
                 TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
             });
@@ -509,14 +515,34 @@ namespace HaloCreek.Services
 
             foreach (var task in tasks)
             {
-                try
-                {
-                    task.Wait();
-                }
-                catch (AggregateException)
-                {
-                    // Application shutdown must continue even if tmux cleanup fails.
-                }
+                WaitForTaskToComplete(task);
+            }
+        }
+
+        private void WaitForLaunchTaskToComplete(string identifier)
+        {
+            Task? task;
+            lock (_launchTasksLock)
+            {
+                _launchTasks.Remove(identifier, out task);
+            }
+
+            if (task is null)
+            {
+                return;
+            }
+
+            WaitForTaskToComplete(task);
+        }
+        private static void WaitForTaskToComplete(Task task)
+        {
+            try
+            {
+                task.Wait();
+            }
+            catch (AggregateException)
+            {
+                // Tmux cleanup is best effort; callers continue after observing task failures.
             }
         }
 
