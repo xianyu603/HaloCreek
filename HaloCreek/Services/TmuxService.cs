@@ -44,7 +44,6 @@ namespace HaloCreek.Services
         private readonly string _frontClientTtyMarkerPath;
         private readonly string _keeperSessionId;
         private readonly object _watchStateLock = new();
-        private readonly object _exitTasksLock = new();// 这个锁似乎没必要? 所有访问目前都是从UI线程发起的
         private readonly object _launchTasksLock = new();
         private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
         private readonly List<Task> _exitTasks = new();
@@ -125,13 +124,10 @@ namespace HaloCreek.Services
                 TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
             });
 
-            lock (_exitTasksLock)
-            {
-                // Prune completed exit tasks before adding a new one so the
-                // tracking list cannot grow indefinitely during normal use.
-                _exitTasks.RemoveAll(static exitTask => exitTask.IsCompleted);
-                _exitTasks.Add(task);
-            }
+            // Exit is issued from UI-owned lifecycle paths. Keep the tasks only so
+            // Dispose can observe and wait for pending best-effort cleanup.
+            _exitTasks.RemoveAll(static exitTask => exitTask.IsCompleted);
+            _exitTasks.Add(task);
         }
 
         public TerminalCommandSpec GetFrontClientStartupCommand(string initialIdentifier)
@@ -506,12 +502,8 @@ namespace HaloCreek.Services
 
         private void WaitForExitTasksToComplete()
         {
-            Task[] tasks;
-            lock (_exitTasksLock)
-            {
-                tasks = _exitTasks.ToArray();
-                _exitTasks.Clear();
-            }
+            var tasks = _exitTasks.ToArray();
+            _exitTasks.Clear();
 
             foreach (var task in tasks)
             {
