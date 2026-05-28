@@ -13,6 +13,8 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
         private readonly SessionLifecycleService? _sessionLifecycleService;
         private readonly ConfigService? _configService;
+        private readonly ApplicationStatusService? _applicationStatusService;
+        private readonly TransientEventService? _transientEventService;
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
@@ -31,11 +33,15 @@ namespace HaloCreek.ViewModels.Tabs
         public HistorySessionsViewModel(
             SessionHistoryRefreshService sessionHistoryRefreshService,
             SessionLifecycleService? sessionLifecycleService = null,
-            ConfigService? configService = null)
+            ConfigService? configService = null,
+            ApplicationStatusService? applicationStatusService = null,
+            TransientEventService? transientEventService = null)
         {
             _sessionHistoryRefreshService = sessionHistoryRefreshService;
             _sessionLifecycleService = sessionLifecycleService;
             _configService = configService;
+            _applicationStatusService = applicationStatusService;
+            _transientEventService = transientEventService;
             _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
             ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
@@ -91,11 +97,6 @@ namespace HaloCreek.ViewModels.Tabs
             _loadedSessions = Array.Empty<HistorySessionInfo>();
             ApplySearch();
             _sessionHistoryRefreshService.SetWorkspacePath(workspacePath);
-        }
-
-        public void SetStatusDispatcher(Action<string> statusDispatcher)
-        {
-            _statusDispatcher = statusDispatcher ?? throw new ArgumentNullException(nameof(statusDispatcher));
         }
 
         public void SetReeditInitialPromptDispatcher(Action<HistorySessionInfo> reeditInitialPromptDispatcher)

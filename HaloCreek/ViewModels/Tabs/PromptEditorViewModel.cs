@@ -12,6 +12,8 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private readonly ConfigService _configService;
         private readonly SessionLifecycleService _sessionLifecycleService;
+        private readonly ApplicationStatusService _applicationStatusService;
+        private readonly TransientEventService _transientEventService;
         private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
         private string _promptText = string.Empty;
         private OngoingSessionInfo? _selectedOngoingSession;
@@ -20,10 +22,16 @@ namespace HaloCreek.ViewModels.Tabs
 
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
-            ConfigService configService)
+            ConfigService configService,
+            ApplicationStatusService applicationStatusService,
+            TransientEventService transientEventService)
         {
             _sessionLifecycleService = sessionLifecycleService;
             _configService = configService;
+            _applicationStatusService = applicationStatusService
+                ?? throw new ArgumentNullException(nameof(applicationStatusService));
+            _transientEventService = transientEventService
+                ?? throw new ArgumentNullException(nameof(transientEventService));
 
             LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);
@@ -84,11 +92,6 @@ namespace HaloCreek.ViewModels.Tabs
             WorkspacePath = workspacePath;
             RefreshOngoingSessions();
             LaunchCommand.NotifyCanExecuteChanged();
-        }
-
-        public void SetStatusDispatcher(Action<string> statusDispatcher)
-        {
-            _statusDispatcher = statusDispatcher ?? throw new ArgumentNullException(nameof(statusDispatcher));
         }
 
         public SessionLaunchResult LaunchPrompt()

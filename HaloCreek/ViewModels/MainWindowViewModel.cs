@@ -34,10 +34,7 @@ namespace HaloCreek.ViewModels
             _tabViewModels = new ViewModelBase[] { PromptEditor, HistorySessions, Git };
 
             WorkspaceFooter.SetWorkspaceDispatcher(ApplyValidatedWorkspacePath);
-            PromptEditor.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
-            HistorySessions.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
             HistorySessions.SetReeditInitialPromptDispatcher(ReeditInitialPrompt);
-            Git.SetStatusDispatcher(message => WorkspaceFooter.StatusText = message);
             SetWorkspacePath(startupWorkspacePath, cacheWorkspace: false);
         }
 
@@ -103,7 +100,6 @@ namespace HaloCreek.ViewModels
 
             PromptEditor.PromptText = session.InitialPrompt;
             SelectedTabIndex = PromptEditorTabIndex;
-            WorkspaceFooter.StatusText = "Initial prompt copied to Prompt Editor.";
         }
     }
 }

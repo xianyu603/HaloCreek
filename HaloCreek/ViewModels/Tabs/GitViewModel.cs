@@ -13,6 +13,8 @@ namespace HaloCreek.ViewModels.Tabs
 
         private readonly GitService _gitService;
         private readonly ConfigService _configService;
+        private readonly ApplicationStatusService? _applicationStatusService;
+        private readonly TransientEventService? _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
         private IReadOnlyList<GitFileActionButtonViewModel> _leftActionButtons = Array.Empty<GitFileActionButtonViewModel>();
         private IReadOnlyList<GitFileActionButtonViewModel> _rightActionButtons = Array.Empty<GitFileActionButtonViewModel>();
@@ -30,10 +32,14 @@ namespace HaloCreek.ViewModels.Tabs
 
         public GitViewModel(
             GitService gitService,
-            ConfigService configService)
+            ConfigService configService,
+            ApplicationStatusService? applicationStatusService = null,
+            TransientEventService? transientEventService = null)
         {
             _gitService = gitService;
             _configService = configService;
+            _applicationStatusService = applicationStatusService;
+            _transientEventService = transientEventService;
             RefreshCommand = new RelayCommand(RefreshChanges, () => HasWorkspace);
             RunActionCommand = new RelayCommand<GitFileActionButtonViewModel>(RunAction, CanRunAction);
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
@@ -113,11 +119,6 @@ namespace HaloCreek.ViewModels.Tabs
             WorkspacePath = workspacePath;
             LoadActionConfig();
             RefreshChanges();
-        }
-
-        public void SetStatusDispatcher(Action<string> statusDispatcher)
-        {
-            _statusDispatcher = statusDispatcher ?? throw new ArgumentNullException(nameof(statusDispatcher));
         }
 
         public void OnSelected()

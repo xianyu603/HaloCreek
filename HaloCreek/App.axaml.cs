@@ -42,6 +42,8 @@ namespace HaloCreek
             var tmuxService = new TmuxService(platformInfrastructure);
             var terminalService = new TerminalService(platformInfrastructure);
             var sessionLifecycleService = new SessionLifecycleService(tmuxService, terminalService);
+            var applicationStatusService = new ApplicationStatusService();
+            var transientEventService = new TransientEventService(platformInfrastructure);
             var gitService = new GitService();
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(platformInfrastructure);
@@ -50,13 +52,24 @@ namespace HaloCreek
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
-                configService);
+                configService,
+                applicationStatusService,
+                transientEventService);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
-                configService);
-            var git = new GitViewModel(gitService, configService);
-            var workspaceFooter = new WorkspaceFooterViewModel(platformInfrastructure);
+                configService,
+                applicationStatusService,
+                transientEventService);
+            var git = new GitViewModel(
+                gitService,
+                configService,
+                applicationStatusService,
+                transientEventService);
+            var workspaceFooter = new WorkspaceFooterViewModel(
+                platformInfrastructure,
+                applicationStatusService,
+                transientEventService);
 
             var mainWindowViewModel = new MainWindowViewModel(
                 startupWorkspacePath,
