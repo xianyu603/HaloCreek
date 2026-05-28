@@ -42,24 +42,32 @@ public sealed class ApplicationStatusService
 
 ### TransientEventService
 
-负责处理一过性事件，不向 status bar 发布状态。
+负责处理需要用户可见反馈的一过性失败，不向 status bar 发布状态。
 
 建议接口形态：
 
 ```csharp
 public sealed class TransientEventService
 {
-    public void ReportInfo(string category, string message);
-    public Task ReportUserActionFailureAsync(string title, string message);
-    public void ReportBackgroundFailure(string category, Exception exception, string message);
+    public TransientEventService(PlatformInfrastructure platformInfrastructure);
+
+    public void ReportUserActionFailure(
+        string category,
+        string title,
+        string message,
+        Exception? exception = null);
 }
 ```
 
 当前策略保持克制：
 
-- 普通成功、取消、后台刷新成功：只写日志或不处理。
-- 可恢复后台失败：只写日志。
-- 用户刚触发且必须知道结果的失败：调用错误弹窗。
+- 普通成功、取消、后台刷新成功：不进入该服务，调用方按需直接写日志或不处理。
+- 可恢复后台失败：不进入该服务，调用方直接写日志。
+- 用户刚触发且必须知道结果的一过性失败：调用 `ReportUserActionFailure(...)`。
+
+`TransientEventService` 不是日志转发器。只需要日志记录的场景直接调用 `Log.Info(...)` / `Log.Warning(...)` / `Log.Error(...)`，避免为了“静默处理”再包一层薄 Action。
+
+`ReportUserActionFailure(...)` 的语义是报告用户动作失败，不是要求调用方管理弹窗。当前实现策略是在服务内部写错误日志，并通过 UI dispatcher 异步显示错误弹窗；调用方不等待弹窗关闭，也不感知 Avalonia dialog 的异步细节。服务内部负责捕获并记录弹窗展示失败，避免 UI 异步异常泄漏。
 
 后续如果增加 toast、错误中心或 tab-local 提示，只调整该服务策略，不让业务 ViewModel 直接依赖具体 UI。
 
@@ -70,7 +78,8 @@ public sealed class TransientEventService
 3. 移除 `PromptEditorViewModel`、`HistorySessionsViewModel`、`GitViewModel` 的 `SetStatusDispatcher(...)`。
 4. 将现有 `_statusDispatcher?.Invoke(...)` 分类迁移：
    - 持续性全局错误或后台任务进入 `ApplicationStatusService`。
-   - 普通操作结果、取消、可恢复后台失败进入 `TransientEventService` 或只写日志。
+   - 用户刚触发且必须知道结果的一过性失败进入 `TransientEventService`。
+   - 普通操作结果、取消、可恢复后台失败直接写日志或不处理。
 5. `MainWindowViewModel` 只保留 workspace 分发和 tab 协调，不再承担 status message 转发。
 
 ## 验收点
