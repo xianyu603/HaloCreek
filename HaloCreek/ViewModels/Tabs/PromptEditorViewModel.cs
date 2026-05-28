@@ -11,7 +11,7 @@ namespace HaloCreek.ViewModels.Tabs
 {
     public sealed class PromptEditorViewModel : ViewModelBase
     {
-        private readonly ConfigService _configService;
+        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
@@ -21,33 +21,35 @@ namespace HaloCreek.ViewModels.Tabs
 
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
-            ConfigService configService,
+            WorkspaceRuntimeService workspaceRuntimeService,
             TransientEventService transientEventService)
         {
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
-            _configService = configService
-                ?? throw new ArgumentNullException(nameof(configService));
+            _workspaceRuntimeService = workspaceRuntimeService
+                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
             _transientEventService = transientEventService
                 ?? throw new ArgumentNullException(nameof(transientEventService));
 
-            LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
+            LaunchCommand = new RelayCommand(Launch);
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
             _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
+            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
+            if (string.IsNullOrWhiteSpace(workspacePath))
+            {
+                throw new InvalidOperationException("Workspace runtime is not initialized.");
+            }
+
+            ApplyWorkspacePath(workspacePath);
+            _workspaceRuntimeService.WorkspaceChangedEvent += OnWorkspaceChanged;
         }
 
         public string PromptText
         {
             get => _promptText;
-            set
-            {
-                if (SetProperty(ref _promptText, value ?? string.Empty))
-                {
-                    LaunchCommand.NotifyCanExecuteChanged();
-                }
-            }
+            set => SetProperty(ref _promptText, value ?? string.Empty);
         }
 
         public string? WorkspacePath
@@ -85,37 +87,25 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
 
-        public void SetWorkspacePath(string workspacePath)
+        private void ApplyWorkspacePath(string workspacePath)
         {
             WorkspacePath = workspacePath;
             RefreshOngoingSessions();
-            LaunchCommand.NotifyCanExecuteChanged();
         }
 
         public SessionLaunchResult LaunchPrompt()
         {
-            if (string.IsNullOrWhiteSpace(WorkspacePath))
-            {
-                return new SessionLaunchResult(false, "No workspace selected.", null);
-            }
-
             if (string.IsNullOrWhiteSpace(PromptText))
             {
                 return new SessionLaunchResult(false, "Prompt is empty.", null);
             }
 
-            var config = _configService.LoadEffectiveConfig(WorkspacePath!);
+            var config = _workspaceRuntimeService.EffectiveConfig;
             return _sessionLifecycleService.Launch(
                 WorkspacePath!,
                 PromptText,
                 config.CodexExecutableName,
                 config.CodexLaunchArguments);
-        }
-
-        private bool CanLaunchPrompt()
-        {
-            return !string.IsNullOrWhiteSpace(WorkspacePath)
-                && !string.IsNullOrWhiteSpace(PromptText);
         }
 
         private void Launch()
@@ -172,6 +162,26 @@ namespace HaloCreek.ViewModels.Tabs
         {
             // 走一下post防同步重入 现在已经不会从别的线程到这了
             Dispatcher.UIThread.Post(RefreshOngoingSessions);
+        }
+
+        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
+        {
+            var previousWorkspacePath = WorkspacePath;
+            ApplyWorkspacePath(e.WorkspacePath);
+            ExitWorkspaceOngoingSessions(previousWorkspacePath);
+        }
+
+        private void ExitWorkspaceOngoingSessions(string? workspacePath)
+        {
+            if (string.IsNullOrWhiteSpace(workspacePath))
+            {
+                return;
+            }
+
+            foreach (var session in _sessionLifecycleService.GetOngoingSessions(workspacePath))
+            {
+                _sessionLifecycleService.Exit(session.Id);
+            }
         }
     }
 }

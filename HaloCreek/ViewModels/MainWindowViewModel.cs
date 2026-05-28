@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using HaloCreek.Models;
-using HaloCreek.Services;
 using HaloCreek.ViewModels.Components;
 using HaloCreek.ViewModels.Tabs;
 
@@ -13,29 +12,22 @@ namespace HaloCreek.ViewModels
     {
         private const int PromptEditorTabIndex = 0;
 
-        private readonly WorkspaceCacheService _workspaceCacheService;
         private readonly IReadOnlyList<ViewModelBase> _tabViewModels;
-        private string? _currentWorkspacePath;
         private int _selectedTabIndex;
 
         public MainWindowViewModel(
-            string startupWorkspacePath,
-            WorkspaceCacheService workspaceCacheService,
             PromptEditorViewModel promptEditor,
             HistorySessionsViewModel historySessions,
             GitViewModel git,
             WorkspaceFooterViewModel workspaceFooter)
         {
-            _workspaceCacheService = workspaceCacheService ?? throw new ArgumentNullException(nameof(workspaceCacheService));
             PromptEditor = promptEditor;
             HistorySessions = historySessions;
             Git = git;
             WorkspaceFooter = workspaceFooter;
             _tabViewModels = new ViewModelBase[] { PromptEditor, HistorySessions, Git };
 
-            WorkspaceFooter.SetWorkspaceDispatcher(ApplyValidatedWorkspacePath);
             HistorySessions.SetReeditInitialPromptDispatcher(ReeditInitialPrompt);
-            SetWorkspacePath(startupWorkspacePath, cacheWorkspace: false);
         }
 
         public PromptEditorViewModel PromptEditor { get; }
@@ -45,12 +37,6 @@ namespace HaloCreek.ViewModels
         public GitViewModel Git { get; }
 
         public WorkspaceFooterViewModel WorkspaceFooter { get; }
-
-        public string? CurrentWorkspacePath
-        {
-            get => _currentWorkspacePath;
-            private set => SetProperty(ref _currentWorkspacePath, value);
-        }
 
         public int SelectedTabIndex
         {
@@ -64,28 +50,6 @@ namespace HaloCreek.ViewModels
                 {
                     selectedTab.OnSelected();
                 }
-            }
-        }
-
-        public void ApplyValidatedWorkspacePath(string workspacePath)
-        {
-            SetWorkspacePath(workspacePath, cacheWorkspace: true);
-        }
-
-        private void SetWorkspacePath(string workspacePath, bool cacheWorkspace)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
-
-            CurrentWorkspacePath = workspacePath;
-
-            PromptEditor.SetWorkspacePath(workspacePath);
-            HistorySessions.SetWorkspacePath(workspacePath);
-            Git.SetWorkspacePath(workspacePath);
-            WorkspaceFooter.SetWorkspacePath(workspacePath);
-
-            if (cacheWorkspace)
-            {
-                _workspaceCacheService.TrySaveLastWorkspacePath(workspacePath);
             }
         }
 

@@ -37,8 +37,12 @@ namespace HaloCreek
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
             var workspaceCacheService = new WorkspaceCacheService();
-            var startupWorkspacePath = ResolveStartupWorkspacePath(platformInfrastructure, workspaceCacheService);
             var configService = new ConfigService();
+            var workspaceRuntimeService = new WorkspaceRuntimeService(
+                platformInfrastructure,
+                workspaceCacheService,
+                configService);
+            workspaceRuntimeService.InitializeStartupWorkspace();
             var tmuxService = new TmuxService(platformInfrastructure);
             var terminalService = new TerminalService(platformInfrastructure);
             var sessionLifecycleService = new SessionLifecycleService(tmuxService, terminalService);
@@ -52,25 +56,24 @@ namespace HaloCreek
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
-                configService,
+                workspaceRuntimeService,
                 transientEventService);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
-                configService,
+                workspaceRuntimeService,
                 transientEventService);
             var git = new GitViewModel(
                 gitService,
-                configService,
+                workspaceRuntimeService,
                 transientEventService);
             var workspaceFooter = new WorkspaceFooterViewModel(
                 platformInfrastructure,
+                workspaceRuntimeService,
                 applicationStatusService,
                 transientEventService);
 
             var mainWindowViewModel = new MainWindowViewModel(
-                startupWorkspacePath,
-                workspaceCacheService,
                 promptEditor,
                 historySessions,
                 git,
@@ -81,28 +84,6 @@ namespace HaloCreek
                 sessionLifecycleService,
                 sessionHistoryRefreshService,
                 tmuxService);
-        }
-
-        private static string ResolveStartupWorkspacePath(
-            PlatformInfrastructure platformInfrastructure,
-            WorkspaceCacheService workspaceCacheService)
-        {
-            ArgumentNullException.ThrowIfNull(platformInfrastructure);
-            ArgumentNullException.ThrowIfNull(workspaceCacheService);
-
-            var cachedWorkspacePath = workspaceCacheService.LoadLastWorkspacePath();
-            if (platformInfrastructure.TryNormalizeExistingDirectoryPath(cachedWorkspacePath, out var normalizedPath))
-            {
-                return normalizedPath;
-            }
-
-            var homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (platformInfrastructure.TryNormalizeExistingDirectoryPath(homePath, out normalizedPath))
-            {
-                return normalizedPath;
-            }
-
-            return AppContext.BaseDirectory;
         }
 
         private sealed class AppServices : IDisposable

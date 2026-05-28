@@ -13,7 +13,7 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
         private readonly SessionLifecycleService _sessionLifecycleService;
-        private readonly ConfigService _configService;
+        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
@@ -25,20 +25,28 @@ namespace HaloCreek.ViewModels.Tabs
         public HistorySessionsViewModel(
             SessionHistoryRefreshService sessionHistoryRefreshService,
             SessionLifecycleService sessionLifecycleService,
-            ConfigService configService,
+            WorkspaceRuntimeService workspaceRuntimeService,
             TransientEventService transientEventService)
         {
             _sessionHistoryRefreshService = sessionHistoryRefreshService
                 ?? throw new ArgumentNullException(nameof(sessionHistoryRefreshService));
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
-            _configService = configService
-                ?? throw new ArgumentNullException(nameof(configService));
+            _workspaceRuntimeService = workspaceRuntimeService
+                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
             _transientEventService = transientEventService
                 ?? throw new ArgumentNullException(nameof(transientEventService));
             _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
             ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
+            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
+            if (string.IsNullOrWhiteSpace(workspacePath))
+            {
+                throw new InvalidOperationException("Workspace runtime is not initialized.");
+            }
+
+            ApplyWorkspacePath(workspacePath, _workspaceRuntimeService.EffectiveConfig);
+            _workspaceRuntimeService.WorkspaceChangedEvent += OnWorkspaceChanged;
         }
 
         public string SearchText
@@ -85,12 +93,11 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<HistorySessionInfo> ReeditInitialPromptCommand { get; }
 
-        public void SetWorkspacePath(string workspacePath)
+        private void ApplyWorkspacePath(string workspacePath, AppConfig config)
         {
             WorkspacePath = workspacePath;
             _loadedSessions = Array.Empty<HistorySessionInfo>();
             ApplySearch();
-            var config = _configService.LoadEffectiveConfig(workspacePath);
             _sessionHistoryRefreshService.SetWorkspacePath(workspacePath, config.MaxSessionHistoryFiles);
         }
 
@@ -223,7 +230,7 @@ namespace HaloCreek.ViewModels.Tabs
                 return;
             }
 
-            var config = _configService.LoadEffectiveConfig(WorkspacePath!);
+            var config = _workspaceRuntimeService.EffectiveConfig;
             var result = _sessionLifecycleService.Resume(
                 session,
                 WorkspacePath!,
@@ -268,6 +275,11 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _reeditInitialPromptDispatcher.Invoke(session);
+        }
+
+        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
+        {
+            ApplyWorkspacePath(e.WorkspacePath, e.EffectiveConfig);
         }
     }
 }

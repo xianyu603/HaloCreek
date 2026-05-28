@@ -11,28 +11,35 @@ namespace HaloCreek.ViewModels.Components
         private const string NoWorkspaceSelectedText = "No workspace selected";
         private const string InvalidWorkspacePathStatusText = "Invalid workspace path";
         private const string SelectingWorkspaceStatusText = "Selecting workspace...";
-        private const string WorkspaceDispatcherNotConnectedStatusText = "Workspace dispatcher is not connected";
         private const string WorkspaceCategory = "Workspace";
 
         private readonly PlatformInfrastructure _platformInfrastructure;
+        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly ApplicationStatusService _applicationStatusService;
         private readonly TransientEventService _transientEventService;
-        private Action<string>? _applyValidatedWorkspace;
         private string _workspacePath = NoWorkspaceSelectedText;
         private string _statusText = string.Empty;
 
         public WorkspaceFooterViewModel(
             PlatformInfrastructure platformInfrastructure,
+            WorkspaceRuntimeService workspaceRuntimeService,
             ApplicationStatusService applicationStatusService,
             TransientEventService transientEventService)
         {
             _platformInfrastructure = platformInfrastructure ?? throw new ArgumentNullException(nameof(platformInfrastructure));
+            _workspaceRuntimeService = workspaceRuntimeService
+                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
             _applicationStatusService = applicationStatusService
                 ?? throw new ArgumentNullException(nameof(applicationStatusService));
             _transientEventService = transientEventService
                 ?? throw new ArgumentNullException(nameof(transientEventService));
             _applicationStatusService.StatusTextChanged += OnStatusTextChanged;
+            _workspaceRuntimeService.WorkspaceChangedEvent += OnWorkspaceChanged;
             ChooseWorkspaceCommand = new AsyncRelayCommand(ChooseWorkspaceAsync);
+            if (!string.IsNullOrWhiteSpace(_workspaceRuntimeService.CurrentWorkspacePath))
+            {
+                WorkspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
+            }
         }
 
         public string WorkspacePath
@@ -49,24 +56,8 @@ namespace HaloCreek.ViewModels.Components
 
         public IAsyncRelayCommand ChooseWorkspaceCommand { get; }
 
-        public void SetWorkspacePath(string workspacePath)
-        {
-            WorkspacePath = workspacePath;
-        }
-
-        public void SetWorkspaceDispatcher(Action<string> applyValidatedWorkspace)
-        {
-            _applyValidatedWorkspace = applyValidatedWorkspace ?? throw new ArgumentNullException(nameof(applyValidatedWorkspace));
-        }
-
         private async Task ChooseWorkspaceAsync()
         {
-            if (_applyValidatedWorkspace is null)
-            {
-                _applicationStatusService.SetGlobalError(WorkspaceDispatcherNotConnectedStatusText);
-                return;
-            }
-
             var selectionStatus = _applicationStatusService.BeginBackgroundTask(SelectingWorkspaceStatusText);
 
             string? selectedPath;
@@ -92,7 +83,7 @@ namespace HaloCreek.ViewModels.Components
                 return;
             }
 
-            if (!_platformInfrastructure.TryNormalizeExistingDirectoryPath(selectedPath, out var normalizedPath))
+            if (!_workspaceRuntimeService.SetWorkspacePath(selectedPath))
             {
                 _transientEventService.ReportUserActionFailure(
                     WorkspaceCategory,
@@ -100,13 +91,16 @@ namespace HaloCreek.ViewModels.Components
                     "Selected workspace path is invalid or unavailable.");
                 return;
             }
-
-            _applyValidatedWorkspace(normalizedPath);
         }
 
         private void OnStatusTextChanged(string statusText)
         {
             StatusText = statusText;
+        }
+
+        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
+        {
+            WorkspacePath = e.WorkspacePath;
         }
     }
 }

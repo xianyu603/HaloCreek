@@ -13,7 +13,7 @@ namespace HaloCreek.ViewModels.Tabs
         private const string InitialEmptyStateText = "Select a workspace to view Git changes";
 
         private readonly GitService _gitService;
-        private readonly ConfigService _configService;
+        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
         private IReadOnlyList<GitFileActionButtonViewModel> _leftActionButtons = Array.Empty<GitFileActionButtonViewModel>();
@@ -26,16 +26,25 @@ namespace HaloCreek.ViewModels.Tabs
 
         public GitViewModel(
             GitService gitService,
-            ConfigService configService,
+            WorkspaceRuntimeService workspaceRuntimeService,
             TransientEventService transientEventService)
         {
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
-            _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+            _workspaceRuntimeService = workspaceRuntimeService
+                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
             _transientEventService = transientEventService
                 ?? throw new ArgumentNullException(nameof(transientEventService));
             RefreshCommand = new RelayCommand(RefreshChanges, () => HasWorkspace);
             RunActionCommand = new RelayCommand<GitFileActionButtonViewModel>(RunAction, CanRunAction);
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
+            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
+            if (string.IsNullOrWhiteSpace(workspacePath))
+            {
+                throw new InvalidOperationException("Workspace runtime is not initialized.");
+            }
+
+            ApplyWorkspacePath(workspacePath, _workspaceRuntimeService.EffectiveConfig);
+            _workspaceRuntimeService.WorkspaceChangedEvent += OnWorkspaceChanged;
         }
 
         public string? WorkspacePath
@@ -107,10 +116,10 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<GitChangeInfo> OpenSelectedChangeCommand { get; }
 
-        public void SetWorkspacePath(string workspacePath)
+        private void ApplyWorkspacePath(string workspacePath, AppConfig config)
         {
             WorkspacePath = workspacePath;
-            LoadActionConfig();
+            LoadActionConfig(config);
             RefreshChanges();
         }
 
@@ -131,9 +140,8 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("Git", result.Message);
         }
 
-        private void LoadActionConfig()
+        private void LoadActionConfig(AppConfig config)
         {
-            var config = _configService.LoadEffectiveConfig(WorkspacePath!);
             _doubleClickActionId = config.GitFileBrowserDoubleClickActionId;
             _doubleClickAction = config.GitFileBrowserActions.FirstOrDefault(
                 configuredAction => string.Equals(
@@ -210,6 +218,11 @@ namespace HaloCreek.ViewModels.Tabs
                 "Git",
                 "Git action failed",
                 result.Message);
+        }
+
+        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
+        {
+            ApplyWorkspacePath(e.WorkspacePath, e.EffectiveConfig);
         }
     }
 }
