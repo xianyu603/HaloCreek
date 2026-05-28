@@ -182,6 +182,7 @@ namespace HaloCreek.Services
                 process.StartInfo.ArgumentList.Add("status");
                 process.StartInfo.ArgumentList.Add("--porcelain=v1");
                 process.StartInfo.ArgumentList.Add("-z");
+                process.StartInfo.ArgumentList.Add("--untracked-files=all");
 
                 process.Start();
                 var output = process.StandardOutput.ReadToEnd();
