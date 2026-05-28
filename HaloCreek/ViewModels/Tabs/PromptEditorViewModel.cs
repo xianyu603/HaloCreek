@@ -31,7 +31,7 @@ namespace HaloCreek.ViewModels.Tabs
             _transientEventService = transientEventService
                 ?? throw new ArgumentNullException(nameof(transientEventService));
 
-            LaunchCommand = new RelayCommand(Launch);
+            LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
@@ -49,7 +49,13 @@ namespace HaloCreek.ViewModels.Tabs
         public string PromptText
         {
             get => _promptText;
-            set => SetProperty(ref _promptText, value ?? string.Empty);
+            set
+            {
+                if (SetProperty(ref _promptText, value ?? string.Empty))
+                {
+                    LaunchCommand.NotifyCanExecuteChanged();
+                }
+            }
         }
 
         public string? WorkspacePath
@@ -121,6 +127,11 @@ namespace HaloCreek.ViewModels.Tabs
                 "PromptEditor",
                 "Launch failed",
                 result.StatusMessage);
+        }
+
+        private bool CanLaunchPrompt()
+        {
+            return !string.IsNullOrWhiteSpace(PromptText);
         }
 
         private void RefreshOngoingSessions()
