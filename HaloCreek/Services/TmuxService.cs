@@ -121,6 +121,9 @@ namespace HaloCreek.Services
 
             lock (_exitTasksLock)
             {
+                // Prune completed exit tasks before adding a new one so the
+                // tracking list cannot grow indefinitely during normal use.
+                _exitTasks.RemoveAll(static exitTask => exitTask.IsCompleted);
                 _exitTasks.Add(task);
             }
         }

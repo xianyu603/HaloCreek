@@ -5,14 +5,16 @@ workspace选择 footer
 on going session management
 接入简单的git状态管理 支持快速查看git当前修改并**接入** diff 工具(TortoiseGitMerge.exe用于测试)
 
-MVP2 topic
-topic 拆分 每一件事(可以理解成每一个分支) 的信息/进度/坑持久化
-快速捞 快速恢复 新起session
-(要不要做) 同workspace的多task并行? 同时在一个物理仓库执行 topic A的信息收集与topic B的编码; 或topic A的编码与topic B的bugfix
-支持筛选式diff
-可能要与Task结合(技术原因) 同一仓库能跑多个只读topic(允许写文档但不允许改代码 只能写自己topic的文档) 要跑多个可写topic 会有些困难?
-topic 的嵌套 如
+后续方向：
+审阅 信息留存 并行
+核心观点： 本产品重点在Human in the loop. 不搞自动编排大跃进 不搞强制性/重量级工作流程 将个人认为Agent编程目前长期存在的人工干预摩擦尽可能降低
+一个MVP版本只做一个话题 避免提前引入组合复杂度
 
-MVP3 task
-Task/Recipe 提示词模板 不同具体任务(如信息收集/方案撰写..) 的具体约束和差异化暴露
-铺量
+MVP2 
+审阅
+
+MVP3
+信息留存
+
+MVP3
+并行
