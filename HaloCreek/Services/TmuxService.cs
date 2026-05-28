@@ -48,7 +48,7 @@ namespace HaloCreek.Services
         private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
         private readonly List<Task> _exitTasks = new();
         private readonly Timer _watchTimer;
-        private string? _frontSessionId;
+        private readonly FrontClientSwitcher _frontClientSwitcher;
         private WatchState _watchState;
 
         public TmuxService(PlatformInfrastructure platformInfrastructure)
@@ -61,6 +61,10 @@ namespace HaloCreek.Services
                 + "/front-client-"
                 + _frontClientId
                 + ".tty";
+            _frontClientSwitcher = new FrontClientSwitcher(
+                _platformInfrastructure,
+                _frontClientTtyMarkerPath,
+                _keeperSessionId);
             _watchTimer = new Timer(
                 OnWatchTimerTick,
                 state: null,
@@ -111,11 +115,7 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
             var task = Task.Run(() =>
             {
-                if (string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
-                {
-                    SwitchFrontClientCore(_keeperSessionId);
-                    _frontSessionId = null;
-                }
+                _frontClientSwitcher.SwitchOutIfFront(identifier);
                 TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
             });
 
@@ -149,9 +149,7 @@ namespace HaloCreek.Services
         public void SwitchFrontClient(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-            SwitchFrontClientCore(identifier);
-            _frontSessionId = identifier;
+            _frontClientSwitcher.SwitchIn(identifier);
         }
 
         public void Dispose()
@@ -165,36 +163,13 @@ namespace HaloCreek.Services
 
                 _watchState = WatchState.Disposed;
                 _watchedSessions.Clear();
-                _frontSessionId = null;
                 _watchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
 
             _watchTimer.Dispose();
             WaitForExitTasksToComplete();
+            _frontClientSwitcher.Clear();
             TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
-        }
-
-        private void SwitchFrontClientCore(string identifier)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-            if (!_platformInfrastructure.TryRunWslCommand(
-                    "cat",
-                    new[] { _frontClientTtyMarkerPath },
-                    out var output))
-            {
-                return;
-            }
-
-            var tty = SplitProcessOutputLines(output).FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(tty))
-            {
-                return;
-            }
-
-            TryRunTmuxCommand(
-                new[] { "switch-client", "-c", tty, "-t", identifier },
-                out _);
         }
 
         public void StartWatching(string identifier)
@@ -349,6 +324,86 @@ namespace HaloCreek.Services
             public OngoingSessionState State { get; set; } = OngoingSessionState.Unknown;
 
             public string HeartbeatPath { get; }
+        }
+
+        private sealed class FrontClientSwitcher
+        {
+            private readonly PlatformInfrastructure _platformInfrastructure;
+            private readonly string _frontClientTtyMarkerPath;
+            private readonly string _keeperSessionId;
+            private readonly object _lock = new();
+            private string? _frontSessionId;
+
+            public FrontClientSwitcher(
+                PlatformInfrastructure platformInfrastructure,
+                string frontClientTtyMarkerPath,
+                string keeperSessionId)
+            {
+                _platformInfrastructure = platformInfrastructure
+                    ?? throw new ArgumentNullException(nameof(platformInfrastructure));
+                ArgumentException.ThrowIfNullOrWhiteSpace(frontClientTtyMarkerPath);
+                ArgumentException.ThrowIfNullOrWhiteSpace(keeperSessionId);
+
+                _frontClientTtyMarkerPath = frontClientTtyMarkerPath;
+                _keeperSessionId = keeperSessionId;
+            }
+
+            public void SwitchIn(string identifier)
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+                lock (_lock)
+                {
+                    SwitchClientCore(identifier);
+                    _frontSessionId = identifier;
+                }
+            }
+
+            public void SwitchOutIfFront(string identifier)
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+                lock (_lock)
+                {
+                    if (!string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+
+                    SwitchClientCore(_keeperSessionId);
+                    _frontSessionId = null;
+                }
+            }
+
+            public void Clear()
+            {
+                lock (_lock)
+                {
+                    _frontSessionId = null;
+                }
+            }
+
+            private void SwitchClientCore(string identifier)
+            {
+                if (!_platformInfrastructure.TryRunWslCommand(
+                        "cat",
+                        new[] { _frontClientTtyMarkerPath },
+                        out var output))
+                {
+                    return;
+                }
+
+                var tty = SplitProcessOutputLines(output).FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(tty))
+                {
+                    return;
+                }
+
+                _platformInfrastructure.TryRunWslCommand(
+                    "tmux",
+                    new[] { "switch-client", "-c", tty, "-t", identifier },
+                    out _);
+            }
         }
 
         private void StartHeartbeatPipe(string identifier)
