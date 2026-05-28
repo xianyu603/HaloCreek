@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
 
@@ -12,24 +13,21 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private readonly ConfigService _configService;
         private readonly SessionLifecycleService _sessionLifecycleService;
-        private readonly ApplicationStatusService _applicationStatusService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
         private string _promptText = string.Empty;
         private OngoingSessionInfo? _selectedOngoingSession;
-        private Action<string>? _statusDispatcher;
         private string? _workspacePath;
 
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
             ConfigService configService,
-            ApplicationStatusService applicationStatusService,
             TransientEventService transientEventService)
         {
-            _sessionLifecycleService = sessionLifecycleService;
-            _configService = configService;
-            _applicationStatusService = applicationStatusService
-                ?? throw new ArgumentNullException(nameof(applicationStatusService));
+            _sessionLifecycleService = sessionLifecycleService
+                ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
+            _configService = configService
+                ?? throw new ArgumentNullException(nameof(configService));
             _transientEventService = transientEventService
                 ?? throw new ArgumentNullException(nameof(transientEventService));
 
@@ -119,7 +117,16 @@ namespace HaloCreek.ViewModels.Tabs
         private void Launch()
         {
             var result = LaunchPrompt();
-            _statusDispatcher?.Invoke(result.StatusMessage);
+            if (result.Started)
+            {
+                Log.Info("PromptEditor", result.StatusMessage);
+                return;
+            }
+
+            _transientEventService.ReportUserActionFailure(
+                "PromptEditor",
+                "Launch failed",
+                result.StatusMessage);
         }
 
         private void RefreshOngoingSessions()
@@ -138,7 +145,7 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _sessionLifecycleService.BringToFront(session.Id);
-            _statusDispatcher?.Invoke("Bring to front requested.");
+            Log.Info("PromptEditor", "Bring to front requested.");
         }
 
         private void ExitSession(OngoingSessionInfo? session)
@@ -149,7 +156,7 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _sessionLifecycleService.Exit(session.Id);
-            _statusDispatcher?.Invoke("Session exit requested.");
+            Log.Info("PromptEditor", "Session exit requested.");
         }
 
         private static bool HasOngoingSession(OngoingSessionInfo? session)

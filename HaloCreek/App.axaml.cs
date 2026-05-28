@@ -53,18 +53,15 @@ namespace HaloCreek
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
                 configService,
-                applicationStatusService,
                 transientEventService);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
                 configService,
-                applicationStatusService,
                 transientEventService);
             var git = new GitViewModel(
                 gitService,
                 configService,
-                applicationStatusService,
                 transientEventService);
             var workspaceFooter = new WorkspaceFooterViewModel(
                 platformInfrastructure,

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
+using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
 
@@ -13,8 +14,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private readonly GitService _gitService;
         private readonly ConfigService _configService;
-        private readonly ApplicationStatusService? _applicationStatusService;
-        private readonly TransientEventService? _transientEventService;
+        private readonly TransientEventService _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
         private IReadOnlyList<GitFileActionButtonViewModel> _leftActionButtons = Array.Empty<GitFileActionButtonViewModel>();
         private IReadOnlyList<GitFileActionButtonViewModel> _rightActionButtons = Array.Empty<GitFileActionButtonViewModel>();
@@ -23,23 +23,16 @@ namespace HaloCreek.ViewModels.Tabs
         private string _doubleClickActionId = string.Empty;
         private string _emptyStateText = InitialEmptyStateText;
         private string? _workspacePath;
-        private Action<string>? _statusDispatcher;
-
-        public GitViewModel()
-            : this(new GitService(), new ConfigService())
-        {
-        }
 
         public GitViewModel(
             GitService gitService,
             ConfigService configService,
-            ApplicationStatusService? applicationStatusService = null,
-            TransientEventService? transientEventService = null)
+            TransientEventService transientEventService)
         {
-            _gitService = gitService;
-            _configService = configService;
-            _applicationStatusService = applicationStatusService;
-            _transientEventService = transientEventService;
+            _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
+            _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+            _transientEventService = transientEventService
+                ?? throw new ArgumentNullException(nameof(transientEventService));
             RefreshCommand = new RelayCommand(RefreshChanges, () => HasWorkspace);
             RunActionCommand = new RelayCommand<GitFileActionButtonViewModel>(RunAction, CanRunAction);
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
@@ -135,7 +128,7 @@ namespace HaloCreek.ViewModels.Tabs
             EmptyStateText = result.Changes.Count == 0
                 ? result.Message
                 : string.Empty;
-            _statusDispatcher?.Invoke(result.Message);
+            Log.Info("Git", result.Message);
         }
 
         private void LoadActionConfig()
@@ -194,7 +187,10 @@ namespace HaloCreek.ViewModels.Tabs
 
             if (_doubleClickAction is null)
             {
-                _statusDispatcher?.Invoke($"Double click action not found: {_doubleClickActionId}");
+                _transientEventService.ReportUserActionFailure(
+                    "Git",
+                    "Open failed",
+                    $"Double click action not found: {_doubleClickActionId}");
                 return;
             }
 
@@ -204,7 +200,16 @@ namespace HaloCreek.ViewModels.Tabs
         private void RunConfiguredAction(GitFileBrowserActionConfig action, GitChangeInfo? selectedChange)
         {
             var result = _gitService.TryRunConfiguredAction(WorkspacePath, selectedChange, action);
-            _statusDispatcher?.Invoke(result.Message);
+            if (result.Succeeded)
+            {
+                Log.Info("Git", result.Message);
+                return;
+            }
+
+            _transientEventService.ReportUserActionFailure(
+                "Git",
+                "Git action failed",
+                result.Message);
         }
     }
 }

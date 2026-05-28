@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
+using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.Services.SessionHistory;
@@ -11,37 +12,30 @@ namespace HaloCreek.ViewModels.Tabs
     public sealed class HistorySessionsViewModel : ViewModelBase
     {
         private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
-        private readonly SessionLifecycleService? _sessionLifecycleService;
-        private readonly ConfigService? _configService;
-        private readonly ApplicationStatusService? _applicationStatusService;
-        private readonly TransientEventService? _transientEventService;
+        private readonly SessionLifecycleService _sessionLifecycleService;
+        private readonly ConfigService _configService;
+        private readonly TransientEventService _transientEventService;
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
         private HistorySessionInfo? _selectedSession;
         private Action<HistorySessionInfo>? _reeditInitialPromptDispatcher;
-        private Action<string>? _statusDispatcher;
         private string? _workspacePath;
-
-        public HistorySessionsViewModel()
-            : this(new SessionHistoryRefreshService(
-                new MockHistorySessionReader(),
-                new ConfigService()))
-        {
-        }
 
         public HistorySessionsViewModel(
             SessionHistoryRefreshService sessionHistoryRefreshService,
-            SessionLifecycleService? sessionLifecycleService = null,
-            ConfigService? configService = null,
-            ApplicationStatusService? applicationStatusService = null,
-            TransientEventService? transientEventService = null)
+            SessionLifecycleService sessionLifecycleService,
+            ConfigService configService,
+            TransientEventService transientEventService)
         {
-            _sessionHistoryRefreshService = sessionHistoryRefreshService;
-            _sessionLifecycleService = sessionLifecycleService;
-            _configService = configService;
-            _applicationStatusService = applicationStatusService;
-            _transientEventService = transientEventService;
+            _sessionHistoryRefreshService = sessionHistoryRefreshService
+                ?? throw new ArgumentNullException(nameof(sessionHistoryRefreshService));
+            _sessionLifecycleService = sessionLifecycleService
+                ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
+            _configService = configService
+                ?? throw new ArgumentNullException(nameof(configService));
+            _transientEventService = transientEventService
+                ?? throw new ArgumentNullException(nameof(transientEventService));
             _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
             ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
@@ -204,7 +198,7 @@ namespace HaloCreek.ViewModels.Tabs
             {
                 if (!string.IsNullOrWhiteSpace(refreshResult.ErrorMessage))
                 {
-                    _statusDispatcher?.Invoke($"Failed to load history sessions: {refreshResult.ErrorMessage}");
+                    Log.Warning("HistorySessions", $"Failed to load history sessions: {refreshResult.ErrorMessage}");
                 }
 
                 return;
@@ -215,7 +209,8 @@ namespace HaloCreek.ViewModels.Tabs
 
             if (refreshResult.HistoryResult.SkippedFileCount > 0)
             {
-                _statusDispatcher?.Invoke(
+                Log.Warning(
+                    "HistorySessions",
                     $"Loaded {_loadedSessions.Count} sessions, skipped {refreshResult.HistoryResult.SkippedFileCount} invalid files.");
             }
         }
@@ -227,15 +222,18 @@ namespace HaloCreek.ViewModels.Tabs
                 return;
             }
 
-            if (_sessionLifecycleService is null || _configService is null)
+            var config = _configService.LoadEffectiveConfig(WorkspacePath!);
+            var result = _sessionLifecycleService.Resume(session, WorkspacePath!, config);
+            if (result.Started)
             {
-                _statusDispatcher?.Invoke("Resume is not available.");
+                Log.Info("HistorySessions", result.StatusMessage);
                 return;
             }
 
-            var config = _configService.LoadEffectiveConfig(WorkspacePath!);
-            var result = _sessionLifecycleService.Resume(session, WorkspacePath!, config);
-            _statusDispatcher?.Invoke(result.StatusMessage);
+            _transientEventService.ReportUserActionFailure(
+                "HistorySessions",
+                "Resume failed",
+                result.StatusMessage);
         }
 
         private static bool HasSelectedSession(HistorySessionInfo? session)
@@ -252,24 +250,19 @@ namespace HaloCreek.ViewModels.Tabs
 
             if (string.IsNullOrWhiteSpace(session.InitialPrompt))
             {
-                _statusDispatcher?.Invoke("Initial prompt is empty.");
+                _transientEventService.ReportUserActionFailure(
+                    "HistorySessions",
+                    "Reedit failed",
+                    "Initial prompt is empty.");
                 return;
             }
 
             if (_reeditInitialPromptDispatcher is null)
             {
-                _statusDispatcher?.Invoke("Prompt editor is not available.");
-                return;
+                throw new InvalidOperationException("Prompt editor dispatcher is not connected.");
             }
 
-            try
-            {
-                _reeditInitialPromptDispatcher.Invoke(session);
-            }
-            catch (InvalidOperationException ex)
-            {
-                _statusDispatcher?.Invoke($"Failed to reedit initial prompt: {ex.Message}");
-            }
+            _reeditInitialPromptDispatcher.Invoke(session);
         }
     }
 }
