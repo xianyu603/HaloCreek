@@ -433,10 +433,10 @@ namespace HaloCreek.Services
                 "last_touch=0;",
                 "while :; do",
                 "chunk=;",
-                "IFS= read -r -n 4096 -t 1 chunk;",
+                "IFS= read -r -n 4096 -t 1 chunk;", // 一次读4096 如果没那么多可读1s超时一次
                 "status=$?;",
                 "if [ -n \"$chunk\" ]; then",
-                "now=${EPOCHSECONDS:-$(date +%s)};",
+                "now=${EPOCHSECONDS:-$(date +%s)};", // 输出以sec为单位的整数时间 以实现最多1s touch一次
                 "if [ \"$now\" != \"$last_touch\" ]; then",
                 ": > \"$heartbeat\";",
                 "last_touch=$now;",
