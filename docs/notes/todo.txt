@@ -2,3 +2,4 @@
 resume with prompt
 考虑下要不要提示词为空允许启动session
 当前不支持运行时 reload config 之后再说加不加的
+连续切session的时候会短暂报假的background running 顺便可以考虑将idle与否与是否前台分开
