@@ -14,9 +14,9 @@ namespace HaloCreek.ViewModels.Components
         private const string WorkspaceCategory = "Workspace";
 
         private readonly PlatformInfrastructure _platformInfrastructure;
-        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly ApplicationStatusService _applicationStatusService;
         private readonly TransientEventService _transientEventService;
+        private readonly Func<string, bool> _setWorkspacePath;
         private string _workspacePath = NoWorkspaceSelectedText;
         private string _statusText = string.Empty;
 
@@ -27,17 +27,13 @@ namespace HaloCreek.ViewModels.Components
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
             _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
-            _workspaceRuntimeService = workspaceRuntimeService
-                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
+            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
+            _setWorkspacePath = workspaceRuntimeService.SetWorkspacePath;
             _applicationStatusService = appCommonRuntime.ApplicationStatusService;
             _transientEventService = appCommonRuntime.TransientEventService;
             _applicationStatusService.StatusTextChanged += OnStatusTextChanged;
-            _workspaceRuntimeService.WorkspaceChangedEvent += OnWorkspaceChanged;
             ChooseWorkspaceCommand = new AsyncRelayCommand(ChooseWorkspaceAsync);
-            if (!string.IsNullOrWhiteSpace(_workspaceRuntimeService.CurrentWorkspacePath))
-            {
-                WorkspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
-            }
+            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
         }
 
         public string WorkspacePath
@@ -81,7 +77,7 @@ namespace HaloCreek.ViewModels.Components
                 return;
             }
 
-            if (!_workspaceRuntimeService.SetWorkspacePath(selectedPath))
+            if (!_setWorkspacePath(selectedPath))
             {
                 _transientEventService.ReportUserActionFailure(
                     WorkspaceCategory,

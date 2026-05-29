@@ -28,12 +28,7 @@ namespace HaloCreek.Services
             _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         }
 
-        public event EventHandler<WorkspaceRuntimeChangedEventArgs>? WorkspaceChangedEvent;
-
-        public string? CurrentWorkspacePath => _currentWorkspacePath;
-
-        public AppConfig EffectiveConfig => _effectiveConfig
-            ?? throw new InvalidOperationException("Workspace runtime is not initialized.");
+        private event EventHandler<WorkspaceRuntimeChangedEventArgs>? WorkspaceChangedEvent;
 
         public void InitializeStartupWorkspace()
         {
@@ -62,6 +57,15 @@ namespace HaloCreek.Services
             return true;
         }
 
+        public void ApplyCurrentWorkspaceAndSubscribe(EventHandler<WorkspaceRuntimeChangedEventArgs> workspaceChangedHandler)
+        {
+            ArgumentNullException.ThrowIfNull(workspaceChangedHandler);
+
+            var currentWorkspace = CreateCurrentWorkspaceChangedEventArgs();
+            workspaceChangedHandler.Invoke(this, currentWorkspace);
+            WorkspaceChangedEvent += workspaceChangedHandler;
+        }
+
         private void ApplyWorkspacePath(string normalizedWorkspacePath, bool cacheWorkspace)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(normalizedWorkspacePath);
@@ -84,6 +88,16 @@ namespace HaloCreek.Services
 
             var changedEventArgs = new WorkspaceRuntimeChangedEventArgs(normalizedWorkspacePath, effectiveConfig);
             Dispatcher.UIThread.Post(() => workspaceChanged.Invoke(this, changedEventArgs));
+        }
+
+        private WorkspaceRuntimeChangedEventArgs CreateCurrentWorkspaceChangedEventArgs()
+        {
+            if (string.IsNullOrWhiteSpace(_currentWorkspacePath) || _effectiveConfig is null)
+            {
+                throw new InvalidOperationException("Workspace runtime is not initialized.");
+            }
+
+            return new WorkspaceRuntimeChangedEventArgs(_currentWorkspacePath, _effectiveConfig);
         }
 
         private string ResolveStartupWorkspacePath()

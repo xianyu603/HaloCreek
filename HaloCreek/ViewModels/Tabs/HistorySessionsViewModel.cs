@@ -13,8 +13,8 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
         private readonly SessionLifecycleService _sessionLifecycleService;
-        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly TransientEventService _transientEventService;
+        private AppConfig? _effectiveConfig;
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
@@ -34,20 +34,12 @@ namespace HaloCreek.ViewModels.Tabs
                 ?? throw new ArgumentNullException(nameof(sessionHistoryRefreshService));
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
-            _workspaceRuntimeService = workspaceRuntimeService
-                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
+            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _transientEventService = appCommonRuntime.TransientEventService;
             _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
             ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
-            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                throw new InvalidOperationException("Workspace runtime is not initialized.");
-            }
-
-            ApplyWorkspacePath(workspacePath, _workspaceRuntimeService.EffectiveConfig);
-            _workspaceRuntimeService.WorkspaceChangedEvent += OnWorkspaceChanged;
+            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
         }
 
         public string SearchText
@@ -97,6 +89,7 @@ namespace HaloCreek.ViewModels.Tabs
         private void ApplyWorkspacePath(string workspacePath, AppConfig config)
         {
             WorkspacePath = workspacePath;
+            _effectiveConfig = config;
             _loadedSessions = Array.Empty<HistorySessionInfo>();
             ApplySearch();
             _sessionHistoryRefreshService.SetWorkspacePath(workspacePath, config.MaxSessionHistoryFiles);
@@ -231,7 +224,8 @@ namespace HaloCreek.ViewModels.Tabs
                 return;
             }
 
-            var config = _workspaceRuntimeService.EffectiveConfig;
+            var config = _effectiveConfig
+                ?? throw new InvalidOperationException("Workspace runtime is not initialized.");
             var result = _sessionLifecycleService.Resume(
                 session,
                 WorkspacePath!,

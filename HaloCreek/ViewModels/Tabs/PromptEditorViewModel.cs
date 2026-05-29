@@ -11,9 +11,9 @@ namespace HaloCreek.ViewModels.Tabs
 {
     public sealed class PromptEditorViewModel : ViewModelBase
     {
-        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
+        private AppConfig? _effectiveConfig;
         private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
         private string _promptText = string.Empty;
         private OngoingSessionInfo? _selectedOngoingSession;
@@ -28,8 +28,7 @@ namespace HaloCreek.ViewModels.Tabs
 
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
-            _workspaceRuntimeService = workspaceRuntimeService
-                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
+            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _transientEventService = appCommonRuntime.TransientEventService;
 
             LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
@@ -37,14 +36,7 @@ namespace HaloCreek.ViewModels.Tabs
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
             _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
-            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                throw new InvalidOperationException("Workspace runtime is not initialized.");
-            }
-
-            ApplyWorkspacePath(workspacePath);
-            _workspaceRuntimeService.WorkspaceChangedEvent += OnWorkspaceChanged;
+            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
         }
 
         public string PromptText
@@ -94,9 +86,10 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
 
-        private void ApplyWorkspacePath(string workspacePath)
+        private void ApplyWorkspacePath(string workspacePath, AppConfig config)
         {
             WorkspacePath = workspacePath;
+            _effectiveConfig = config;
             RefreshOngoingSessions();
         }
 
@@ -107,7 +100,8 @@ namespace HaloCreek.ViewModels.Tabs
                 return new SessionLaunchResult(false, "Prompt is empty.", null);
             }
 
-            var config = _workspaceRuntimeService.EffectiveConfig;
+            var config = _effectiveConfig
+                ?? throw new InvalidOperationException("Workspace runtime is not initialized.");
             return _sessionLifecycleService.Launch(
                 WorkspacePath!,
                 PromptText,
@@ -179,7 +173,7 @@ namespace HaloCreek.ViewModels.Tabs
         private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
         {
             var previousWorkspacePath = WorkspacePath;
-            ApplyWorkspacePath(e.WorkspacePath);
+            ApplyWorkspacePath(e.WorkspacePath, e.EffectiveConfig);
             ExitWorkspaceOngoingSessions(previousWorkspacePath);
         }
 
