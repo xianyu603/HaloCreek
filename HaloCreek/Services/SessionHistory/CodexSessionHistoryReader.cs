@@ -22,9 +22,11 @@ namespace HaloCreek.Services.SessionHistory
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly Dictionary<string, CachedSessionFile> _fileCache = new(GetFilePathComparer());
 
-        public CodexSessionHistoryReader(PlatformInfrastructure platformInfrastructure)
+        public CodexSessionHistoryReader(AppCommonRuntime appCommonRuntime)
         {
-            _platformInfrastructure = platformInfrastructure ?? throw new ArgumentNullException(nameof(platformInfrastructure));
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+
+            _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
         }
 
         public SessionHistoryResult ReadSessions(string? workspacePath, int maxSessionHistoryFiles)

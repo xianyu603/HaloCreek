@@ -21,18 +21,16 @@ namespace HaloCreek.ViewModels.Components
         private string _statusText = string.Empty;
 
         public WorkspaceFooterViewModel(
-            PlatformInfrastructure platformInfrastructure,
             WorkspaceRuntimeService workspaceRuntimeService,
-            ApplicationStatusService applicationStatusService,
-            TransientEventService transientEventService)
+            AppCommonRuntime appCommonRuntime)
         {
-            _platformInfrastructure = platformInfrastructure ?? throw new ArgumentNullException(nameof(platformInfrastructure));
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+
+            _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             _workspaceRuntimeService = workspaceRuntimeService
                 ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
-            _applicationStatusService = applicationStatusService
-                ?? throw new ArgumentNullException(nameof(applicationStatusService));
-            _transientEventService = transientEventService
-                ?? throw new ArgumentNullException(nameof(transientEventService));
+            _applicationStatusService = appCommonRuntime.ApplicationStatusService;
+            _transientEventService = appCommonRuntime.TransientEventService;
             _applicationStatusService.StatusTextChanged += OnStatusTextChanged;
             _workspaceRuntimeService.WorkspaceChangedEvent += OnWorkspaceChanged;
             ChooseWorkspaceCommand = new AsyncRelayCommand(ChooseWorkspaceAsync);

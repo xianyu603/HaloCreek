@@ -22,14 +22,15 @@ namespace HaloCreek.ViewModels.Tabs
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
             WorkspaceRuntimeService workspaceRuntimeService,
-            TransientEventService transientEventService)
+            AppCommonRuntime appCommonRuntime)
         {
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _workspaceRuntimeService = workspaceRuntimeService
                 ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
-            _transientEventService = transientEventService
-                ?? throw new ArgumentNullException(nameof(transientEventService));
+            _transientEventService = appCommonRuntime.TransientEventService;
 
             LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);

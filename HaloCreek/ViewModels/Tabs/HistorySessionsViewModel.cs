@@ -26,16 +26,17 @@ namespace HaloCreek.ViewModels.Tabs
             SessionHistoryRefreshService sessionHistoryRefreshService,
             SessionLifecycleService sessionLifecycleService,
             WorkspaceRuntimeService workspaceRuntimeService,
-            TransientEventService transientEventService)
+            AppCommonRuntime appCommonRuntime)
         {
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+
             _sessionHistoryRefreshService = sessionHistoryRefreshService
                 ?? throw new ArgumentNullException(nameof(sessionHistoryRefreshService));
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _workspaceRuntimeService = workspaceRuntimeService
                 ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
-            _transientEventService = transientEventService
-                ?? throw new ArgumentNullException(nameof(transientEventService));
+            _transientEventService = appCommonRuntime.TransientEventService;
             _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
             ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);

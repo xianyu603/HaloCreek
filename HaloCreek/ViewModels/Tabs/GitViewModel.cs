@@ -27,13 +27,14 @@ namespace HaloCreek.ViewModels.Tabs
         public GitViewModel(
             GitService gitService,
             WorkspaceRuntimeService workspaceRuntimeService,
-            TransientEventService transientEventService)
+            AppCommonRuntime appCommonRuntime)
         {
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
             _workspaceRuntimeService = workspaceRuntimeService
                 ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
-            _transientEventService = transientEventService
-                ?? throw new ArgumentNullException(nameof(transientEventService));
+            _transientEventService = appCommonRuntime.TransientEventService;
             RefreshCommand = new RelayCommand(RefreshChanges, () => HasWorkspace);
             RunActionCommand = new RelayCommand<GitFileActionButtonViewModel>(RunAction, CanRunAction);
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);

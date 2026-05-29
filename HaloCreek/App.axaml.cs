@@ -36,42 +36,44 @@ namespace HaloCreek
         private static AppServices CreateAppServices(MainWindow mainWindow)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
+            var applicationStatusService = new ApplicationStatusService();
+            var transientEventService = new TransientEventService(platformInfrastructure);
+            var appCommonRuntime = new AppCommonRuntime(
+                platformInfrastructure,
+                applicationStatusService,
+                transientEventService);
             var workspaceCacheService = new WorkspaceCacheService();
             var configService = new ConfigService();
             var workspaceRuntimeService = new WorkspaceRuntimeService(
-                platformInfrastructure,
+                appCommonRuntime,
                 workspaceCacheService,
                 configService);
             workspaceRuntimeService.InitializeStartupWorkspace();
-            var tmuxService = new TmuxService(platformInfrastructure);
-            var terminalService = new TerminalService(platformInfrastructure);
+            var tmuxService = new TmuxService(appCommonRuntime);
+            var terminalService = new TerminalService(appCommonRuntime);
             var sessionLifecycleService = new SessionLifecycleService(tmuxService, terminalService);
-            var applicationStatusService = new ApplicationStatusService();
-            var transientEventService = new TransientEventService(platformInfrastructure);
             var gitService = new GitService();
 
-            ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(platformInfrastructure);
+            ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
             var sessionHistoryRefreshService = new SessionHistoryRefreshService(sessionHistoryQueryService);
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
                 workspaceRuntimeService,
-                transientEventService);
+                appCommonRuntime);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
                 workspaceRuntimeService,
-                transientEventService);
+                appCommonRuntime);
             var git = new GitViewModel(
                 gitService,
                 workspaceRuntimeService,
-                transientEventService);
+                appCommonRuntime);
             var workspaceFooter = new WorkspaceFooterViewModel(
-                platformInfrastructure,
                 workspaceRuntimeService,
-                applicationStatusService,
-                transientEventService);
+                appCommonRuntime);
 
             var mainWindowViewModel = new MainWindowViewModel(
                 promptEditor,

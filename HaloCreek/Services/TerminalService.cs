@@ -9,10 +9,11 @@ namespace HaloCreek.Services
         private readonly string _frontWindowIdentity;
         private bool _frontClientStarted;
 
-        public TerminalService(PlatformInfrastructure platformInfrastructure)
+        public TerminalService(AppCommonRuntime appCommonRuntime)
         {
-            _platformInfrastructure = platformInfrastructure
-                ?? throw new ArgumentNullException(nameof(platformInfrastructure));
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+
+            _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             _frontWindowIdentity = "halocreek-front-" + Guid.NewGuid().ToString("N")[..8];
         }
 

@@ -16,12 +16,13 @@ namespace HaloCreek.Services
         private AppConfig? _effectiveConfig;
 
         public WorkspaceRuntimeService(
-            PlatformInfrastructure platformInfrastructure,
+            AppCommonRuntime appCommonRuntime,
             WorkspaceCacheService workspaceCacheService,
             ConfigService configService)
         {
-            _platformInfrastructure = platformInfrastructure
-                ?? throw new ArgumentNullException(nameof(platformInfrastructure));
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+
+            _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             _workspaceCacheService = workspaceCacheService
                 ?? throw new ArgumentNullException(nameof(workspaceCacheService));
             _configService = configService ?? throw new ArgumentNullException(nameof(configService));

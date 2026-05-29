@@ -52,10 +52,11 @@ namespace HaloCreek.Services
         private readonly FrontClientSwitcher _frontClientSwitcher;
         private WatchState _watchState;
 
-        public TmuxService(PlatformInfrastructure platformInfrastructure)
+        public TmuxService(AppCommonRuntime appCommonRuntime)
         {
-            _platformInfrastructure = platformInfrastructure
-                ?? throw new ArgumentNullException(nameof(platformInfrastructure));
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+
+            _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             _frontClientId = Guid.NewGuid().ToString("N")[..8];
             _keeperSessionId = "halocreek-keeper-" + _frontClientId;
             _frontClientTtyMarkerPath = HaloCreekTempDirectory
