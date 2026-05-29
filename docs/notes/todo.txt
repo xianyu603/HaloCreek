@@ -1,5 +1,4 @@
 删掉无参构造函数 精简逻辑 避免业务逻辑静默缺失
 resume with prompt
-不同VM对workspace的管理都差不多 可能抽个公共组件或者基类比较好 再新增的时候可以考虑
 考虑下要不要提示词为空允许启动session
 当前不支持运行时 reload config 之后再说加不加的
