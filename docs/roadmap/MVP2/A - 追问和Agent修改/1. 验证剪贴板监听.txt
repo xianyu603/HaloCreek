@@ -1,0 +1,2 @@
+目标: 确认剪贴板监听能力的抽象方式 是Util还是Service 是否要写在现在的Platform Infra里面
+考虑将Platfrom相关能力写在一个目录 方便以后适配 塞到app context

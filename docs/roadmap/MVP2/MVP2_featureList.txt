@@ -1,0 +1,48 @@
+review panel 实现为一个tab 悬浮窗先不搞 不替换原有的git panel
+监听剪贴板事件 识别行号 定位'当前审阅位置'
+面板上放一个文本框 用于追尾 限定范围修改时的提示词输入
+Action :
+追问 定位自动注入(文件 行号) append 问题 限定不要修改代码
+agent 修改 定位自动注入(文件 行号) append 修改内容 注入约束(只允许修改XXX范围内的代码)
+批注 以一个列表展示 一件'以这些批注拉起新session修改'
+mark reviewed 支持: 当前文件标记reviewed/当前文件到目前为止标记reviewed 支持两级diff(reviewed vs head/working tree vs reviewed)
+重抽 一键 discard all
+手动修改 不提供功能 保证与HC Action交错的行为正确
+
+关键问题 :
+
+追问/修改 发送到当前front session 不处理用户切走了之类的情况('任务并行'的MVP再处理) 需要验证能力
+
+如何定位?
+先做从剪贴板读内容后，搜索git有修改的文件(内容匹配)，定位到行号之后不通过操作处理不同 
+搜不到/搜到多条UI提示即可
+追尾 修改 mark revied定位都只要临时定位 这些可以直接用行号
+
+批注如何持久化定位?
+记录选中内容 在diff了的文件内搜索 如果内容变了匹配不到 标注批注失效 批注有效性手动刷新
+批注只和working tree进行匹配 和reviewed功能正交 reviewed用来让agent的修改可感知 批注用于批量指导agent下一步修改
+预想的工作流 边添加批注边逐步标记reviewed 然后一次让agent处理所有批注内容 此时允许working tree vs reviewed diff 非空 但是不保证此后对working tree的修改可感知
+
+mark reviewed的实现
+git index file 结合注入环境变量
+diff用自己攒temp文件的形式 前期写死tortoise git的diff命令行 后期考虑可以配置(diff action: XXX {from} XXX {to} token 替换临时文件)
+reviewed vs head 的 head指当前head 不考虑用户手动切分支的正确性 用户手动切workspace的正确性后续专门处理 前期可以先抛异常(如果reviewed中切workspace)
+diff 时将reviewed放左边 右边放working tree以支持'回退至reviewed'
+
+重抽细节:
+需要能选定文件 不能无脑全部revert 对于单工作目录多任务/临时不需要commit的文件有用
+只做文件级 是last resort 不支持'只revert unreviewed内容'
+review临时进度(reviewed内容/批注)暂定有感知的全部discard
+
+agent限定范围修改:
+只做提示词软限制 修改超限用reviewed功能保证可感知即可
+
+简单枚举几个交错:
+批注后mark reviewed: 不影响批注。批注绑定 working tree 内容，reviewed 只表示审阅进度。
+mark reviewed后手动改: 显示在working tree vs reviewed中 需要用户手动标记reviewed 因为不好区分手动还是agent修改
+重抽后批注: 重抽会清空相关 review 临时状态，包括 reviewed 进度和批注。之后新批注重新开始。
+批注后working tree变化: 如果批注 key 匹配不到，标记批注失效；保留原批注内容，允许用户 relocate。
+批注后拉新session: 视为 working tree 可能变化；旧批注可删除或隐藏，避免重复导出和干扰。
+
+做到mark reviewed和批注的时候需要确认出口问题 reviewed的内容如何提交(要不要支持从reviewed 提交?)
+批注如何清理 是否需要持久化 暂时的想法是批注形成prompt/文档后就清理得了
