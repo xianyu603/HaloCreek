@@ -1,8 +1,10 @@
 using System;
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using HaloCreek.Infrastructure;
+using HaloCreek.Logging;
 using HaloCreek.Services;
 using HaloCreek.Services.SessionHistory;
 using HaloCreek.ViewModels;
@@ -14,6 +16,8 @@ namespace HaloCreek
 {
     public partial class App : Application
     {
+        private const int ClipboardLogPreviewMaxLength = 80;
+
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -36,6 +40,31 @@ namespace HaloCreek
         private static AppDisposeScope CreateAppDisposeScope(MainWindow mainWindow)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
+            PlatformClipboardInfrastructure platformClipboardInfrastructure;
+            try
+            {
+                platformClipboardInfrastructure = new PlatformClipboardInfrastructure(mainWindow);
+                Log.Info("Clipboard", "Clipboard infrastructure created.");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Clipboard", ex, "Clipboard infrastructure creation failed.");
+                throw;
+            }
+
+            // TODO MVP2-A: Temporary clipboard watch for capability validation.
+            // Remove this direct TextChanged subscription after ReviewClipboardContextService owns clipboard context.
+            platformClipboardInfrastructure.TextChanged += (_, args) =>
+            {
+                var snapshot = args.Snapshot;
+                Log.Info(
+                    "Clipboard",
+                    "Clipboard text changed. "
+                    + $"length={snapshot.Text.Length} "
+                    + $"capturedAt={snapshot.CapturedAt.ToString("O", CultureInfo.InvariantCulture)} "
+                    + $"preview=\"{CreateClipboardLogPreview(snapshot.Text)}\"");
+            };
+
             var applicationStatusService = new ApplicationStatusService();
             var transientEventService = new TransientEventService(platformInfrastructure);
             var appCommonRuntime = new AppCommonRuntime(
@@ -88,7 +117,24 @@ namespace HaloCreek
                 logs,
                 sessionLifecycleService,
                 sessionHistoryRefreshService,
-                tmuxService);
+                tmuxService,
+                platformClipboardInfrastructure);
+        }
+
+        private static string CreateClipboardLogPreview(string text)
+        {
+            ArgumentNullException.ThrowIfNull(text);
+
+            var isTruncated = text.Length > ClipboardLogPreviewMaxLength;
+            var preview = isTruncated ? text[..ClipboardLogPreviewMaxLength] : text;
+            preview = preview
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal)
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal)
+                .Replace("\t", "\\t", StringComparison.Ordinal);
+
+            return isTruncated ? preview + "..." : preview;
         }
 
         // 统一收口应用级对象的退出释放。当前这里同时承载少量对象组装职责，
@@ -99,6 +145,7 @@ namespace HaloCreek
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
             private readonly TmuxService _tmuxService;
+            private readonly PlatformClipboardInfrastructure _platformClipboardInfrastructure;
             private bool _isDisposed;
 
             public AppDisposeScope(
@@ -106,13 +153,16 @@ namespace HaloCreek
                 LogPanelViewModel logs,
                 SessionLifecycleService sessionLifecycleService,
                 SessionHistoryRefreshService sessionHistoryRefreshService,
-                TmuxService tmuxService)
+                TmuxService tmuxService,
+                PlatformClipboardInfrastructure platformClipboardInfrastructure)
             {
                 MainWindowViewModel = mainWindowViewModel;
                 _logs = logs;
                 _sessionLifecycleService = sessionLifecycleService;
                 _sessionHistoryRefreshService = sessionHistoryRefreshService;
                 _tmuxService = tmuxService;
+                _platformClipboardInfrastructure = platformClipboardInfrastructure
+                    ?? throw new ArgumentNullException(nameof(platformClipboardInfrastructure));
             }
 
             public MainWindowViewModel MainWindowViewModel { get; }
@@ -125,6 +175,7 @@ namespace HaloCreek
                 }
 
                 _isDisposed = true;
+                _platformClipboardInfrastructure.Dispose();
                 _logs.Dispose();
                 _sessionHistoryRefreshService.Dispose();
                 _sessionLifecycleService.Dispose();
