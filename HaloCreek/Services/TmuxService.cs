@@ -27,7 +27,7 @@ using HaloCreek.Models;
 | Probe finish | `Probing` with sessions left | Schedule next timer | `Scheduled` |
 | Probe finish | `Probing` with no sessions left | Keep timer stopped | `Idle` |
 | Probe finish | `Disposed` | Keep timer stopped | `Disposed` |
-| `Dispose` | Any state | Clear sessions, stop timer, wait pending exit tasks, best effort kill keeper session | `Disposed` |
+| `Dispose` | Any state | Clear sessions, stop timer, wait pending session operation tasks, best effort kill keeper session | `Disposed` |
 */
 
 namespace HaloCreek.Services
@@ -44,10 +44,9 @@ namespace HaloCreek.Services
         private readonly string _frontClientTtyMarkerPath;
         private readonly string _keeperSessionId;
         private readonly object _watchStateLock = new();
-        private readonly object _launchTasksLock = new();
+        private readonly object _sessionOperationTasksLock = new();
         private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
-        private readonly List<Task> _exitTasks = new();
-        private readonly Dictionary<string, Task> _launchTasks = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Task> _sessionOperationTasks = new(StringComparer.Ordinal);
         private readonly Timer _watchTimer;
         private readonly FrontClientSwitcher _frontClientSwitcher;
         private WatchState _watchState;
@@ -100,17 +99,13 @@ namespace HaloCreek.Services
                 .Concat(request.Arguments)
                 .ToArray();
 
-            var launchTask = Task.Run(() =>
+            QueueSessionOperation(identifier, () =>
             {
                 RunTmuxCommand(arguments, "launch tmux session");
                 StartHeartbeatPipe(identifier);
                 TryRunTmuxCommand(new[] { "set-option", "-t", identifier, "mouse", "on" }, out _);
                 SetSessionMetadata(identifier, wslWorkspacePath, request.Title);
             });
-            lock (_launchTasksLock)
-            {
-                _launchTasks[identifier] = launchTask;
-            }
 
             return identifier;
         }
@@ -118,17 +113,11 @@ namespace HaloCreek.Services
         public void Exit(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-            var task = Task.Run(() =>
+            QueueSessionOperation(identifier, () =>
             {
-                WaitForLaunchTaskToComplete(identifier);
                 _frontClientSwitcher.SwitchOutIfFront(identifier);
                 TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
             });
-
-            // Exit is issued from UI-owned lifecycle paths. Keep the tasks only so
-            // Dispose can observe and wait for pending best-effort cleanup.
-            _exitTasks.RemoveAll(static exitTask => exitTask.IsCompleted);
-            _exitTasks.Add(task);
         }
 
         public TerminalCommandSpec GetFrontClientStartupCommand(string initialIdentifier)
@@ -158,56 +147,20 @@ namespace HaloCreek.Services
             _frontClientSwitcher.SwitchIn(identifier);
         }
 
-        public TmuxFrontSessionSendResult SendMessageToFrontSession(string message)
+        public void SendMessageToSession(
+            string identifier,
+            string message)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
             ArgumentNullException.ThrowIfNull(message);
 
             if (string.IsNullOrWhiteSpace(message))
             {
-                return new TmuxFrontSessionSendResult(false, "Message is empty.");
+                return;
             }
 
-            if (!_frontClientSwitcher.TryGetFrontSessionId(out var frontSessionId))
-            {
-                return new TmuxFrontSessionSendResult(false, "No front session is available.");
-            }
-
-            WaitForLaunchTaskToComplete(frontSessionId);
-
-            var targetPane = frontSessionId + ":0.0";
-            var bufferName = "halocreek-send-" + _frontClientId;
-
-            if (!TryRunTmuxCommand(
-                    new[] { "set-buffer", "-b", bufferName, message },
-                    out var setBufferOutput))
-            {
-                return new TmuxFrontSessionSendResult(
-                    false,
-                    "Failed to stage message for front session: "
-                    + BuildTmuxFailureMessage(setBufferOutput));
-            }
-
-            if (!TryRunTmuxCommand(
-                    new[] { "paste-buffer", "-d", "-b", bufferName, "-t", targetPane },
-                    out var pasteOutput))
-            {
-                return new TmuxFrontSessionSendResult(
-                    false,
-                    "Failed to paste message to front session: "
-                    + BuildTmuxFailureMessage(pasteOutput));
-            }
-
-            if (!TryRunTmuxCommand(
-                    new[] { "send-keys", "-t", targetPane, "Enter" },
-                    out var sendKeysOutput))
-            {
-                return new TmuxFrontSessionSendResult(
-                    false,
-                    "Failed to submit message to front session: "
-                    + BuildTmuxFailureMessage(sendKeysOutput));
-            }
-
-            return new TmuxFrontSessionSendResult(true, "Message sent to front session.");
+            QueueSessionOperation(identifier, () =>
+                SendMessageToSessionCore(identifier, message));
         }
 
         public void Dispose()
@@ -225,7 +178,7 @@ namespace HaloCreek.Services
             }
 
             _watchTimer.Dispose();
-            WaitForExitTasksToComplete();
+            WaitForSessionOperationsToComplete();
             _frontClientSwitcher.Clear();
             TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
         }
@@ -568,10 +521,84 @@ namespace HaloCreek.Services
                 "launch tmux keeper session");
         }
 
-        private void WaitForExitTasksToComplete()
+        private void SendMessageToSessionCore(
+            string identifier,
+            string message)
         {
-            var tasks = _exitTasks.ToArray();
-            _exitTasks.Clear();
+            var targetPane = identifier + ":0.0";
+            var bufferName = "halocreek-send-"
+                + _frontClientId
+                + "-"
+                + Guid.NewGuid().ToString("N")[..8];
+
+            if (!TryRunTmuxCommand(
+                    new[] { "set-buffer", "-b", bufferName, message },
+                    out _))
+            {
+                return;
+            }
+
+            if (!TryRunTmuxCommand(
+                    new[] { "paste-buffer", "-d", "-b", bufferName, "-t", targetPane },
+                    out _))
+            {
+                return;
+            }
+
+            if (!TryRunTmuxCommand(
+                    new[] { "send-keys", "-t", targetPane, "Enter" },
+                    out _))
+            {
+                return;
+            }
+        }
+
+        private Task QueueSessionOperation(string identifier, Action operation)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+            ArgumentNullException.ThrowIfNull(operation);
+
+            lock (_sessionOperationTasksLock)
+            {
+                _sessionOperationTasks.TryGetValue(identifier, out var previousTask);
+                var task = Task.Run(() =>
+                {
+                    if (previousTask is not null)
+                    {
+                        WaitForTaskToComplete(previousTask);
+                    }
+
+                    operation();
+                });
+
+                _sessionOperationTasks[identifier] = task;
+                _ = task.ContinueWith(
+                    completedTask => RemoveCompletedSessionOperation(identifier, completedTask),
+                    TaskScheduler.Default);
+                return task;
+            }
+        }
+
+        private void RemoveCompletedSessionOperation(string identifier, Task completedTask)
+        {
+            lock (_sessionOperationTasksLock)
+            {
+                if (_sessionOperationTasks.TryGetValue(identifier, out var currentTask)
+                    && ReferenceEquals(currentTask, completedTask))
+                {
+                    _sessionOperationTasks.Remove(identifier);
+                }
+            }
+        }
+
+        private void WaitForSessionOperationsToComplete()
+        {
+            Task[] tasks;
+            lock (_sessionOperationTasksLock)
+            {
+                tasks = _sessionOperationTasks.Values.ToArray();
+                _sessionOperationTasks.Clear();
+            }
 
             foreach (var task in tasks)
             {
@@ -579,21 +606,6 @@ namespace HaloCreek.Services
             }
         }
 
-        private void WaitForLaunchTaskToComplete(string identifier)
-        {
-            Task? task;
-            lock (_launchTasksLock)
-            {
-                _launchTasks.Remove(identifier, out task);
-            }
-
-            if (task is null)
-            {
-                return;
-            }
-
-            WaitForTaskToComplete(task);
-        }
         private static void WaitForTaskToComplete(Task task)
         {
             try
@@ -625,14 +637,6 @@ namespace HaloCreek.Services
                 "Failed to " + operationName + ": " + message);
         }
 
-        private static string BuildTmuxFailureMessage(string output)
-        {
-            var message = NormalizeProcessOutput(output);
-            return string.IsNullOrWhiteSpace(message)
-                ? "tmux command failed."
-                : message;
-        }
-
         private bool TryRunTmuxCommand(
             IReadOnlyList<string> arguments,
             out string output)
@@ -661,8 +665,4 @@ namespace HaloCreek.Services
             return output.Replace("\0", string.Empty).Trim();
         }
     }
-
-    public sealed record TmuxFrontSessionSendResult(
-        bool Sent,
-        string StatusMessage);
 }

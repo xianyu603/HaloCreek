@@ -238,6 +238,8 @@ namespace HaloCreek.Services
                 _tmuxService.StartWatching(previousFrontSessionId);
             }
 
+            // TODO: BringToFront currently does not wait for the per-session tmux operation
+            // queue. If launch is still in flight, attach/switch can still race creation.
             _tmuxService.StopWatching(sessionId);
             var startupCommand = _tmuxService.GetFrontClientStartupCommand(sessionId);
             _terminalService.EnsureFrontClient(startupCommand);
@@ -262,6 +264,11 @@ namespace HaloCreek.Services
             RequireUiThread();
             ArgumentNullException.ThrowIfNull(message);
 
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return new FrontSessionSendResult(false, "Message is empty.");
+            }
+
             if (string.IsNullOrWhiteSpace(_frontSessionId)
                 || !_sessionsById.TryGetValue(_frontSessionId, out var frontSession)
                 || frontSession.State != OngoingSessionState.Front)
@@ -269,8 +276,9 @@ namespace HaloCreek.Services
                 return new FrontSessionSendResult(false, "No front session is available.");
             }
 
-            var result = _tmuxService.SendMessageToFrontSession(message);
-            return new FrontSessionSendResult(result.Sent, result.StatusMessage);
+            var frontSessionId = _frontSessionId;
+            _tmuxService.SendMessageToSession(frontSessionId, message);
+            return new FrontSessionSendResult(true, "Message send requested.");
         }
 
         public void Exit(string sessionId)
