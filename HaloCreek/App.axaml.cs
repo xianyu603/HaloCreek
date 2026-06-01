@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -16,8 +15,6 @@ namespace HaloCreek
 {
     public partial class App : Application
     {
-        private const int ClipboardLogPreviewMaxLength = 80;
-
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -52,19 +49,6 @@ namespace HaloCreek
                 throw;
             }
 
-            // TODO MVP2-A: Temporary clipboard watch for capability validation.
-            // Remove this direct TextChanged subscription after ReviewClipboardContextService owns clipboard context.
-            platformClipboardInfrastructure.TextChanged += (_, args) =>
-            {
-                var snapshot = args.Snapshot;
-                Log.Info(
-                    "Clipboard",
-                    "Clipboard text changed. "
-                    + $"length={snapshot.Text.Length} "
-                    + $"capturedAt={snapshot.CapturedAt.ToString("O", CultureInfo.InvariantCulture)} "
-                    + $"preview=\"{CreateClipboardLogPreview(snapshot.Text)}\"");
-            };
-
             var applicationStatusService = new ApplicationStatusService();
             var transientEventService = new TransientEventService(platformInfrastructure);
             var appCommonRuntime = new AppCommonRuntime(
@@ -82,6 +66,12 @@ namespace HaloCreek
             var terminalService = new TerminalService(appCommonRuntime);
             var sessionLifecycleService = new SessionLifecycleService(tmuxService, terminalService);
             var gitService = new GitService();
+            // TODO MVP2-A: Temporary review location validation.
+            // Replace log-only validation after Review panel consumes ReviewClipboardContextService.LocationChanged.
+            var reviewClipboardContextService = new ReviewClipboardContextService(
+                platformClipboardInfrastructure,
+                workspaceRuntimeService,
+                gitService);
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
@@ -118,23 +108,8 @@ namespace HaloCreek
                 sessionLifecycleService,
                 sessionHistoryRefreshService,
                 tmuxService,
+                reviewClipboardContextService,
                 platformClipboardInfrastructure);
-        }
-
-        private static string CreateClipboardLogPreview(string text)
-        {
-            ArgumentNullException.ThrowIfNull(text);
-
-            var isTruncated = text.Length > ClipboardLogPreviewMaxLength;
-            var preview = isTruncated ? text[..ClipboardLogPreviewMaxLength] : text;
-            preview = preview
-                .Replace("\\", "\\\\", StringComparison.Ordinal)
-                .Replace("\"", "\\\"", StringComparison.Ordinal)
-                .Replace("\r", "\\r", StringComparison.Ordinal)
-                .Replace("\n", "\\n", StringComparison.Ordinal)
-                .Replace("\t", "\\t", StringComparison.Ordinal);
-
-            return isTruncated ? preview + "..." : preview;
         }
 
         // 统一收口应用级对象的退出释放。当前这里同时承载少量对象组装职责，
@@ -145,6 +120,7 @@ namespace HaloCreek
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
             private readonly TmuxService _tmuxService;
+            private readonly ReviewClipboardContextService _reviewClipboardContextService;
             private readonly PlatformClipboardInfrastructure _platformClipboardInfrastructure;
             private bool _isDisposed;
 
@@ -154,6 +130,7 @@ namespace HaloCreek
                 SessionLifecycleService sessionLifecycleService,
                 SessionHistoryRefreshService sessionHistoryRefreshService,
                 TmuxService tmuxService,
+                ReviewClipboardContextService reviewClipboardContextService,
                 PlatformClipboardInfrastructure platformClipboardInfrastructure)
             {
                 MainWindowViewModel = mainWindowViewModel;
@@ -161,6 +138,8 @@ namespace HaloCreek
                 _sessionLifecycleService = sessionLifecycleService;
                 _sessionHistoryRefreshService = sessionHistoryRefreshService;
                 _tmuxService = tmuxService;
+                _reviewClipboardContextService = reviewClipboardContextService
+                    ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
                 _platformClipboardInfrastructure = platformClipboardInfrastructure
                     ?? throw new ArgumentNullException(nameof(platformClipboardInfrastructure));
             }
@@ -175,6 +154,7 @@ namespace HaloCreek
                 }
 
                 _isDisposed = true;
+                _reviewClipboardContextService.Dispose();
                 _platformClipboardInfrastructure.Dispose();
                 _logs.Dispose();
                 _sessionHistoryRefreshService.Dispose();

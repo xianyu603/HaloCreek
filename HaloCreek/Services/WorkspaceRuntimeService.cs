@@ -30,6 +30,8 @@ namespace HaloCreek.Services
 
         private event EventHandler<WorkspaceRuntimeChangedEventArgs>? WorkspaceChangedEvent;
 
+        public string? CurrentWorkspacePath => _currentWorkspacePath;
+
         public void InitializeStartupWorkspace()
         {
             InitializeStartupWorkspace(ResolveStartupWorkspacePath());
