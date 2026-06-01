@@ -77,6 +77,8 @@ namespace HaloCreek.Logging
             ArgumentException.ThrowIfNullOrWhiteSpace(category);
             ArgumentNullException.ThrowIfNull(message);
 
+            var formattedLine = FormatLine(level, category, message);
+
             lock (WriterLock)
             {
                 if (_writer is null)
@@ -87,8 +89,10 @@ namespace HaloCreek.Logging
                     return;
                 }
 
-                _writer.WriteLine(FormatLine(level, category, message));
+                _writer.WriteLine(formattedLine);
             }
+
+            CurrentLogText.AppendLine(formattedLine);
         }
 
         public static void Shutdown()
