@@ -1,0 +1,7 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HaloCreek.ViewModels.Tabs"
+             x:DataType="vm:ReviewViewModel"
+             x:Class="HaloCreek.Views.Tabs.ReviewView">
+    <Grid Margin="20"/>
+</UserControl>

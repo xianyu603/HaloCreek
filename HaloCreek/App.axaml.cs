@@ -81,6 +81,7 @@ namespace HaloCreek
                 sessionLifecycleService,
                 workspaceRuntimeService,
                 appCommonRuntime);
+            var review = new ReviewViewModel();
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
@@ -97,6 +98,7 @@ namespace HaloCreek
 
             var mainWindowViewModel = new MainWindowViewModel(
                 promptEditor,
+                review,
                 historySessions,
                 git,
                 logs,

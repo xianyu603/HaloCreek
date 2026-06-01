@@ -20,13 +20,16 @@
             <TabItem Header="Prompt Editor">
                 <tabs:PromptEditorView DataContext="{Binding PromptEditor}"/>
             </TabItem>
-            <TabItem Header="History Sessions">
-                <tabs:HistorySessionsView DataContext="{Binding HistorySessions}"/>
+            <TabItem Header="Review">
+                <tabs:ReviewView DataContext="{Binding Review}"/>
             </TabItem>
             <TabItem Header="Git">
                 <tabs:GitView DataContext="{Binding Git}"/>
             </TabItem>
-            <TabItem Header="Logs">
+            <TabItem Header="History">
+                <tabs:HistorySessionsView DataContext="{Binding HistorySessions}"/>
+            </TabItem>
+            <TabItem Header="AppLogs">
                 <tabs:LogPanelView DataContext="{Binding Logs}"/>
             </TabItem>
         </TabControl>
