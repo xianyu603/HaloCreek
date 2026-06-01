@@ -71,6 +71,7 @@ namespace HaloCreek
                 gitService,
                 workspaceRuntimeService,
                 appCommonRuntime);
+            var logs = new LogPanelViewModel();
             var workspaceFooter = new WorkspaceFooterViewModel(
                 workspaceRuntimeService,
                 appCommonRuntime);
@@ -79,6 +80,7 @@ namespace HaloCreek
                 promptEditor,
                 historySessions,
                 git,
+                logs,
                 workspaceFooter);
 
             return new AppServices(

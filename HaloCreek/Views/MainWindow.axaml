@@ -26,6 +26,9 @@
             <TabItem Header="Git">
                 <tabs:GitView DataContext="{Binding Git}"/>
             </TabItem>
+            <TabItem Header="Logs">
+                <tabs:LogPanelView DataContext="{Binding Logs}"/>
+            </TabItem>
         </TabControl>
 
         <components:WorkspaceFooterView Grid.Row="1" DataContext="{Binding WorkspaceFooter}"/>
