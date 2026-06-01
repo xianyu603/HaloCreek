@@ -32,6 +32,7 @@ namespace HaloCreek.ViewModels.Tabs
             _transientEventService = appCommonRuntime.TransientEventService;
 
             LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
+            SendToFrontCommand = new RelayCommand(SendToFront, CanLaunchPrompt);
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
@@ -47,6 +48,7 @@ namespace HaloCreek.ViewModels.Tabs
                 if (SetProperty(ref _promptText, value ?? string.Empty))
                 {
                     LaunchCommand.NotifyCanExecuteChanged();
+                    SendToFrontCommand.NotifyCanExecuteChanged();
                 }
             }
         }
@@ -81,6 +83,8 @@ namespace HaloCreek.ViewModels.Tabs
         public bool IsOngoingSessionsEmpty => !HasOngoingSessions;
 
         public IRelayCommand LaunchCommand { get; }
+
+        public IRelayCommand SendToFrontCommand { get; }
 
         public IRelayCommand<OngoingSessionInfo> BringToFrontCommand { get; }
 
@@ -121,6 +125,21 @@ namespace HaloCreek.ViewModels.Tabs
             _transientEventService.ReportUserActionFailure(
                 "PromptEditor",
                 "Launch failed",
+                result.StatusMessage);
+        }
+
+        private void SendToFront()
+        {
+            var result = _sessionLifecycleService.SendMessageToFrontSession(PromptText);
+            if (result.Sent)
+            {
+                Log.Info("PromptEditor", result.StatusMessage);
+                return;
+            }
+
+            _transientEventService.ReportUserActionFailure(
+                "PromptEditor",
+                "Send to front failed",
                 result.StatusMessage);
         }
 

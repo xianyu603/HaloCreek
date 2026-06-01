@@ -257,6 +257,22 @@ namespace HaloCreek.Services
             SessionsChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        public FrontSessionSendResult SendMessageToFrontSession(string message)
+        {
+            RequireUiThread();
+            ArgumentNullException.ThrowIfNull(message);
+
+            if (string.IsNullOrWhiteSpace(_frontSessionId)
+                || !_sessionsById.TryGetValue(_frontSessionId, out var frontSession)
+                || frontSession.State != OngoingSessionState.Front)
+            {
+                return new FrontSessionSendResult(false, "No front session is available.");
+            }
+
+            var result = _tmuxService.SendMessageToFrontSession(message);
+            return new FrontSessionSendResult(result.Sent, result.StatusMessage);
+        }
+
         public void Exit(string sessionId)
         {
             RequireUiThread();
@@ -354,5 +370,9 @@ namespace HaloCreek.Services
 
     public sealed record SessionResumeResult(
         bool Started,
+        string StatusMessage);
+
+    public sealed record FrontSessionSendResult(
+        bool Sent,
         string StatusMessage);
 }

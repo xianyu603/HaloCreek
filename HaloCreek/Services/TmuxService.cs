@@ -158,6 +158,58 @@ namespace HaloCreek.Services
             _frontClientSwitcher.SwitchIn(identifier);
         }
 
+        public TmuxFrontSessionSendResult SendMessageToFrontSession(string message)
+        {
+            ArgumentNullException.ThrowIfNull(message);
+
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return new TmuxFrontSessionSendResult(false, "Message is empty.");
+            }
+
+            if (!_frontClientSwitcher.TryGetFrontSessionId(out var frontSessionId))
+            {
+                return new TmuxFrontSessionSendResult(false, "No front session is available.");
+            }
+
+            WaitForLaunchTaskToComplete(frontSessionId);
+
+            var targetPane = frontSessionId + ":0.0";
+            var bufferName = "halocreek-send-" + _frontClientId;
+
+            if (!TryRunTmuxCommand(
+                    new[] { "set-buffer", "-b", bufferName, message },
+                    out var setBufferOutput))
+            {
+                return new TmuxFrontSessionSendResult(
+                    false,
+                    "Failed to stage message for front session: "
+                    + BuildTmuxFailureMessage(setBufferOutput));
+            }
+
+            if (!TryRunTmuxCommand(
+                    new[] { "paste-buffer", "-d", "-b", bufferName, "-t", targetPane },
+                    out var pasteOutput))
+            {
+                return new TmuxFrontSessionSendResult(
+                    false,
+                    "Failed to paste message to front session: "
+                    + BuildTmuxFailureMessage(pasteOutput));
+            }
+
+            if (!TryRunTmuxCommand(
+                    new[] { "send-keys", "-t", targetPane, "Enter" },
+                    out var sendKeysOutput))
+            {
+                return new TmuxFrontSessionSendResult(
+                    false,
+                    "Failed to submit message to front session: "
+                    + BuildTmuxFailureMessage(sendKeysOutput));
+            }
+
+            return new TmuxFrontSessionSendResult(true, "Message sent to front session.");
+        }
+
         public void Dispose()
         {
             lock (_watchStateLock)
@@ -389,6 +441,21 @@ namespace HaloCreek.Services
                 }
             }
 
+            public bool TryGetFrontSessionId(out string frontSessionId)
+            {
+                lock (_lock)
+                {
+                    if (string.IsNullOrWhiteSpace(_frontSessionId))
+                    {
+                        frontSessionId = string.Empty;
+                        return false;
+                    }
+
+                    frontSessionId = _frontSessionId;
+                    return true;
+                }
+            }
+
             private void SwitchClientCore(string identifier)
             {
                 if (!_platformInfrastructure.TryRunWslCommand(
@@ -558,6 +625,14 @@ namespace HaloCreek.Services
                 "Failed to " + operationName + ": " + message);
         }
 
+        private static string BuildTmuxFailureMessage(string output)
+        {
+            var message = NormalizeProcessOutput(output);
+            return string.IsNullOrWhiteSpace(message)
+                ? "tmux command failed."
+                : message;
+        }
+
         private bool TryRunTmuxCommand(
             IReadOnlyList<string> arguments,
             out string output)
@@ -586,4 +661,8 @@ namespace HaloCreek.Services
             return output.Replace("\0", string.Empty).Trim();
         }
     }
+
+    public sealed record TmuxFrontSessionSendResult(
+        bool Sent,
+        string StatusMessage);
 }

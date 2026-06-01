@@ -116,6 +116,8 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Spacing="8">
+            <Button Content="SendToFront"
+                    Command="{Binding SendToFrontCommand}"/>
             <Button Content="Launch"
                     Command="{Binding LaunchCommand}"/>
         </StackPanel>
