@@ -24,16 +24,16 @@ namespace HaloCreek
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var mainWindow = new MainWindow();
-                var appServices = CreateAppServices(mainWindow);
-                mainWindow.DataContext = appServices.MainWindowViewModel;
-                desktop.Exit += (_, _) => appServices.Dispose();
+                var appDisposeScope = CreateAppDisposeScope(mainWindow);
+                mainWindow.DataContext = appDisposeScope.MainWindowViewModel;
+                desktop.Exit += (_, _) => appDisposeScope.Dispose();
                 desktop.MainWindow = mainWindow;
             }
 
             base.OnFrameworkInitializationCompleted();
         }
 
-        private static AppServices CreateAppServices(MainWindow mainWindow)
+        private static AppDisposeScope CreateAppDisposeScope(MainWindow mainWindow)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
             var applicationStatusService = new ApplicationStatusService();
@@ -83,27 +83,33 @@ namespace HaloCreek
                 logs,
                 workspaceFooter);
 
-            return new AppServices(
+            return new AppDisposeScope(
                 mainWindowViewModel,
+                logs,
                 sessionLifecycleService,
                 sessionHistoryRefreshService,
                 tmuxService);
         }
 
-        private sealed class AppServices : IDisposable
+        // 统一收口应用级对象的退出释放。当前这里同时承载少量对象组装职责，
+        // 后续如果创建流程继续变复杂，再拆出单独的 composition/root 类型。
+        private sealed class AppDisposeScope : IDisposable
         {
+            private readonly LogPanelViewModel _logs;
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
             private readonly TmuxService _tmuxService;
             private bool _isDisposed;
 
-            public AppServices(
+            public AppDisposeScope(
                 MainWindowViewModel mainWindowViewModel,
+                LogPanelViewModel logs,
                 SessionLifecycleService sessionLifecycleService,
                 SessionHistoryRefreshService sessionHistoryRefreshService,
                 TmuxService tmuxService)
             {
                 MainWindowViewModel = mainWindowViewModel;
+                _logs = logs;
                 _sessionLifecycleService = sessionLifecycleService;
                 _sessionHistoryRefreshService = sessionHistoryRefreshService;
                 _tmuxService = tmuxService;
@@ -119,6 +125,7 @@ namespace HaloCreek
                 }
 
                 _isDisposed = true;
+                _logs.Dispose();
                 _sessionHistoryRefreshService.Dispose();
                 _sessionLifecycleService.Dispose();
                 _tmuxService.Dispose();

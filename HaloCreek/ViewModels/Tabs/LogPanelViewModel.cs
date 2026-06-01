@@ -1,16 +1,20 @@
 using System;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using HaloCreek.Logging;
 
 namespace HaloCreek.ViewModels.Tabs
 {
-    public sealed class LogPanelViewModel : ViewModelBase
+    public sealed class LogPanelViewModel : ViewModelBase, IDisposable
     {
         private string _logText;
+        private bool _isDisposed;// 不喜欢这个 不过这个类足够简单 不纠结了
 
         public LogPanelViewModel()
         {
-            _logText = CreatePreviewLogText();
+            _logText = CurrentLogText.GetSnapshotText();
             ClearCommand = new RelayCommand(Clear);
+            CurrentLogText.TextChanged += OnLogTextChanged;
         }
 
         public string LogText
@@ -21,22 +25,42 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand ClearCommand { get; }
 
-        private void Clear()
+        public void Dispose()
         {
-            LogText = string.Empty;
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            CurrentLogText.TextChanged -= OnLogTextChanged;
         }
 
-        private static string CreatePreviewLogText()
+        private void Clear()
         {
-            return string.Join(
-                Environment.NewLine,
-                "2026-06-01T09:20:13.1040000+08:00 [Info] [Application] [T1] HaloCreek starting. LogFile=C:\\Users\\demo\\AppData\\Roaming\\HaloCreek\\Logs\\HaloCreek_20260601_092013_104_24856.log",
-                "2026-06-01T09:20:13.2250000+08:00 [Info] [Workspace] [T1] Startup workspace initialized. Path=D:\\work\\HaloCreek",
-                "2026-06-01T09:20:14.0180000+08:00 [Debug] [Git] [T8] Refresh requested for workspace D:\\work\\HaloCreek",
-                "2026-06-01T09:20:14.1450000+08:00 [Info] [Git] [T8] Found 4 changed files.",
-                "2026-06-01T09:20:15.0070000+08:00 [Warning] [Session] [T10] Session title is not available yet; keeping temporary display text.",
-                "2026-06-01T09:20:16.3320000+08:00 [Error] [Terminal] [T12] Launch failed. Command=codex --sandbox workspace-write --approval never --very-long-argument-for-horizontal-scroll-preview=abcdefghijklmnopqrstuvwxyz-0123456789-ABCDEFGHIJKLMNOPQRSTUVWXYZ-D:\\work\\HaloCreek\\docs\\roadmap\\MVP2\\0-log-panel\\sample.txt",
-                string.Empty);
+            CurrentLogText.Clear();
+        }
+
+        private void OnLogTextChanged(string snapshot)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                LogText = snapshot;
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (!_isDisposed)
+                {
+                    LogText = snapshot;
+                }
+            });
         }
     }
 }
