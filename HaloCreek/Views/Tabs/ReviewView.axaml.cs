@@ -11,7 +11,7 @@ namespace HaloCreek.Views.Tabs
             InitializeComponent();
         }
 
-        private void ClipLocateButton_OnDoubleTapped(object? sender, TappedEventArgs e)
+        private void ClipLocateStatus_OnDoubleTapped(object? sender, TappedEventArgs e)
         {
             if (DataContext is not ReviewViewModel viewModel)
             {

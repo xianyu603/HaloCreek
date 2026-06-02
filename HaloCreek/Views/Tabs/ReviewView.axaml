@@ -20,6 +20,22 @@
             <Setter Property="IsHitTestVisible" Value="False"/>
         </Style>
 
+        <Style Selector="Border.reviewBarStatus">
+            <Setter Property="MinWidth" Value="116"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Padding" Value="10,0"/>
+        </Style>
+
+        <Style Selector="TextBlock.reviewBarStatusText">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+        </Style>
+
         <Style Selector="Button.reviewPanelToggleButton">
             <Setter Property="Width" Value="30"/>
             <Setter Property="Height" Value="30"/>
@@ -76,10 +92,12 @@
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
 
-                    <Button Classes="reviewBarButton"
-                            Content="{Binding ClipLocateStatusText}"
-                            Foreground="{Binding ClipLocateButtonForeground}"
-                            DoubleTapped="ClipLocateButton_OnDoubleTapped"/>
+                    <Border Classes="reviewBarStatus"
+                            DoubleTapped="ClipLocateStatus_OnDoubleTapped">
+                        <TextBlock Classes="reviewBarStatusText"
+                                   Text="{Binding ClipLocateStatusText}"
+                                   Foreground="{Binding ClipLocateButtonForeground}"/>
+                    </Border>
                     <Button Classes="reviewBarButton reviewStatusButton"
                             Content="Front Session"/>
                 </ItemsControl>

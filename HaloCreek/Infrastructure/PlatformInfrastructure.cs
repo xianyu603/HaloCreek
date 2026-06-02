@@ -90,6 +90,8 @@ namespace HaloCreek.Infrastructure
                 Content = "OK",
                 MinWidth = 80,
                 HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
             };
             closeButton.Click += (_, _) => dialog.Close();
 

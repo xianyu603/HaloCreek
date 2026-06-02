@@ -31,7 +31,7 @@ namespace HaloCreek.ViewModels.Tabs
             _appCommonRuntime = appCommonRuntime ?? throw new ArgumentNullException(nameof(appCommonRuntime));
             MoveLeftCommand = new RelayCommand(MoveLeft, CanMoveLeft);
             MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
-            ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateLineAsync);
+            ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
             ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
         }
@@ -153,14 +153,38 @@ namespace HaloCreek.ViewModels.Tabs
             ClipLocateButtonForeground = isMatched ? MatchedForeground : UnmatchedForeground;
         }
 
-        private async Task ShowClipLocateLineAsync()
+        private async Task ShowClipLocateResultAsync()
         {
-            var clipLocate = _clipLocateResult?.ClipLocate;
-            var message = clipLocate is null
-                ? "Unmatched"
-                : clipLocate.StartLine == clipLocate.EndLine
+            var result = _clipLocateResult;
+            var clipLocate = result?.ClipLocate;
+            string message;
+            if (clipLocate is not null)
+            {
+                var lineRange = clipLocate.StartLine == clipLocate.EndLine
                     ? $"Line {clipLocate.StartLine}"
                     : $"Lines {clipLocate.StartLine}-{clipLocate.EndLine}";
+                message =
+                    "Matched"
+                    + Environment.NewLine
+                    + $"Path: {clipLocate.RelativePath}"
+                    + Environment.NewLine
+                    + $"{lineRange}, Columns {clipLocate.StartColumn}-{clipLocate.EndColumn}";
+            }
+            else
+            {
+                var failureReason = string.IsNullOrWhiteSpace(result?.FailureReason)
+                    ? "Unknown"
+                    : result.FailureReason;
+                var detail = string.IsNullOrWhiteSpace(result?.Message)
+                    ? "No clipboard clip locate result is available."
+                    : result.Message;
+                message =
+                    "Unmatched"
+                    + Environment.NewLine
+                    + $"Failure reason: {failureReason}"
+                    + Environment.NewLine
+                    + detail;
+            }
 
             await _appCommonRuntime.PlatformInfrastructure.ShowMessageDialogAsync(
                 "Review ClipLocate",
