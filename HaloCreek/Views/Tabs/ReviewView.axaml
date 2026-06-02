@@ -76,8 +76,10 @@
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
 
-                    <Button Classes="reviewBarButton reviewStatusButton"
-                            Content="Match Success"/>
+                    <Button Classes="reviewBarButton"
+                            Content="{Binding ClipLocateStatusText}"
+                            Foreground="{Binding ClipLocateButtonForeground}"
+                            DoubleTapped="ClipLocateButton_OnDoubleTapped"/>
                     <Button Classes="reviewBarButton reviewStatusButton"
                             Content="Front Session"/>
                 </ItemsControl>

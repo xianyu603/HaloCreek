@@ -9,7 +9,7 @@ namespace HaloCreek.Services
 {
     public sealed class ReviewClipboardContextService : IDisposable
     {
-        private const string LogCategory = "ReviewLocation";
+        private const string LogCategory = "ReviewClipLocate";
         private const long MaxCandidateFileBytes = 2 * 1024 * 1024;
 
         private readonly PlatformClipboardInfrastructure _platformClipboardInfrastructure;
@@ -17,7 +17,7 @@ namespace HaloCreek.Services
         private readonly GitService _gitService;
         private readonly object SyncRoot = new();
         private long _latestScanId;
-        private ReviewClipboardLocationResult? _currentLocationResult;
+        private ReviewClipboardClipLocateResult? _currentClipLocateResult;
         private bool _isDisposed;
 
         public ReviewClipboardContextService(
@@ -35,18 +35,18 @@ namespace HaloCreek.Services
             Log.Info(LogCategory, "Review clipboard context service created.");
         }
 
-        public ReviewClipboardLocationResult? CurrentLocationResult
+        public ReviewClipboardClipLocateResult? CurrentClipLocateResult
         {
             get
             {
                 lock (SyncRoot)
                 {
-                    return _currentLocationResult;
+                    return _currentClipLocateResult;
                 }
             }
         }
 
-        public event EventHandler<ReviewClipboardLocationChangedEventArgs>? LocationChanged;
+        public event EventHandler<ReviewClipboardClipLocateChangedEventArgs>? ClipLocateChanged;
 
         public void Dispose()
         {
@@ -77,10 +77,10 @@ namespace HaloCreek.Services
                 scanId = _latestScanId;
             }
 
-            _ = Task.Run(() => RunLocationScan(e.Snapshot, scanId));
+            _ = Task.Run(() => RunClipLocateScan(e.Snapshot, scanId));
         }
 
-        private void RunLocationScan(ClipboardTextSnapshot snapshot, long scanId)
+        private void RunClipLocateScan(ClipboardTextSnapshot snapshot, long scanId)
         {
             try
             {
@@ -95,19 +95,19 @@ namespace HaloCreek.Services
                 or System.ComponentModel.Win32Exception
                 or InvalidOperationException)
             {
-                var result = CreateFailureResult(snapshot, "ScanFailed", "Review location scan failed.");
+                var result = CreateFailureResult(snapshot, "ScanFailed", "Review clip locate scan failed.");
                 if (ApplyScanResult(result, scanId))
                 {
-                    Log.Error(LogCategory, ex, "Review location scan failed.");
+                    Log.Error(LogCategory, ex, "Review clip locate scan failed.");
                 }
             }
         }
 
-        private ReviewClipboardLocationResult Scan(ClipboardTextSnapshot snapshot)
+        private ReviewClipboardClipLocateResult Scan(ClipboardTextSnapshot snapshot)
         {
             if (string.IsNullOrWhiteSpace(snapshot.Text))
             {
-                Log.Info(LogCategory, "Review location scan ignored. reason=IgnoredEmptyClipboardText");
+                Log.Info(LogCategory, "Review clip locate scan ignored. reason=IgnoredEmptyClipboardText");
                 return CreateFailureResult(
                     snapshot,
                     "IgnoredEmptyClipboardText",
@@ -117,7 +117,7 @@ namespace HaloCreek.Services
             var searchText = TrimTrailingNewlines(NormalizeLineEndings(snapshot.Text));
             if (string.IsNullOrWhiteSpace(searchText))
             {
-                Log.Info(LogCategory, "Review location scan ignored. reason=IgnoredEmptyClipboardText");
+                Log.Info(LogCategory, "Review clip locate scan ignored. reason=IgnoredEmptyClipboardText");
                 return CreateFailureResult(
                     snapshot,
                     "IgnoredEmptyClipboardText",
@@ -127,18 +127,18 @@ namespace HaloCreek.Services
             var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
             if (string.IsNullOrWhiteSpace(workspacePath))
             {
-                Log.Info(LogCategory, "Review location scan failed. reason=NoWorkspace");
+                Log.Info(LogCategory, "Review clip locate scan failed. reason=NoWorkspace");
                 return CreateFailureResult(snapshot, "NoWorkspace", "No workspace is available.");
             }
 
             Log.Info(
                 LogCategory,
-                $"Review location scan started. clipboardLength={snapshot.Text.Length} workspace={QuoteForLog(workspacePath)}");
+                $"Review clip locate scan started. clipboardLength={snapshot.Text.Length} workspace={QuoteForLog(workspacePath)}");
 
             var gitChanges = _gitService.GetChanges(workspacePath);
             var searchedFiles = 0;
             var skippedFiles = 0;
-            ReviewLocationCandidate? firstMatch = null;
+            ReviewClipLocateCandidate? firstMatch = null;
 
             foreach (var change in gitChanges.Changes)
             {
@@ -162,7 +162,7 @@ namespace HaloCreek.Services
                     continue;
                 }
 
-                var currentMatch = CreateLocationCandidate(
+                var currentMatch = CreateClipLocateCandidate(
                     change.RelativePath,
                     normalizedContent,
                     firstIndex,
@@ -173,7 +173,7 @@ namespace HaloCreek.Services
                     StringComparison.Ordinal);
                 if (secondIndex >= 0)
                 {
-                    var secondMatch = CreateLocationCandidate(
+                    var secondMatch = CreateClipLocateCandidate(
                         change.RelativePath,
                         normalizedContent,
                         secondIndex,
@@ -183,7 +183,7 @@ namespace HaloCreek.Services
                     return CreateFailureResult(
                         snapshot,
                         "MultipleMatches",
-                        "Clipboard text matched more than one location.");
+                        "Clipboard text matched more than one clip locate candidate.");
                 }
 
                 if (firstMatch is not null)
@@ -193,7 +193,7 @@ namespace HaloCreek.Services
                     return CreateFailureResult(
                         snapshot,
                         "MultipleMatches",
-                        "Clipboard text matched more than one location.");
+                        "Clipboard text matched more than one clip locate candidate.");
                 }
 
                 firstMatch = currentMatch;
@@ -204,33 +204,33 @@ namespace HaloCreek.Services
                 LogSkippedFiles(skippedFiles);
                 Log.Info(
                     LogCategory,
-                    $"Review location no match. searchedFiles={searchedFiles} skippedFiles={skippedFiles} clipboardLength={snapshot.Text.Length}");
+                    $"Review clip locate no match. searchedFiles={searchedFiles} skippedFiles={skippedFiles} clipboardLength={snapshot.Text.Length}");
                 return CreateFailureResult(snapshot, "NoMatch", "Clipboard text did not match changed files.");
             }
 
             LogSkippedFiles(skippedFiles);
             Log.Info(
                 LogCategory,
-                "Review location unique match. "
+                "Review clip locate unique match. "
                 + $"file={QuoteForLog(firstMatch.RelativePath)} "
                 + $"startLine={firstMatch.StartLine} "
                 + $"startColumn={firstMatch.StartColumn} "
                 + $"endLine={firstMatch.EndLine} "
                 + $"endColumn={firstMatch.EndColumn}");
 
-            return new ReviewClipboardLocationResult(
-                ReviewClipboardLocationStatus.UniqueMatch,
+            return new ReviewClipboardClipLocateResult(
+                ReviewClipboardClipLocateStatus.UniqueMatch,
                 snapshot,
                 firstMatch,
                 null,
-                "Clipboard text matched one changed-file location.");
+                "Clipboard text matched one changed-file clip locate candidate.");
         }
 
         private bool ApplyScanResult(
-            ReviewClipboardLocationResult result,
+            ReviewClipboardClipLocateResult result,
             long scanId)
         {
-            EventHandler<ReviewClipboardLocationChangedEventArgs>? locationChanged;
+            EventHandler<ReviewClipboardClipLocateChangedEventArgs>? clipLocateChanged;
             lock (SyncRoot)
             {
                 if (_isDisposed)
@@ -240,15 +240,15 @@ namespace HaloCreek.Services
 
                 if (scanId != _latestScanId)
                 {
-                    Log.Info(LogCategory, "Review location scan result ignored because a newer clipboard text arrived.");
+                    Log.Info(LogCategory, "Review clip locate scan result ignored because a newer clipboard text arrived.");
                     return false;
                 }
 
-                _currentLocationResult = result;
-                locationChanged = LocationChanged;
+                _currentClipLocateResult = result;
+                clipLocateChanged = ClipLocateChanged;
             }
 
-            locationChanged?.Invoke(this, new ReviewClipboardLocationChangedEventArgs(result));
+            clipLocateChanged?.Invoke(this, new ReviewClipboardClipLocateChangedEventArgs(result));
             return true;
         }
 
@@ -299,7 +299,7 @@ namespace HaloCreek.Services
                 or GitChangeType.Untracked;
         }
 
-        private static ReviewLocationCandidate CreateLocationCandidate(
+        private static ReviewClipLocateCandidate CreateClipLocateCandidate(
             string relativePath,
             string content,
             int startIndex,
@@ -307,7 +307,7 @@ namespace HaloCreek.Services
         {
             var start = GetPosition(content, startIndex);
             var end = GetPosition(content, startIndex + matchLength - 1);
-            return new ReviewLocationCandidate(
+            return new ReviewClipLocateCandidate(
                 relativePath,
                 start.Line,
                 start.Column,
@@ -354,13 +354,13 @@ namespace HaloCreek.Services
             return end == text.Length ? text : text[..end];
         }
 
-        private static ReviewClipboardLocationResult CreateFailureResult(
+        private static ReviewClipboardClipLocateResult CreateFailureResult(
             ClipboardTextSnapshot snapshot,
             string failureReason,
             string message)
         {
-            return new ReviewClipboardLocationResult(
-                ReviewClipboardLocationStatus.Failed,
+            return new ReviewClipboardClipLocateResult(
+                ReviewClipboardClipLocateStatus.Failed,
                 snapshot,
                 null,
                 failureReason,
@@ -369,14 +369,14 @@ namespace HaloCreek.Services
 
         private static void LogMultipleMatches(
             int searchedFilesBeforeStop,
-            ReviewLocationCandidate firstMatch,
-            ReviewLocationCandidate secondMatch)
+            ReviewClipLocateCandidate firstMatch,
+            ReviewClipLocateCandidate secondMatch)
         {
             Log.Info(
                 LogCategory,
-                $"Review location multiple matches. searchedFilesBeforeStop={searchedFilesBeforeStop}");
-            Log.Info(LogCategory, FormatMatchLog("Review location first match.", firstMatch));
-            Log.Info(LogCategory, FormatMatchLog("Review location second match.", secondMatch));
+                $"Review clip locate multiple matches. searchedFilesBeforeStop={searchedFilesBeforeStop}");
+            Log.Info(LogCategory, FormatMatchLog("Review clip locate first match.", firstMatch));
+            Log.Info(LogCategory, FormatMatchLog("Review clip locate second match.", secondMatch));
         }
 
         private static void LogSkippedFiles(int skippedFiles)
@@ -386,10 +386,10 @@ namespace HaloCreek.Services
                 return;
             }
 
-            Log.Info(LogCategory, $"Review location skipped files. skippedFiles={skippedFiles}");
+            Log.Info(LogCategory, $"Review clip locate skipped files. skippedFiles={skippedFiles}");
         }
 
-        private static string FormatMatchLog(string prefix, ReviewLocationCandidate match)
+        private static string FormatMatchLog(string prefix, ReviewClipLocateCandidate match)
         {
             return prefix
                 + $" file={QuoteForLog(match.RelativePath)}"

@@ -65,7 +65,13 @@ namespace HaloCreek.Infrastructure
             }
         }
 
+        // TODO 这里的ShowErrorDialogAsync没有额外信息量还容易误导 合并一下
         public async Task ShowErrorDialogAsync(string title, string message)
+        {
+            await ShowMessageDialogAsync(title, message);
+        }
+
+        public async Task ShowMessageDialogAsync(string title, string message)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(title);
             ArgumentException.ThrowIfNullOrWhiteSpace(message);

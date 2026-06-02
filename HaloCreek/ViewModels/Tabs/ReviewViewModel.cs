@@ -1,16 +1,39 @@
+using System;
+using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using HaloCreek.Models;
+using HaloCreek.Services;
 
 namespace HaloCreek.ViewModels.Tabs
 {
-    public sealed class ReviewViewModel : ViewModelBase
+    public sealed class ReviewViewModel : ViewModelBase, IDisposable
     {
-        private ReviewPanelLayoutState _panelLayoutState;
+        private static readonly IBrush MatchedForeground = new SolidColorBrush(Color.Parse("#166534"));
+        private static readonly IBrush UnmatchedForeground = new SolidColorBrush(Color.Parse("#854D0E"));
 
-        public ReviewViewModel()
+        private readonly ReviewClipboardContextService _reviewClipboardContextService;
+        private readonly AppCommonRuntime _appCommonRuntime;
+        private ReviewPanelLayoutState _panelLayoutState;
+        private ReviewClipboardClipLocateResult? _clipLocateResult;
+        private string _clipLocateStatusText = "Unmatched";
+        private IBrush _clipLocateButtonForeground = UnmatchedForeground;
+        private bool _isDisposed;
+
+        public ReviewViewModel(
+            ReviewClipboardContextService reviewClipboardContextService,
+            AppCommonRuntime appCommonRuntime)
         {
+            _reviewClipboardContextService = reviewClipboardContextService
+                ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
+            _appCommonRuntime = appCommonRuntime ?? throw new ArgumentNullException(nameof(appCommonRuntime));
             MoveLeftCommand = new RelayCommand(MoveLeft, CanMoveLeft);
             MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
+            ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateLineAsync);
+            _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
+            ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
         }
 
         public bool IsLeftPanelExpanded => _panelLayoutState != ReviewPanelLayoutState.LeftCollapsed;
@@ -32,6 +55,31 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand MoveLeftCommand { get; }
 
         public IRelayCommand MoveRightCommand { get; }
+
+        public IAsyncRelayCommand ShowClipLocateLineCommand { get; }
+
+        public string ClipLocateStatusText
+        {
+            get => _clipLocateStatusText;
+            private set => SetProperty(ref _clipLocateStatusText, value);
+        }
+
+        public IBrush ClipLocateButtonForeground
+        {
+            get => _clipLocateButtonForeground;
+            private set => SetProperty(ref _clipLocateButtonForeground, value);
+        }
+
+        public void Dispose()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            _reviewClipboardContextService.ClipLocateChanged -= OnClipLocateChanged;
+        }
 
         private void MoveLeft()
         {
@@ -78,6 +126,45 @@ namespace HaloCreek.ViewModels.Tabs
             OnPropertyChanged(nameof(PanelGapWidth));
             MoveLeftCommand.NotifyCanExecuteChanged();
             MoveRightCommand.NotifyCanExecuteChanged();
+        }
+
+        private void OnClipLocateChanged(object? sender, ReviewClipboardClipLocateChangedEventArgs e)
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                ApplyClipLocateResult(e.Result);
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() => ApplyClipLocateResult(e.Result));
+        }
+
+        private void ApplyClipLocateResult(ReviewClipboardClipLocateResult? result)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _clipLocateResult = result;
+            var isMatched = result?.Status == ReviewClipboardClipLocateStatus.UniqueMatch
+                && result.ClipLocate is not null;
+            ClipLocateStatusText = isMatched ? "Matched" : "Unmatched";
+            ClipLocateButtonForeground = isMatched ? MatchedForeground : UnmatchedForeground;
+        }
+
+        private async Task ShowClipLocateLineAsync()
+        {
+            var clipLocate = _clipLocateResult?.ClipLocate;
+            var message = clipLocate is null
+                ? "Unmatched"
+                : clipLocate.StartLine == clipLocate.EndLine
+                    ? $"Line {clipLocate.StartLine}"
+                    : $"Lines {clipLocate.StartLine}-{clipLocate.EndLine}";
+
+            await _appCommonRuntime.PlatformInfrastructure.ShowMessageDialogAsync(
+                "Review ClipLocate",
+                message);
         }
 
         private enum ReviewPanelLayoutState

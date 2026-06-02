@@ -66,8 +66,6 @@ namespace HaloCreek
             var terminalService = new TerminalService(appCommonRuntime);
             var sessionLifecycleService = new SessionLifecycleService(tmuxService, terminalService);
             var gitService = new GitService();
-            // TODO MVP2-A: Temporary review location validation.
-            // Replace log-only validation after Review panel consumes ReviewClipboardContextService.LocationChanged.
             var reviewClipboardContextService = new ReviewClipboardContextService(
                 platformClipboardInfrastructure,
                 workspaceRuntimeService,
@@ -81,7 +79,7 @@ namespace HaloCreek
                 sessionLifecycleService,
                 workspaceRuntimeService,
                 appCommonRuntime);
-            var review = new ReviewViewModel();
+            var review = new ReviewViewModel(reviewClipboardContextService, appCommonRuntime);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
@@ -106,6 +104,7 @@ namespace HaloCreek
 
             return new AppDisposeScope(
                 mainWindowViewModel,
+                review,
                 logs,
                 sessionLifecycleService,
                 sessionHistoryRefreshService,
@@ -119,6 +118,7 @@ namespace HaloCreek
         private sealed class AppDisposeScope : IDisposable
         {
             private readonly LogPanelViewModel _logs;
+            private readonly ReviewViewModel _review;
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
             private readonly TmuxService _tmuxService;
@@ -128,6 +128,7 @@ namespace HaloCreek
 
             public AppDisposeScope(
                 MainWindowViewModel mainWindowViewModel,
+                ReviewViewModel review,
                 LogPanelViewModel logs,
                 SessionLifecycleService sessionLifecycleService,
                 SessionHistoryRefreshService sessionHistoryRefreshService,
@@ -136,6 +137,7 @@ namespace HaloCreek
                 PlatformClipboardInfrastructure platformClipboardInfrastructure)
             {
                 MainWindowViewModel = mainWindowViewModel;
+                _review = review ?? throw new ArgumentNullException(nameof(review));
                 _logs = logs;
                 _sessionLifecycleService = sessionLifecycleService;
                 _sessionHistoryRefreshService = sessionHistoryRefreshService;
@@ -156,6 +158,7 @@ namespace HaloCreek
                 }
 
                 _isDisposed = true;
+                _review.Dispose();
                 _reviewClipboardContextService.Dispose();
                 _platformClipboardInfrastructure.Dispose();
                 _logs.Dispose();
