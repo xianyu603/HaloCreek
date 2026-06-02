@@ -1,0 +1,4 @@
+功能上不再区分追问和让当前session继续修改. 如果需要固定话术之后产品做到Prompt编辑的时候再搞
+先做成弹框体验体验试试 之后如果体验不好再想优化
+Reviewed提供三个文件清单: Modified WorkingTree Vs. Head/Unreviewed: WorkingTree Vs. Reviewed/Reviewed: Reviewed Vs.Head
+Reviewed和Notes均提供右键清理 不自动管理 最多提供一个一键Reset进度
