@@ -13,6 +13,8 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private static readonly IBrush MatchedForeground = new SolidColorBrush(Color.Parse("#166534"));
         private static readonly IBrush UnmatchedForeground = new SolidColorBrush(Color.Parse("#854D0E"));
+        private static readonly IBrush FrontSessionForeground = new SolidColorBrush(Color.Parse("#334155"));
+        private static readonly IBrush DisabledForeground = new SolidColorBrush(Color.Parse("#94A3B8"));
 
         private readonly ReviewClipboardContextService _reviewClipboardContextService;
         private readonly SessionLifecycleService _sessionLifecycleService;
@@ -21,6 +23,7 @@ namespace HaloCreek.ViewModels.Tabs
         private ReviewClipboardClipLocateResult? _clipLocateResult;
         private string _clipLocateStatusText = "Unmatched";
         private IBrush _clipLocateButtonForeground = UnmatchedForeground;
+        private bool _hasFrontSession;
         private bool _isDisposed;
 
         public ReviewViewModel(
@@ -36,9 +39,11 @@ namespace HaloCreek.ViewModels.Tabs
             MoveLeftCommand = new RelayCommand(MoveLeft, CanMoveLeft);
             MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
-            ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient);
+            ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
+            _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
             ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
+            RefreshFrontSessionState();
         }
 
         public bool IsLeftPanelExpanded => _panelLayoutState != ReviewPanelLayoutState.LeftCollapsed;
@@ -65,6 +70,23 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand ActivateFrontClientCommand { get; }
 
+        public bool HasFrontSession
+        {
+            get => _hasFrontSession;
+            private set
+            {
+                if (SetProperty(ref _hasFrontSession, value))
+                {
+                    OnPropertyChanged(nameof(FrontSessionButtonForeground));
+                    ActivateFrontClientCommand.NotifyCanExecuteChanged();
+                }
+            }
+        }
+
+        public IBrush FrontSessionButtonForeground => HasFrontSession
+            ? FrontSessionForeground
+            : DisabledForeground;
+
         public string ClipLocateStatusText
         {
             get => _clipLocateStatusText;
@@ -86,6 +108,7 @@ namespace HaloCreek.ViewModels.Tabs
 
             _isDisposed = true;
             _reviewClipboardContextService.ClipLocateChanged -= OnClipLocateChanged;
+            _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
         }
 
         private void MoveLeft()
@@ -138,6 +161,25 @@ namespace HaloCreek.ViewModels.Tabs
         private void ActivateFrontClient()
         {
             _sessionLifecycleService.ActivateFrontClient();
+        }
+
+        private bool CanActivateFrontClient()
+        {
+            return HasFrontSession;
+        }
+
+        private void RefreshFrontSessionState(object? sender = null, EventArgs? e = null)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => RefreshFrontSessionState());
+                return;
+            }
+
+            if (!_isDisposed)
+            {
+                HasFrontSession = _sessionLifecycleService.HasFrontSession;
+            }
         }
 
         private void OnClipLocateChanged(object? sender, ReviewClipboardClipLocateChangedEventArgs e)

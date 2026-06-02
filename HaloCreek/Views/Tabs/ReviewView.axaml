@@ -16,10 +16,6 @@
             <Setter Property="Padding" Value="10,0"/>
         </Style>
 
-        <Style Selector="Button.reviewStatusButton">
-            <Setter Property="IsHitTestVisible" Value="False"/>
-        </Style>
-
         <Style Selector="Border.reviewBarStatus">
             <Setter Property="MinWidth" Value="116"/>
             <Setter Property="Height" Value="36"/>
@@ -98,9 +94,13 @@
                                    Text="{Binding ClipLocateStatusText}"
                                    Foreground="{Binding ClipLocateButtonForeground}"/>
                     </Border>
-                    <Button Classes="reviewBarButton"
-                            Content="Front Session"
-                            DoubleTapped="FrontSession_OnDoubleTapped"/>
+                    <Border Classes="reviewBarStatus"
+                            IsEnabled="{Binding HasFrontSession}"
+                            DoubleTapped="FrontSession_OnDoubleTapped">
+                        <TextBlock Classes="reviewBarStatusText"
+                                   Text="Front Session"
+                                   Foreground="{Binding FrontSessionButtonForeground}"/>
+                    </Border>
                 </ItemsControl>
             </Border>
 

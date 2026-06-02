@@ -33,6 +33,15 @@ namespace HaloCreek.Services
         // 只向外部汇报session或其状态发生了变化 先不实现复杂的消息通知 卡了再优化
         public event EventHandler? SessionsChanged;
 
+        public bool HasFrontSession
+        {
+            get
+            {
+                RequireUiThread();
+                return TryGetFrontSessionId(out _);
+            }
+        }
+
         public void Dispose()
         {
             if (_isDisposed)
