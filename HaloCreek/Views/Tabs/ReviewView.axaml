@@ -51,6 +51,8 @@
         <Style Selector="TabItem.reviewInnerTab">
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="MinHeight" Value="20"/>
+            <Setter Property="Height" Value="25"/>
         </Style>
     </UserControl.Styles>
 
@@ -80,29 +82,29 @@
             <Border Grid.Column="0"
                     BorderBrush="#CBD5E1"
                     BorderThickness="1"
-                    CornerRadius="6"
+                    CornerRadius="3"
                     Background="#FFFFFF"
                     ClipToBounds="True"
                     IsVisible="{Binding IsLeftPanelExpanded}">
                 <TabControl Classes="reviewInnerTabs"
-                            Margin="6"
+                            Margin="0"
                             SelectedIndex="0">
                     <TabItem Classes="reviewInnerTab">
                         <TabItem.Header>
                             <TextBlock Text="Modified"
-                                       FontSize="11"/>
+                                       FontSize="13"/>
                         </TabItem.Header>
                     </TabItem>
                     <TabItem Classes="reviewInnerTab">
                         <TabItem.Header>
                             <TextBlock Text="Unreviewed"
-                                       FontSize="11"/>
+                                       FontSize="13"/>
                         </TabItem.Header>
                     </TabItem>
                     <TabItem Classes="reviewInnerTab">
                         <TabItem.Header>
                             <TextBlock Text="Reviewed"
-                                       FontSize="11"/>
+                                       FontSize="13"/>
                         </TabItem.Header>
                     </TabItem>
                 </TabControl>
@@ -111,7 +113,7 @@
             <Border Grid.Column="2"
                     BorderBrush="#CBD5E1"
                     BorderThickness="1"
-                    CornerRadius="6"
+                    CornerRadius="3"
                     Background="#FFFFFF"
                     ClipToBounds="True"
                     IsVisible="{Binding IsRightPanelExpanded}">
