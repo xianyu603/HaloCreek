@@ -1,0 +1,15 @@
+暂时搞成独立tab 等开发差不多了再考虑删掉重复的业务页签
+总体布局: 固定的footer + 上方可变面板
+
+L | R
+F F F
+L: 文件列表 可以切换三种视图(用tab ctrl) modified unreviewed reviewed对应不同的右键Action
+R: 批注列表 细节待定 也用右键Action
+LR可以同时存在 也可以折叠其中一个 完全显示另一个
+
+FFF: Action Bar 高度有限
+从左至右: 定位信息 FrontSession信息 Actions
+Actions主要是针对当前定位的操作: 
+向front发prompt 按下后弹出框来输入文字/确认
+AddNote
+MarkReviewed(之后想个办法确认范围 可能: 标记选中的内容reviewed/标记选中内容及之前/标记当前定位file)
