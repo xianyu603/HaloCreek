@@ -65,9 +65,9 @@ namespace HaloCreek.Infrastructure
             }
         }
 
-        // TODO 这里的ShowErrorDialogAsync没有额外信息量还容易误导 合并一下
         public async Task ShowErrorDialogAsync(string title, string message)
         {
+            // 暂时使用相同实现 未来Error可能改样式啥的
             await ShowMessageDialogAsync(title, message);
         }
 
