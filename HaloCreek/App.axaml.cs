@@ -64,7 +64,10 @@ namespace HaloCreek
             workspaceRuntimeService.InitializeStartupWorkspace();
             var tmuxService = new TmuxService(appCommonRuntime);
             var terminalService = new TerminalService(appCommonRuntime);
-            var sessionLifecycleService = new SessionLifecycleService(tmuxService, terminalService);
+            var sessionLifecycleService = new SessionLifecycleService(
+                tmuxService,
+                terminalService,
+                appCommonRuntime);
             var gitService = new GitService();
             var reviewClipboardContextService = new ReviewClipboardContextService(
                 platformClipboardInfrastructure,
@@ -79,7 +82,10 @@ namespace HaloCreek
                 sessionLifecycleService,
                 workspaceRuntimeService,
                 appCommonRuntime);
-            var review = new ReviewViewModel(reviewClipboardContextService, appCommonRuntime);
+            var review = new ReviewViewModel(
+                reviewClipboardContextService,
+                sessionLifecycleService,
+                appCommonRuntime);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,

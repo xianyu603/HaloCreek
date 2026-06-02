@@ -31,6 +31,12 @@ namespace HaloCreek.Services
                 return;
             }
 
+            ActivateFrontClient();
+        }
+
+        // 这个和上面的接口命名不好 如果之后这里要再改考虑整理下
+        public void ActivateFrontClient()
+        {
             _platformInfrastructure.ActivateTerminalWindow(_frontWindowIdentity);
         }
     }

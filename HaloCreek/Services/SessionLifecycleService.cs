@@ -14,15 +14,19 @@ namespace HaloCreek.Services
         private readonly Dictionary<string, OngoingSessionInfo> _sessionsById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
         private readonly TerminalService _terminalService;
+        private readonly TransientEventService _transientEventService;
         private string? _frontSessionId;
         private bool _isDisposed;
 
         public SessionLifecycleService(
             TmuxService tmuxService,
-            TerminalService terminalService)
+            TerminalService terminalService,
+            AppCommonRuntime appCommonRuntime)
         {
             _tmuxService = tmuxService ?? throw new ArgumentNullException(nameof(tmuxService));
             _terminalService = terminalService ?? throw new ArgumentNullException(nameof(terminalService));
+            ArgumentNullException.ThrowIfNull(appCommonRuntime);
+            _transientEventService = appCommonRuntime.TransientEventService;
             _tmuxService.StateChanged += HandleTmuxStateChanged;
         }
 
@@ -259,26 +263,37 @@ namespace HaloCreek.Services
             SessionsChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        public FrontSessionSendResult SendMessageToFrontSession(string message)
+        public void SendMessageToFrontSession(string message)
         {
             RequireUiThread();
             ArgumentNullException.ThrowIfNull(message);
 
             if (string.IsNullOrWhiteSpace(message))
             {
-                return new FrontSessionSendResult(false, "Message is empty.");
+                ReportFrontSessionFailure("Send to front failed", "Message is empty.");
+                return;
             }
 
-            if (string.IsNullOrWhiteSpace(_frontSessionId)
-                || !_sessionsById.TryGetValue(_frontSessionId, out var frontSession)
-                || frontSession.State != OngoingSessionState.Front)
+            if (!TryGetFrontSessionId(out var frontSessionId))
             {
-                return new FrontSessionSendResult(false, "No front session is available.");
+                ReportFrontSessionFailure("Send to front failed", "No front session is available.");
+                return;
             }
 
-            var frontSessionId = _frontSessionId;
             _tmuxService.SendMessageToSession(frontSessionId, message);
-            return new FrontSessionSendResult(true, "Message send requested.");
+        }
+
+        public void ActivateFrontClient()
+        {
+            RequireUiThread();
+
+            if (!TryGetFrontSessionId(out _))
+            {
+                ReportFrontSessionFailure("Activate front session failed", "No front session is available.");
+                return;
+            }
+
+            _terminalService.ActivateFrontClient();
         }
 
         public void Exit(string sessionId)
@@ -361,6 +376,28 @@ namespace HaloCreek.Services
             return summary;
         }
 
+        private bool TryGetFrontSessionId(out string frontSessionId)
+        {
+            if (!string.IsNullOrWhiteSpace(_frontSessionId)
+                && _sessionsById.TryGetValue(_frontSessionId, out var frontSession)
+                && frontSession.State == OngoingSessionState.Front)
+            {
+                frontSessionId = _frontSessionId;
+                return true;
+            }
+
+            frontSessionId = string.Empty;
+            return false;
+        }
+
+        private void ReportFrontSessionFailure(string title, string message)
+        {
+            _transientEventService.ReportUserActionFailure(
+                "SessionLifecycle",
+                title,
+                message);
+        }
+
         private static void RequireUiThread()
         {
             if (!Dispatcher.UIThread.CheckAccess())
@@ -378,9 +415,5 @@ namespace HaloCreek.Services
 
     public sealed record SessionResumeResult(
         bool Started,
-        string StatusMessage);
-
-    public sealed record FrontSessionSendResult(
-        bool Sent,
         string StatusMessage);
 }

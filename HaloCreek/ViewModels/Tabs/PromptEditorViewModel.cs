@@ -130,17 +130,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void SendToFront()
         {
-            var result = _sessionLifecycleService.SendMessageToFrontSession(PromptText);
-            if (result.Sent)
-            {
-                Log.Info("PromptEditor", result.StatusMessage);
-                return;
-            }
-
-            _transientEventService.ReportUserActionFailure(
-                "PromptEditor",
-                "Send to front failed",
-                result.StatusMessage);
+            _sessionLifecycleService.SendMessageToFrontSession(PromptText);
         }
 
         private bool CanLaunchPrompt()

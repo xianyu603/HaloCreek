@@ -15,6 +15,7 @@ namespace HaloCreek.ViewModels.Tabs
         private static readonly IBrush UnmatchedForeground = new SolidColorBrush(Color.Parse("#854D0E"));
 
         private readonly ReviewClipboardContextService _reviewClipboardContextService;
+        private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly AppCommonRuntime _appCommonRuntime;
         private ReviewPanelLayoutState _panelLayoutState;
         private ReviewClipboardClipLocateResult? _clipLocateResult;
@@ -24,14 +25,18 @@ namespace HaloCreek.ViewModels.Tabs
 
         public ReviewViewModel(
             ReviewClipboardContextService reviewClipboardContextService,
+            SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime)
         {
             _reviewClipboardContextService = reviewClipboardContextService
                 ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
+            _sessionLifecycleService = sessionLifecycleService
+                ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _appCommonRuntime = appCommonRuntime ?? throw new ArgumentNullException(nameof(appCommonRuntime));
             MoveLeftCommand = new RelayCommand(MoveLeft, CanMoveLeft);
             MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
+            ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
             ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
         }
@@ -57,6 +62,8 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand MoveRightCommand { get; }
 
         public IAsyncRelayCommand ShowClipLocateLineCommand { get; }
+
+        public IRelayCommand ActivateFrontClientCommand { get; }
 
         public string ClipLocateStatusText
         {
@@ -126,6 +133,11 @@ namespace HaloCreek.ViewModels.Tabs
             OnPropertyChanged(nameof(PanelGapWidth));
             MoveLeftCommand.NotifyCanExecuteChanged();
             MoveRightCommand.NotifyCanExecuteChanged();
+        }
+
+        private void ActivateFrontClient()
+        {
+            _sessionLifecycleService.ActivateFrontClient();
         }
 
         private void OnClipLocateChanged(object? sender, ReviewClipboardClipLocateChangedEventArgs e)

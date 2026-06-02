@@ -98,8 +98,9 @@
                                    Text="{Binding ClipLocateStatusText}"
                                    Foreground="{Binding ClipLocateButtonForeground}"/>
                     </Border>
-                    <Button Classes="reviewBarButton reviewStatusButton"
-                            Content="Front Session"/>
+                    <Button Classes="reviewBarButton"
+                            Content="Front Session"
+                            DoubleTapped="FrontSession_OnDoubleTapped"/>
                 </ItemsControl>
             </Border>
 
