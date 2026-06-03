@@ -437,15 +437,108 @@ TortoiseGitProc.exe /command:diff /path:<rightPath> /path2:<leftPath>
 
 ## 8. 任务拆分
 
-- [ ] **R-01 新增 ReviewSnapshotService 基础骨架**：实现 workspace 校验、`.HaloCreek/HaloCreekIndex` 路径解析、统一 git 命令执行和结果模型。
-- [ ] **R-02 实现 reviewed entry 枚举和 blob 查询**：支持 `ls-files -s -z` 读取 `HaloCreekIndex` entry，支持 `HEAD:path` / `:path` blob 查询。
-- [ ] **R-03 实现 MarkFileReviewed / MarkFileUnreviewed**：用独立 `GIT_INDEX_FILE` 写入或删除单文件 reviewed 快照。
-- [ ] **R-04 实现 RefreshReviewSnapshot**：按支持类型和 reviewed==HEAD 规则清理无效 entry。
-- [ ] **R-05 实现两个文件列表查询**：返回 `Reviewed vs HEAD` 和 `WorkingTree vs Reviewed` 路径列表。
-- [ ] **R-06 扩展 GitService 的 HEAD 临时文件能力**：为 `HEAD:path` 创建 temp 文件，支持 empty head 文件，不读取 `HaloCreekIndex`。
-- [ ] **R-07 实现 ReviewSnapshotService 的 Reviewed 临时文件能力**：为 reviewed 内容创建 temp 文件；没有 reviewed entry 时调用 `GitService.CreateTempHeadFile(...)`。
-- [ ] **R-08 新增 DiffService**：传入左右文件路径启动写死 diff 命令。
-- [ ] **R-09 构建与 code review**：编译通过，并做服务边界、Git index 隔离、路径安全和失败路径的 code review。
+拆分原则：
+
+- 按用户可验证的纵切交付，不先一口气写完全部 service 再接 UI。
+- 每个纵切都包含本步需要的最小基础能力、ViewModel 状态和 Review 面板 UI 接入。
+- 每个纵切完成后立即编译，并用 UI happy path 验证本步能力。
+- 本轮不在 Review 面板实现 `Modified` 列表；`Modified` 继续复用现有 Git tab 能力。
+- 本轮先聚焦 happy path；应用重启保留、统一错误展示和失败路径验证后续走统一能力验证。
+
+- [ ] **R-01 Unreviewed 列表展示**
+  - 基础能力：
+    - 新增 `ReviewSnapshotService` 的最小骨架：workspace 规范化、`.HaloCreek/HaloCreekIndex` 路径解析、Review 专用 git 命令执行、结果模型。
+    - 实现 `GetWorkingTreeAgainstReviewedFiles(...)`。
+    - 候选文件来自 `GitService.GetChanges(...)` 中的 `Modified`、`Added`、`Untracked`。
+    - 排除 `Deleted`、`Renamed`、`Copied`、`Conflicted`、`Unknown`。
+    - 比较 `WorkingTree:path` 和 `Reviewed(path)`；没有 reviewed entry 时 fallback 到 `HEAD:path`。
+    - 返回路径按 case-insensitive 排序。
+  - UI 接入：
+    - Review 面板新增 / 接入 `Unreviewed` 列表数据源。
+    - 进入 Review 面板或 workspace 变化时加载 `Unreviewed`。
+    - 列表项先展示相对路径即可，不要求状态、行数、图标、更新时间。
+  - 验证：
+    - 修改 tracked 文件后出现在 `Unreviewed`。
+    - 新增 untracked 文件后出现在 `Unreviewed`。
+    - 删除、重命名、冲突、copy 不作为本轮 happy path 验证入口。
+
+- [ ] **R-02 Unreviewed 右键 Add Reviewed + Reviewed 列表展示**
+  - 基础能力：
+    - 实现 reviewed entry 枚举和 blob 查询，支持读取 `HaloCreekIndex` entry、`HEAD:path` 和 `:path` blob。
+    - 实现 `MarkFileReviewed(...)`，把当前 working tree 文件内容写入独立 `HaloCreekIndex`。
+    - `WorkingTree:path == HEAD:path` 时 no-op，不写 reviewed 快照。
+    - 实现 `GetReviewedAgainstHeadFiles(...)`，只返回 `HaloCreekIndex` 中相对 `HEAD` 有变化的 path。
+  - UI 接入：
+    - `Unreviewed` 文件右键菜单新增 `Add Reviewed`。
+    - 点击后调用 `MarkFileReviewed(...)`。
+    - action 成功后立即刷新 `Unreviewed` 和 `Reviewed` 两个列表。
+    - Review 面板新增 / 接入 `Reviewed` 列表数据源。
+  - 验证：
+    - modified 文件执行 `Add Reviewed` 后从 `Unreviewed` 消失，并出现在 `Reviewed`。
+    - untracked 文件执行 `Add Reviewed` 后出现在 `Reviewed`。
+    - 文件被 reviewed 后继续修改，会同时出现在 `Reviewed` 和 `Unreviewed`。
+
+- [ ] **R-03 Reviewed 右键 Unreviewed action**
+  - 基础能力：
+    - 实现 `MarkFileUnreviewed(...)`，删除指定 path 在 `HaloCreekIndex` 中的 reviewed 快照。
+    - 删除 reviewed 快照不修改 working tree，不修改真实 Git index。
+    - `HaloCreekIndex` 不存在或没有该 path entry 时按 no-op 处理。
+  - UI 接入：
+    - `Reviewed` 文件右键菜单新增 `Unreviewed`。
+    - 点击后调用 `MarkFileUnreviewed(...)`。
+    - action 成功后立即刷新 `Unreviewed` 和 `Reviewed` 两个列表。
+  - 验证：
+    - reviewed 文件执行 `Unreviewed` 后从 `Reviewed` 消失。
+    - 如果该文件 working tree 仍相对 `HEAD` 有修改，应重新出现在 `Unreviewed`。
+
+- [ ] **R-04 Refresh**
+  - 基础能力：
+    - 实现 `RefreshReviewSnapshot(...)`。
+    - 枚举 `HaloCreekIndex` 中的 reviewed entry。
+    - 清理不再属于 `Modified`、`Added`、`Untracked` 的 entry。
+    - 清理 reviewed blob 已经等于 `HEAD:path` 的 entry。
+    - 清理进入 `Deleted`、`Renamed`、`Copied`、`Conflicted` 状态的 entry。
+    - `Refresh` 是显式清理入口，不在普通列表查询里偷偷修改 index。
+  - UI 接入：
+    - Review 面板空白区域或工具入口接入 `Refresh`。
+    - 点击后按顺序执行 `RefreshReviewSnapshot(...)`，再刷新 `Unreviewed` 和 `Reviewed` 两个列表。
+  - 验证：
+    - reviewed 内容进入 `HEAD` 后点击 `Refresh`，该 path 从 `Reviewed` 消失。
+    - reviewed 文件恢复到非 modified 状态后点击 `Refresh`，该 path 的 reviewed 状态被清理。
+
+- [ ] **R-05 Reviewed Diff Against WT，两处接入**
+  - 基础能力：
+    - 实现 `ReviewSnapshotService.CreateTempReviewedFile(...)`。
+    - 没有 reviewed entry 时，`CreateTempReviewedFile(...)` fallback 到 `GitService.CreateTempHeadFile(...)`。
+    - 新增 `DiffService.OpenDiff(...)`，第一版写死启动 TortoiseGitProc。
+    - 约定 left 是旧内容，right 是新内容；`WorkingTree vs Reviewed` 中 left 为 reviewed temp，right 为 working tree 文件。
+  - UI 接入：
+    - `Unreviewed` 文件右键菜单接入 `Diff Against Reviewed`。
+    - `Unreviewed` 文件双击默认执行 `Diff Against Reviewed`。
+    - `Reviewed` 文件右键菜单接入 `Diff Against Working Tree`。
+  - 验证：
+    - 未 reviewed 的 tracked 文件可以从 `Unreviewed` 打开 `WorkingTree vs HEAD` 语义 diff。
+    - 已 reviewed 后继续修改的文件，可以从 `Unreviewed` 打开 `WorkingTree vs Reviewed` diff。
+    - `Reviewed` 列表中的文件可以打开 working tree 与 reviewed 内容的 diff。
+
+- [ ] **R-06 Reviewed Diff Against HEAD**
+  - 基础能力：
+    - 扩展 `GitService.CreateTempHeadFile(...)`，为 `HEAD:path` 创建 temp 文件。
+    - `HEAD:path` 不存在时创建空文件，用于 added / untracked 的 head 侧 diff。
+    - 复用 `ReviewSnapshotService.CreateTempReviewedFile(...)` 和 `DiffService.OpenDiff(...)`。
+    - `Reviewed vs HEAD` 中 left 为 head temp，right 为 reviewed temp。
+  - UI 接入：
+    - `Reviewed` 文件右键菜单接入 `Diff Against HEAD`。
+    - `Reviewed` 文件双击默认执行 `Diff Against HEAD`。
+  - 验证：
+    - reviewed modified 文件可以打开 `Reviewed vs HEAD` diff。
+    - reviewed untracked / added 文件可以打开空 HEAD 侧与 reviewed 内容的 diff。
+
+- [ ] **R-07 构建与 code review**
+  - 编译通过。
+  - 检查 Review 相关命令只注入独立 `GIT_INDEX_FILE`，不影响真实 Git staging area。
+  - 检查每个纵切的基础能力都有对应 UI 入口和 happy path 验证方式。
+  - 检查路径校验、服务边界和临时文件语义边界没有互相泄漏。
 
 ## 9. Code Review 关注点
 
@@ -462,7 +555,6 @@ TortoiseGitProc.exe /command:diff /path:<rightPath> /path2:<leftPath>
 - `Diff Against Reviewed` 能打开 working tree 与 reviewed 临时文件的 diff。
 - `Diff Against HEAD` 能打开由 `GitService` 创建的 head 临时文件与 reviewed 临时文件的 diff。
 - untracked 文件与 head diff 时，head 侧使用空文件。
-- 外部 diff 工具缺失、Git 命令失败、非 Git workspace 都有明确失败消息。
 
 ## 10. 构建建议
 
@@ -483,4 +575,6 @@ dotnet build HaloCreek/HaloCreek.csproj
 - reviewed 快照的额外数据库 / store。
 - 自动区分 Agent 修改和用户手动修改。
 - reviewed 文件列表的额外元信息。
-- Review UI / ViewModel 接入。
+- Review 面板的 `Modified` 列表接入。
+- 应用重启后的 reviewed 状态保留专项验证。
+- 统一错误展示和失败路径验证。
