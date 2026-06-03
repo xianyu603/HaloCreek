@@ -7,9 +7,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Services;
 
 namespace HaloCreek.Infrastructure
@@ -142,6 +144,12 @@ namespace HaloCreek.Infrastructure
                 MinHeight = 180,
                 MaxHeight = 320,
             };
+            var confirmCommand = new RelayCommand(() => dialog.Close(textBox.Text ?? string.Empty));
+            textBox.KeyBindings.Add(new KeyBinding
+            {
+                Gesture = KeyGesture.Parse("Ctrl+Enter"),
+                Command = confirmCommand,
+            });
 
             var cancelButton = new Button
             {
@@ -158,8 +166,8 @@ namespace HaloCreek.Infrastructure
                 MinWidth = 80,
                 HorizontalContentAlignment = HorizontalAlignment.Center,
                 VerticalContentAlignment = VerticalAlignment.Center,
+                Command = confirmCommand,
             };
-            confirmButton.Click += (_, _) => dialog.Close(textBox.Text ?? string.Empty);
 
             dialog.Content = new StackPanel
             {
