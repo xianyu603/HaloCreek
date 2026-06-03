@@ -6,8 +6,10 @@ A - 追问和Agent修改
 追问实现
 临时修改UI和实现
 
-B - 批注
+B - mark reviewed
+Reviewed服务
+Reviewed接入
 
-C - mark reviewed
+C - 批注
 
 D - 重抽
