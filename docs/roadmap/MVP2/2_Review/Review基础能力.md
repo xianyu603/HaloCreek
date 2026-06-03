@@ -23,13 +23,14 @@ Reviewed(path) = HaloCreekIndex:path ?? HEAD:path
 物理存储使用独立 Git index 文件：
 
 ```text
-GIT_INDEX_FILE=<workspace git dir>/HaloCreekIndex
+GIT_INDEX_FILE=<workspace>/.HaloCreek/HaloCreekIndex
 ```
 
 约束：
 
 - Review 相关命令才允许注入 `GIT_INDEX_FILE`。
 - 现有 Git tab、真实 Git staging area 和用户 `.git/index` 不受影响。
+- `HaloCreekIndex` 放在 workspace 的 `.HaloCreek` 目录下，和 workspace `config.json` 同属 HaloCreek 管理的应用文件。
 - `HaloCreekIndex` 只作为 reviewed 快照存储，不引入额外 store。
 - `HaloCreekIndex` 中的 entry 只代表“该 path 有显式 reviewed 快照”；没有 entry 时 fallback 到 `HEAD:path`。
 
@@ -81,8 +82,8 @@ HaloCreek/Services/ReviewSnapshotService.cs
 
 职责：
 
-- 定位 workspace 对应 Git 目录和 `HaloCreekIndex` 路径。
-- 管理所有带 `GIT_INDEX_FILE=HaloCreekIndex` 的 git 命令。
+- 规范化 workspace，并定位 workspace `.HaloCreek/HaloCreekIndex` 路径。
+- 管理所有带 `GIT_INDEX_FILE=<workspace>/.HaloCreek/HaloCreekIndex` 的 git 命令。
 - 将文件当前 working tree 内容写入 reviewed 快照。
 - 删除指定文件的 reviewed 快照。
 - 按业务规则清理无效 reviewed 快照。
@@ -166,26 +167,26 @@ public sealed record GitTempFileResult(
 - 不注入 `GIT_INDEX_FILE`。
 - 路径校验沿用 `GitService` / workspace relative path 规则。
 
-### 4.4 Git repo 与 index 路径
+### 4.4 Workspace 应用文件路径
 
-所有入口先规范化 workspace：
+ReviewSnapshotService 不定位 Git dir。`HaloCreekIndex` 是 HaloCreek 在 workspace 下管理的应用文件，和 workspace `.HaloCreek/config.json` 放在同一目录。
+
+所有入口先规范化 workspace 路径：
 
 1. `Path.GetFullPath(workspacePath.Trim())`
 2. `Directory.Exists(...)`
-3. `git -C <workspace> rev-parse --git-dir`
-
-`rev-parse --git-dir` 返回相对路径时，按 workspace 拼成绝对路径。
 
 `HaloCreekIndex` 路径：
 
 ```text
-Path.Combine(gitDir, "HaloCreekIndex")
+Path.Combine(workspacePath, ".HaloCreek", "HaloCreekIndex")
 ```
 
 注意：
 
-- 不写到 `.HaloCreek`，因为 `GIT_INDEX_FILE` 更适合跟随 Git dir。
-- worktree / submodule 的 git dir 可能不是 `<workspace>/.git`，必须以 `rev-parse --git-dir` 为准。
+- 不写入 Git dir，也不通过 `rev-parse --git-dir` 推导路径。
+- 查询类入口不为了读取而创建 `.HaloCreek` 或空 index；写入 reviewed 快照前再确保 `.HaloCreek` 目录存在。
+- Git repo 是否有效由后续 `git -C <workspace>` 命令的失败结果显式报告；本服务不单独做 Git repo 探测。
 
 ### 4.5 路径校验
 
@@ -436,7 +437,7 @@ TortoiseGitProc.exe /command:diff /path:<rightPath> /path2:<leftPath>
 
 ## 8. 任务拆分
 
-- [ ] **R-01 新增 ReviewSnapshotService 基础骨架**：实现 workspace 校验、git dir 定位、`HaloCreekIndex` 路径解析、统一 git 命令执行和结果模型。
+- [ ] **R-01 新增 ReviewSnapshotService 基础骨架**：实现 workspace 校验、`.HaloCreek/HaloCreekIndex` 路径解析、统一 git 命令执行和结果模型。
 - [ ] **R-02 实现 reviewed entry 枚举和 blob 查询**：支持 `ls-files -s -z` 读取 `HaloCreekIndex` entry，支持 `HEAD:path` / `:path` blob 查询。
 - [ ] **R-03 实现 MarkFileReviewed / MarkFileUnreviewed**：用独立 `GIT_INDEX_FILE` 写入或删除单文件 reviewed 快照。
 - [ ] **R-04 实现 RefreshReviewSnapshot**：按支持类型和 reviewed==HEAD 规则清理无效 entry。
@@ -448,7 +449,7 @@ TortoiseGitProc.exe /command:diff /path:<rightPath> /path2:<leftPath>
 
 ## 9. Code Review 关注点
 
-- `Mark File Reviewed` 会把当前 working tree 文件内容写入 `<git dir>/HaloCreekIndex`。
+- `Mark File Reviewed` 会把当前 working tree 文件内容写入 `<workspace>/.HaloCreek/HaloCreekIndex`。
 - `Mark File Reviewed` 不改变真实 Git staging area。
 - `WorkingTree == HEAD` 时执行 `Mark File Reviewed` 是 no-op。
 - untracked 文件执行 `Mark File Reviewed` 后，会出现在 `Reviewed` 中。
