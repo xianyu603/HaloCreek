@@ -113,6 +113,7 @@ namespace HaloCreek.Infrastructure
             await dialog.ShowDialog(_owner);
         }
 
+        // 暂时用null 表示取消 有点潜规则但范围还小
         public async Task<string?> ShowTextInputDialogAsync(
             string title,
             string initialText,

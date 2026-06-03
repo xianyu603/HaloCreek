@@ -40,6 +40,7 @@ namespace HaloCreek.ViewModels.Tabs
             MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
+            SendPromptCommand = new AsyncRelayCommand(SendPromptAsync, CanSendPrompt);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
             ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
@@ -70,6 +71,8 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand ActivateFrontClientCommand { get; }
 
+        public IAsyncRelayCommand SendPromptCommand { get; }
+
         public bool HasFrontSession
         {
             get => _hasFrontSession;
@@ -79,6 +82,7 @@ namespace HaloCreek.ViewModels.Tabs
                 {
                     OnPropertyChanged(nameof(FrontSessionButtonForeground));
                     ActivateFrontClientCommand.NotifyCanExecuteChanged();
+                    SendPromptCommand.NotifyCanExecuteChanged();
                 }
             }
         }
@@ -168,6 +172,11 @@ namespace HaloCreek.ViewModels.Tabs
             return HasFrontSession;
         }
 
+        private bool CanSendPrompt()
+        {
+            return HasFrontSession;
+        }
+
         private void RefreshFrontSessionState(object? sender = null, EventArgs? e = null)
         {
             if (!Dispatcher.UIThread.CheckAccess())
@@ -214,6 +223,28 @@ namespace HaloCreek.ViewModels.Tabs
             await _appCommonRuntime.PlatformInfrastructure.ShowMessageDialogAsync(
                 "Review ClipLocate",
                 message);
+        }
+
+        private async Task SendPromptAsync()
+        {
+            var initialText = _clipLocateResult?.Status == ReviewClipboardClipLocateStatus.UniqueMatch
+                && _clipLocateResult.ClipLocate is not null
+                    ? _clipLocateResult.ClipLocate.FormatLocationText()
+                        + Environment.NewLine
+                    : string.Empty;
+
+            var message = await _appCommonRuntime.PlatformInfrastructure.ShowTextInputDialogAsync(
+                "Send Prompt",
+                initialText,
+                "Send",
+                "Cancel");
+
+            if (message is null || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            _sessionLifecycleService.SendMessageToFrontSession(message);
         }
 
         private enum ReviewPanelLayoutState

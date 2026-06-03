@@ -121,7 +121,8 @@
                         </ItemsControl.ItemsPanel>
 
                         <Button Classes="reviewBarButton"
-                                Content="Send Prompt"/>
+                                Content="Send Prompt"
+                                Command="{Binding SendPromptCommand}"/>
                         <Button Classes="reviewBarButton"
                                 Content="Add Note"/>
                         <Button Classes="reviewBarButton"
