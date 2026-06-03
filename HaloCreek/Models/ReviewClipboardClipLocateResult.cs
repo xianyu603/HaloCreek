@@ -8,7 +8,40 @@ namespace HaloCreek.Models
         ClipboardTextSnapshot ClipboardSnapshot,
         ReviewClipLocateCandidate? ClipLocate,
         string? FailureReason,
-        string Message);
+        string Message)
+    {
+        public static string FormatResultText(ReviewClipboardClipLocateResult? result)
+        {
+            return result?.FormatResultText()
+                ?? "Unmatched"
+                + Environment.NewLine
+                + "Failure reason: Unknown"
+                + Environment.NewLine
+                + "No clipboard clip locate result is available.";
+        }
+
+        public string FormatResultText()
+        {
+            if (Status == ReviewClipboardClipLocateStatus.UniqueMatch && ClipLocate is not null)
+            {
+                return "Matched"
+                    + Environment.NewLine
+                    + ClipLocate.FormatLocationText();
+            }
+
+            var failureReason = string.IsNullOrWhiteSpace(FailureReason)
+                ? "Unknown"
+                : FailureReason;
+            var detail = string.IsNullOrWhiteSpace(Message)
+                ? "No clipboard clip locate result is available."
+                : Message;
+            return "Unmatched"
+                + Environment.NewLine
+                + $"Failure reason: {failureReason}"
+                + Environment.NewLine
+                + detail;
+        }
+    }
 
     public enum ReviewClipboardClipLocateStatus
     {
@@ -21,7 +54,13 @@ namespace HaloCreek.Models
         int StartLine,
         int StartColumn,
         int EndLine,
-        int EndColumn);
+        int EndColumn)
+    {
+        public string FormatLocationText()
+        {
+            return $"{RelativePath}, line {StartLine} col {StartColumn} to line {EndLine} col {EndColumn}";
+        }
+    }
 
     public sealed class ReviewClipboardClipLocateChangedEventArgs : EventArgs
     {

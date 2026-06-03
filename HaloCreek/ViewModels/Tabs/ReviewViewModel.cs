@@ -209,36 +209,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private async Task ShowClipLocateResultAsync()
         {
-            var result = _clipLocateResult;
-            var clipLocate = result?.ClipLocate;
-            string message;
-            if (clipLocate is not null)
-            {
-                var lineRange = clipLocate.StartLine == clipLocate.EndLine
-                    ? $"Line {clipLocate.StartLine}"
-                    : $"Lines {clipLocate.StartLine}-{clipLocate.EndLine}";
-                message =
-                    "Matched"
-                    + Environment.NewLine
-                    + $"Path: {clipLocate.RelativePath}"
-                    + Environment.NewLine
-                    + $"{lineRange}, Columns {clipLocate.StartColumn}-{clipLocate.EndColumn}";
-            }
-            else
-            {
-                var failureReason = string.IsNullOrWhiteSpace(result?.FailureReason)
-                    ? "Unknown"
-                    : result.FailureReason;
-                var detail = string.IsNullOrWhiteSpace(result?.Message)
-                    ? "No clipboard clip locate result is available."
-                    : result.Message;
-                message =
-                    "Unmatched"
-                    + Environment.NewLine
-                    + $"Failure reason: {failureReason}"
-                    + Environment.NewLine
-                    + detail;
-            }
+            var message = ReviewClipboardClipLocateResult.FormatResultText(_clipLocateResult);
 
             await _appCommonRuntime.PlatformInfrastructure.ShowMessageDialogAsync(
                 "Review ClipLocate",

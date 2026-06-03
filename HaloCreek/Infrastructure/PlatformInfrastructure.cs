@@ -113,6 +113,77 @@ namespace HaloCreek.Infrastructure
             await dialog.ShowDialog(_owner);
         }
 
+        public async Task<string?> ShowTextInputDialogAsync(
+            string title,
+            string initialText,
+            string confirmText,
+            string cancelText)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(title);
+            ArgumentNullException.ThrowIfNull(initialText);
+            ArgumentException.ThrowIfNullOrWhiteSpace(confirmText);
+            ArgumentException.ThrowIfNullOrWhiteSpace(cancelText);
+
+            var dialog = new Window
+            {
+                Title = title,
+                Width = 640,
+                SizeToContent = SizeToContent.Height,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                CanResize = false,
+            };
+
+            var textBox = new TextBox
+            {
+                Text = initialText,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MinHeight = 180,
+                MaxHeight = 320,
+            };
+
+            var cancelButton = new Button
+            {
+                Content = cancelText,
+                MinWidth = 80,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+            };
+            cancelButton.Click += (_, _) => dialog.Close(null);
+
+            var confirmButton = new Button
+            {
+                Content = confirmText,
+                MinWidth = 80,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+            };
+            confirmButton.Click += (_, _) => dialog.Close(textBox.Text ?? string.Empty);
+
+            dialog.Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(20),
+                Spacing = 16,
+                Children =
+                {
+                    textBox,
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children =
+                        {
+                            cancelButton,
+                            confirmButton,
+                        },
+                    },
+                },
+            };
+
+            return await dialog.ShowDialog<string?>(_owner);
+        }
+
         /// <summary>
         /// Normalizes a directory path only when it points to an existing directory.
         /// Invalid, blank, or missing paths return false and do not expose a normalized path.
