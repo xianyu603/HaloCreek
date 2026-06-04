@@ -197,14 +197,8 @@
                                               x:CompileBindings="False">
                                     <Grid MinHeight="34"
                                           RowDefinitions="1,*"
-                                          Background="Transparent">
-                                        <Grid.ContextMenu>
-                                            <ContextMenu>
-                                                <MenuItem Header="Add Reviewed"
-                                                          Command="{Binding DataContext.AddReviewedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                          CommandParameter="{Binding}"/>
-                                            </ContextMenu>
-                                        </Grid.ContextMenu>
+                                          Background="Transparent"
+                                          ContextRequested="UnreviewedItem_OnContextRequested">
                                         <Border Grid.Row="0"
                                                 Background="#E2E8F0"/>
                                         <Border Grid.Row="1"

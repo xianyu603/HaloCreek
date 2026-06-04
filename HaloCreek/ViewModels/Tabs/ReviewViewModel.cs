@@ -295,13 +295,18 @@ namespace HaloCreek.ViewModels.Tabs
 
         private bool CanAddReviewed(ReviewFilePath? file)
         {
-            return file is not null;
+            var canAddReviewed = file is not null;
+            Log.Debug(
+                "Review",
+                $"CanAddReviewed evaluated. CanExecute={canAddReviewed} File={file?.RelativePath ?? "<null>"}");
+            return canAddReviewed;
         }
 
         private void AddReviewed(ReviewFilePath? file)
         {
             try
             {
+                Log.Info("Review", $"AddReviewed invoked. File={file?.RelativePath ?? "<null>"}");
                 if (file is null)
                 {
                     throw new InvalidOperationException("Select an unreviewed file first.");
