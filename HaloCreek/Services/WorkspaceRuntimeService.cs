@@ -5,6 +5,7 @@ using HaloCreek.Models;
 
 namespace HaloCreek.Services
 {
+    // TODO 这个类的所有权考虑变更 只给VM有点太麻烦 workspace可以是应用级的状态
     public sealed class WorkspaceRuntimeService
     {
         private const string InvalidStartupWorkspacePathMessage = "Startup workspace path is invalid or unavailable.";
