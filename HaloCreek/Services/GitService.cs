@@ -76,7 +76,7 @@ namespace HaloCreek.Services
                 return null;
             }
 
-            throw new InvalidOperationException(GetGitFailureMessage("Git HEAD blob query failed.", message));
+            throw new InvalidOperationException($"Git HEAD blob query failed. {message}");
         }
 
         public string? HashWorkingTreeFile(string? relativePath)
@@ -101,7 +101,7 @@ namespace HaloCreek.Services
             }
 
             var message = commandResult.ErrorMessage.Trim();
-            throw new InvalidOperationException(GetGitFailureMessage("Git working tree blob hash failed.", message));
+            throw new InvalidOperationException($"Git working tree blob hash failed. {message}");
         }
 
         public GitOperationResult TryRunConfiguredAction(
@@ -225,21 +225,6 @@ namespace HaloCreek.Services
                 || message.Contains("exists on disk, but not in", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("invalid object name 'HEAD'", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("ambiguous argument 'HEAD:", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string GetGitFailureMessage(string fallbackMessage, string gitMessage)
-        {
-            if (string.IsNullOrWhiteSpace(gitMessage))
-            {
-                return fallbackMessage;
-            }
-
-            if (gitMessage.Contains("not a git repository", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Current workspace is not a Git repository.";
-            }
-
-            return gitMessage;
         }
 
         private static IReadOnlyList<GitChangeInfo> ParsePorcelainStatus(string output)

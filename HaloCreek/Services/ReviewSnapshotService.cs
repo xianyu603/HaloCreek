@@ -160,10 +160,8 @@ namespace HaloCreek.Services
                 return result.Output;
             }
 
-            var message = GetGitFailureMessage(
-                "Review snapshot git command failed.",
-                result.ErrorMessage.Trim());
-            throw new InvalidOperationException(message, result.Exception);
+            var message = result.ErrorMessage.Trim();
+            throw new InvalidOperationException($"Review snapshot git command failed. {message}", result.Exception);
         }
 
         private bool IsWorkingTreeDifferentFromReviewed(
@@ -223,21 +221,6 @@ namespace HaloCreek.Services
             return change.ChangeType is GitChangeType.Modified
                 or GitChangeType.Added
                 or GitChangeType.Untracked;
-        }
-
-        private static string GetGitFailureMessage(string fallbackMessage, string gitMessage)
-        {
-            if (string.IsNullOrWhiteSpace(gitMessage))
-            {
-                return fallbackMessage;
-            }
-
-            if (gitMessage.Contains("not a git repository", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Current workspace is not a Git repository.";
-            }
-
-            return gitMessage;
         }
 
         private sealed record ReviewedIndexEntry(string RelativePath, string BlobId);
