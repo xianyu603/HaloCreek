@@ -58,6 +58,61 @@ namespace HaloCreek.Services
             return new GitChangesResult(changes, loadedMessage, workspacePath);
         }
 
+        public string? GetHeadBlobId(string? relativePath)
+        {
+            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
+            if (string.IsNullOrWhiteSpace(workspacePath))
+            {
+                throw new InvalidOperationException("CurrentWorkspacePath is empty!");
+            }
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            var commandResult = RunGit(
+                workspacePath,
+                new[] { "rev-parse", $"HEAD:{gitRelativePath}" });
+            if (commandResult.Succeeded)
+            {
+                return NormalizeBlobId(commandResult.Output);
+            }
+
+            var message = commandResult.ErrorMessage.Trim();
+            if (IsMissingHeadPathError(message))
+            {
+                return null;
+            }
+
+            throw new InvalidOperationException(GetGitFailureMessage("Git HEAD blob query failed.", message));
+        }
+
+        public string? HashWorkingTreeFile(string? relativePath)
+        {
+            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+            if (string.IsNullOrWhiteSpace(workspacePath))
+            {
+                throw new InvalidOperationException("CurrentWorkspacePath is empty!");
+            }
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            var absoluteFilePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
+                workspacePath,
+                gitRelativePath);
+            if (!File.Exists(absoluteFilePath) || Directory.Exists(absoluteFilePath))
+            {
+                return null;
+            }
+
+            var commandResult = RunGit(
+                workspacePath,
+                new[] { "hash-object", $"--path={gitRelativePath}", "--", absoluteFilePath });
+            if (commandResult.Succeeded)
+            {
+                return NormalizeBlobId(commandResult.Output);
+            }
+
+            var message = commandResult.ErrorMessage.Trim();
+            throw new InvalidOperationException(GetGitFailureMessage("Git working tree blob hash failed.", message));
+        }
+
         public GitOperationResult TryRunConfiguredAction(
             GitChangeInfo? selectedChange,
             GitFileBrowserActionConfig action)
@@ -140,6 +195,16 @@ namespace HaloCreek.Services
 
         private static GitCommandResult RunGitStatus(string workspacePath)
         {
+            return RunGit(
+                workspacePath,
+                new[] { "status", "--porcelain=v1", "-z", "--untracked-files=all" });
+        }
+
+        private static GitCommandResult RunGit(
+            string workspacePath,
+            IEnumerable<string> arguments,
+            IReadOnlyDictionary<string, string?>? environmentVariables = null)
+        {
             try
             {
                 using var process = new Process();
@@ -155,10 +220,18 @@ namespace HaloCreek.Services
                 };
                 process.StartInfo.ArgumentList.Add("-C");
                 process.StartInfo.ArgumentList.Add(workspacePath);
-                process.StartInfo.ArgumentList.Add("status");
-                process.StartInfo.ArgumentList.Add("--porcelain=v1");
-                process.StartInfo.ArgumentList.Add("-z");
-                process.StartInfo.ArgumentList.Add("--untracked-files=all");
+                foreach (var argument in arguments)
+                {
+                    process.StartInfo.ArgumentList.Add(argument);
+                }
+
+                if (environmentVariables is not null)
+                {
+                    foreach (var pair in environmentVariables)
+                    {
+                        process.StartInfo.Environment[pair.Key] = pair.Value;
+                    }
+                }
 
                 process.Start();
                 var output = process.StandardOutput.ReadToEnd();
@@ -174,6 +247,37 @@ namespace HaloCreek.Services
             {
                 return new GitCommandResult(false, string.Empty, ex.Message);
             }
+        }
+
+        private static string? NormalizeBlobId(string output)
+        {
+            var blobId = output.Trim();
+            return string.IsNullOrWhiteSpace(blobId)
+                ? null
+                : blobId;
+        }
+
+        private static bool IsMissingHeadPathError(string message)
+        {
+            return message.Contains("does not exist in", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("exists on disk, but not in", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("invalid object name 'HEAD'", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("ambiguous argument 'HEAD:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetGitFailureMessage(string fallbackMessage, string gitMessage)
+        {
+            if (string.IsNullOrWhiteSpace(gitMessage))
+            {
+                return fallbackMessage;
+            }
+
+            if (gitMessage.Contains("not a git repository", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Current workspace is not a Git repository.";
+            }
+
+            return gitMessage;
         }
 
         private static IReadOnlyList<GitChangeInfo> ParsePorcelainStatus(string output)

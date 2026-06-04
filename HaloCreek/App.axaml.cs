@@ -69,7 +69,9 @@ namespace HaloCreek
                 terminalService,
                 appCommonRuntime);
             var gitService = new GitService(workspaceRuntimeService);
-            var reviewFileService = new ReviewFileService(gitService);
+            var reviewSnapshotService = new ReviewSnapshotService(
+                workspaceRuntimeService,
+                gitService);
             var reviewClipboardContextService = new ReviewClipboardContextService(
                 platformClipboardInfrastructure,
                 gitService);
@@ -83,7 +85,7 @@ namespace HaloCreek
                 workspaceRuntimeService,
                 appCommonRuntime);
             var review = new ReviewViewModel(
-                reviewFileService,
+                reviewSnapshotService,
                 workspaceRuntimeService,
                 reviewClipboardContextService,
                 sessionLifecycleService,

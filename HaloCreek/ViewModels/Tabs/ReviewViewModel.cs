@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
 
@@ -17,7 +18,7 @@ namespace HaloCreek.ViewModels.Tabs
         private static readonly IBrush FrontSessionForeground = new SolidColorBrush(Color.Parse("#334155"));
         private static readonly IBrush DisabledForeground = new SolidColorBrush(Color.Parse("#94A3B8"));
 
-        private readonly ReviewFileService _reviewFileService;
+        private readonly ReviewSnapshotService _reviewSnapshotService;
         private readonly ReviewClipboardContextService _reviewClipboardContextService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly AppCommonRuntime _appCommonRuntime;
@@ -25,21 +26,23 @@ namespace HaloCreek.ViewModels.Tabs
         private ReviewPanelLayoutState _panelLayoutState;
         private ReviewClipboardClipLocateResult? _clipLocateResult;
         private IReadOnlyList<ReviewFilePath> _unreviewedFiles = Array.Empty<ReviewFilePath>();
+        private IReadOnlyList<ReviewFilePath> _reviewedFiles = Array.Empty<ReviewFilePath>();
         private ReviewFilePath? _selectedUnreviewedFile;
+        private ReviewFilePath? _selectedReviewedFile;
         private string _clipLocateStatusText = "Unmatched";
         private IBrush _clipLocateButtonForeground = UnmatchedForeground;
         private bool _hasFrontSession;
         private bool _isDisposed;
 
         public ReviewViewModel(
-            ReviewFileService reviewFileService,
+            ReviewSnapshotService reviewSnapshotService,
             WorkspaceRuntimeService workspaceRuntimeService,
             ReviewClipboardContextService reviewClipboardContextService,
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime)
         {
-            _reviewFileService = reviewFileService
-                ?? throw new ArgumentNullException(nameof(reviewFileService));
+            _reviewSnapshotService = reviewSnapshotService
+                ?? throw new ArgumentNullException(nameof(reviewSnapshotService));
             ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _reviewClipboardContextService = reviewClipboardContextService
                 ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
@@ -52,6 +55,7 @@ namespace HaloCreek.ViewModels.Tabs
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
             SendPromptCommand = new AsyncRelayCommand(SendPromptAsync, CanSendPrompt);
+            AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed, CanAddReviewed);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
             workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
@@ -85,16 +89,36 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IAsyncRelayCommand SendPromptCommand { get; }
 
+        public IRelayCommand<ReviewFilePath> AddReviewedCommand { get; }
+
         public IReadOnlyList<ReviewFilePath> UnreviewedFiles
         {
             get => _unreviewedFiles;
             private set => SetProperty(ref _unreviewedFiles, value);
         }
 
+        public IReadOnlyList<ReviewFilePath> ReviewedFiles
+        {
+            get => _reviewedFiles;
+            private set => SetProperty(ref _reviewedFiles, value);
+        }
+
         public ReviewFilePath? SelectedUnreviewedFile
         {
             get => _selectedUnreviewedFile;
-            set => SetProperty(ref _selectedUnreviewedFile, value);
+            set
+            {
+                if (SetProperty(ref _selectedUnreviewedFile, value))
+                {
+                    AddReviewedCommand.NotifyCanExecuteChanged();
+                }
+            }
+        }
+
+        public ReviewFilePath? SelectedReviewedFile
+        {
+            get => _selectedReviewedFile;
+            set => SetProperty(ref _selectedReviewedFile, value);
         }
 
         public bool HasFrontSession
@@ -141,7 +165,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         public void OnSelected()
         {
-            RefreshUnreviewedFiles();
+            RefreshReviewFiles();
         }
 
         private void MoveLeft()
@@ -245,18 +269,20 @@ namespace HaloCreek.ViewModels.Tabs
             ClipLocateButtonForeground = isMatched ? MatchedForeground : UnmatchedForeground;
         }
 
-        private void RefreshUnreviewedFiles()
+        private void RefreshReviewFiles()
         {
             try
             {
                 SelectedUnreviewedFile = null;
-                UnreviewedFiles = _reviewFileService.GetUnreviewedFiles();
+                SelectedReviewedFile = null;
+                UnreviewedFiles = _reviewSnapshotService.GetWorkingTreeAgainstReviewedFiles();
+                ReviewedFiles = _reviewSnapshotService.GetReviewedAgainstHeadFiles();
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
                 _transientEventService.ReportUserActionFailure(
                     "Review",
-                    "Review unreviewed files failed",
+                    "Review files refresh failed",
                     ex.Message,
                     ex);
             }
@@ -264,7 +290,35 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
         {
-            RefreshUnreviewedFiles();
+            RefreshReviewFiles();
+        }
+
+        private bool CanAddReviewed(ReviewFilePath? file)
+        {
+            return file is not null;
+        }
+
+        private void AddReviewed(ReviewFilePath? file)
+        {
+            try
+            {
+                if (file is null)
+                {
+                    throw new InvalidOperationException("Select an unreviewed file first.");
+                }
+
+                _reviewSnapshotService.MarkFileReviewed(file.RelativePath);
+                Log.Info("Review", $"Marked reviewed: {file.RelativePath}");
+                RefreshReviewFiles();
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Add reviewed failed",
+                    ex.Message,
+                    ex);
+            }
         }
 
         private async Task ShowClipLocateResultAsync()

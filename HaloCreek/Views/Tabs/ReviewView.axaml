@@ -198,6 +198,13 @@
                                     <Grid MinHeight="34"
                                           RowDefinitions="1,*"
                                           Background="Transparent">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Add Reviewed"
+                                                          Command="{Binding DataContext.AddReviewedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                          CommandParameter="{Binding}"/>
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
                                         <Border Grid.Row="0"
                                                 Background="#E2E8F0"/>
                                         <Border Grid.Row="1"
@@ -220,6 +227,46 @@
                             <TextBlock Text="Reviewed"
                                        FontSize="13"/>
                         </TabItem.Header>
+                        <ListBox ItemsSource="{Binding ReviewedFiles}"
+                                 SelectedItem="{Binding SelectedReviewedFile, Mode=TwoWay}"
+                                 SelectionMode="Single"
+                                 BorderThickness="0"
+                                 Background="White"
+                                 Padding="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.Styles>
+                                <Style Selector="ListBoxItem">
+                                    <Setter Property="MinHeight" Value="34"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Margin" Value="0"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                </Style>
+                            </ListBox.Styles>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="model:ReviewFilePath"
+                                              x:CompileBindings="False">
+                                    <Grid MinHeight="34"
+                                          RowDefinitions="1,*"
+                                          Background="Transparent">
+                                        <Border Grid.Row="0"
+                                                Background="#E2E8F0"/>
+                                        <Border Grid.Row="1"
+                                                Padding="10,0"
+                                                Background="Transparent">
+                                            <TextBlock Text="{Binding DisplayPath}"
+                                                       VerticalAlignment="Center"
+                                                       TextWrapping="NoWrap"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Foreground="#334155"
+                                                       FontSize="13"/>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                     </TabItem>
                 </TabControl>
             </Border>
