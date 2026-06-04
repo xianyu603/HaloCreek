@@ -52,6 +52,7 @@ namespace HaloCreek.ViewModels.Tabs
             _transientEventService = _appCommonRuntime.TransientEventService;
             MoveLeftCommand = new RelayCommand(MoveLeft, CanMoveLeft);
             MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
+            RefreshCommand = new RelayCommand(RefreshReviewFiles);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
             SendPromptCommand = new AsyncRelayCommand(SendPromptAsync, CanSendPrompt);
@@ -82,6 +83,8 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand MoveLeftCommand { get; }
 
         public IRelayCommand MoveRightCommand { get; }
+
+        public IRelayCommand RefreshCommand { get; }
 
         public IAsyncRelayCommand ShowClipLocateLineCommand { get; }
 

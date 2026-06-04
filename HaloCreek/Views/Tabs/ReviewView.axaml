@@ -168,6 +168,14 @@
                             <TextBlock Text="Modified"
                                        FontSize="13"/>
                         </TabItem.Header>
+                        <Grid Background="White">
+                            <Grid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Refresh"
+                                              Command="{Binding RefreshCommand}"/>
+                                </ContextMenu>
+                            </Grid.ContextMenu>
+                        </Grid>
                     </TabItem>
                     <TabItem Classes="reviewInnerTab">
                         <TabItem.Header>
@@ -184,9 +192,8 @@
                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
                             <ListBox.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="Add Reviewed"
-                                              Command="{Binding AddReviewedCommand}"
-                                              CommandParameter="{Binding $parent[ListBox].SelectedItem}"/>
+                                    <MenuItem Header="Refresh"
+                                              Command="{Binding RefreshCommand}"/>
                                 </ContextMenu>
                             </ListBox.ContextMenu>
                             <ListBox.Styles>
@@ -204,8 +211,13 @@
                                               x:CompileBindings="False">
                                     <Grid MinHeight="34"
                                           RowDefinitions="1,*"
-                                          Background="Transparent"
-                                          PointerPressed="UnreviewedItem_OnPointerPressed">
+                                          Background="Transparent">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Add Reviewed"
+                                                          Click="AddReviewedMenuItem_OnClick"/>
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
                                         <Border Grid.Row="0"
                                                 Background="#E2E8F0"/>
                                         <Border Grid.Row="1"
@@ -236,6 +248,12 @@
                                  Padding="0"
                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Refresh"
+                                              Command="{Binding RefreshCommand}"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
                             <ListBox.Styles>
                                 <Style Selector="ListBoxItem">
                                     <Setter Property="MinHeight" Value="34"/>
@@ -252,6 +270,11 @@
                                     <Grid MinHeight="34"
                                           RowDefinitions="1,*"
                                           Background="Transparent">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Mark Unreviewed"/>
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
                                         <Border Grid.Row="0"
                                                 Background="#E2E8F0"/>
                                         <Border Grid.Row="1"

@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
-using HaloCreek.Logging;
+using Avalonia.Interactivity;
 using HaloCreek.Models;
 using HaloCreek.ViewModels.Tabs;
 
@@ -41,18 +41,19 @@ namespace HaloCreek.Views.Tabs
             }
         }
 
-        private void UnreviewedItem_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+        private void AddReviewedMenuItem_OnClick(object? sender, RoutedEventArgs e)
         {
-            if (!e.GetCurrentPoint(sender as Control).Properties.IsRightButtonPressed)
+            if (DataContext is not ReviewViewModel viewModel
+                || sender is not Control { DataContext: ReviewFilePath file })
             {
                 return;
             }
 
-            if (DataContext is ReviewViewModel viewModel
-                && sender is Control { DataContext: ReviewFilePath file })
+            if (viewModel.AddReviewedCommand.CanExecute(file))
             {
                 viewModel.SelectedUnreviewedFile = file;
-                Log.Info("Review", $"Unreviewed file selected by context request: {file.RelativePath}");
+                viewModel.AddReviewedCommand.Execute(file);
+                e.Handled = true;
             }
         }
     }
