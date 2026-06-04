@@ -478,7 +478,7 @@ TortoiseGitProc.exe /command:diff /path:<rightPath> /path2:<leftPath>
     - untracked 文件执行 `Add Reviewed` 后出现在 `Reviewed`。
     - 文件被 reviewed 后继续修改，会同时出现在 `Reviewed` 和 `Unreviewed`。
 
-- [ ] **R-03 Reviewed 右键 Unreviewed action**
+- [x] **R-03 Reviewed 右键 Unreviewed action**
   - 基础能力：
     - 实现 `MarkFileUnreviewed(...)`，删除指定 path 在 `HaloCreekIndex` 中的 reviewed 快照。
     - 删除 reviewed 快照不修改 working tree，不修改真实 Git index。

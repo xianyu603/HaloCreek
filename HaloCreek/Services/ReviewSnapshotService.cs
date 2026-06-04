@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using HaloCreek.Infrastructure;
+using HaloCreek.Logging;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services
@@ -57,6 +58,27 @@ namespace HaloCreek.Services
                 workspacePath,
                 haloCreekIndexPath,
                 new[] { "update-index", "--add", "--", gitRelativePath });
+        }
+
+        public void MarkFileUnreviewed(string? relativePath)
+        {
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+            if (!IsHaloCreekIndexAvailable(workspacePath))
+            {
+                Log.Warning(
+                    "Review",
+                    "MarkFileUnreviewed skipped because HaloCreekIndex is missing. "
+                    + "This may indicate stale Review UI state or command misuse. "
+                    + $"File={relativePath} Index={GetHaloCreekIndexPath(workspacePath)}");
+                return;
+            }
+
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            RunReviewGit(
+                workspacePath,
+                GetHaloCreekIndexPath(workspacePath),
+                new[] { "update-index", "--force-remove", "--", gitRelativePath });
         }
 
         public IReadOnlyList<ReviewFilePath> GetReviewedAgainstHeadFiles()

@@ -214,7 +214,7 @@
                                           Background="Transparent">
                                         <Grid.ContextMenu>
                                             <ContextMenu>
-                                                <MenuItem Header="Add Reviewed"
+                                                <MenuItem Header="Mark Reviewed"
                                                           Click="AddReviewedMenuItem_OnClick"/>
                                             </ContextMenu>
                                         </Grid.ContextMenu>
@@ -272,7 +272,8 @@
                                           Background="Transparent">
                                         <Grid.ContextMenu>
                                             <ContextMenu>
-                                                <MenuItem Header="Mark Unreviewed"/>
+                                                <MenuItem Header="Mark Unreviewed"
+                                                          Click="MarkUnreviewedMenuItem_OnClick"/>
                                             </ContextMenu>
                                         </Grid.ContextMenu>
                                         <Border Grid.Row="0"

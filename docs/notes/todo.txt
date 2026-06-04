@@ -5,3 +5,4 @@ resume with prompt
 连续切session的时候会短暂报假的background running 顺便可以考虑将idle与否与是否前台分开
 日志面板只在前台监听日志变化
 A - 追问和Agent修改 这种路径 exploreTo会出问题
+Reviewed相关文件操作走异步

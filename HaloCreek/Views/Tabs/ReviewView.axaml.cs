@@ -56,5 +56,21 @@ namespace HaloCreek.Views.Tabs
                 e.Handled = true;
             }
         }
+
+        private void MarkUnreviewedMenuItem_OnClick(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not ReviewViewModel viewModel
+                || sender is not Control { DataContext: ReviewFilePath file })
+            {
+                return;
+            }
+
+            if (viewModel.MarkUnreviewedCommand.CanExecute(file))
+            {
+                viewModel.SelectedReviewedFile = file;
+                viewModel.MarkUnreviewedCommand.Execute(file);
+                e.Handled = true;
+            }
+        }
     }
 }

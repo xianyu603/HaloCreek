@@ -56,7 +56,8 @@ namespace HaloCreek.ViewModels.Tabs
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
             SendPromptCommand = new AsyncRelayCommand(SendPromptAsync, CanSendPrompt);
-            AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed, CanAddReviewed);
+            AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed);
+            MarkUnreviewedCommand = new RelayCommand<ReviewFilePath>(MarkUnreviewed);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
             workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
@@ -94,6 +95,8 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<ReviewFilePath> AddReviewedCommand { get; }
 
+        public IRelayCommand<ReviewFilePath> MarkUnreviewedCommand { get; }
+
         public IReadOnlyList<ReviewFilePath> UnreviewedFiles
         {
             get => _unreviewedFiles;
@@ -109,13 +112,7 @@ namespace HaloCreek.ViewModels.Tabs
         public ReviewFilePath? SelectedUnreviewedFile
         {
             get => _selectedUnreviewedFile;
-            set
-            {
-                if (SetProperty(ref _selectedUnreviewedFile, value))
-                {
-                    AddReviewedCommand.NotifyCanExecuteChanged();
-                }
-            }
+            set => SetProperty(ref _selectedUnreviewedFile, value);
         }
 
         public ReviewFilePath? SelectedReviewedFile
@@ -296,25 +293,13 @@ namespace HaloCreek.ViewModels.Tabs
             RefreshReviewFiles();
         }
 
-        private bool CanAddReviewed(ReviewFilePath? file)
-        {
-            var canAddReviewed = file is not null;
-            Log.Debug(
-                "Review",
-                $"CanAddReviewed evaluated. CanExecute={canAddReviewed} File={file?.RelativePath ?? "<null>"}");
-            return canAddReviewed;
-        }
-
         private void AddReviewed(ReviewFilePath? file)
         {
+            ArgumentNullException.ThrowIfNull(file);
+
             try
             {
-                Log.Info("Review", $"AddReviewed invoked. File={file?.RelativePath ?? "<null>"}");
-                if (file is null)
-                {
-                    throw new InvalidOperationException("Select an unreviewed file first.");
-                }
-
+                Log.Info("Review", $"AddReviewed invoked. File={file.RelativePath}");
                 _reviewSnapshotService.MarkFileReviewed(file.RelativePath);
                 Log.Info("Review", $"Marked reviewed: {file.RelativePath}");
                 RefreshReviewFiles();
@@ -324,6 +309,27 @@ namespace HaloCreek.ViewModels.Tabs
                 _transientEventService.ReportUserActionFailure(
                     "Review",
                     "Add reviewed failed",
+                    ex.Message,
+                    ex);
+            }
+        }
+
+        private void MarkUnreviewed(ReviewFilePath? file)
+        {
+            ArgumentNullException.ThrowIfNull(file);
+
+            try
+            {
+                Log.Info("Review", $"MarkUnreviewed invoked. File={file.RelativePath}");
+                _reviewSnapshotService.MarkFileUnreviewed(file.RelativePath);
+                Log.Info("Review", $"Marked unreviewed: {file.RelativePath}");
+                RefreshReviewFiles();
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Mark unreviewed failed",
                     ex.Message,
                     ex);
             }
