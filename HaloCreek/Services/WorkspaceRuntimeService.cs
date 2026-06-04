@@ -32,6 +32,16 @@ namespace HaloCreek.Services
 
         public string? CurrentWorkspacePath => _currentWorkspacePath;
 
+        public string GetRequiredWorkspacePath(string missingWorkspaceMessage = "Current workspace path is empty.")
+        {
+            if (string.IsNullOrWhiteSpace(_currentWorkspacePath))
+            {
+                throw new InvalidOperationException(missingWorkspaceMessage);
+            }
+
+            return _currentWorkspacePath;
+        }
+
         public void InitializeStartupWorkspace()
         {
             InitializeStartupWorkspace(ResolveStartupWorkspacePath());

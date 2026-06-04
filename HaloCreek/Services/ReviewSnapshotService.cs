@@ -30,7 +30,7 @@ namespace HaloCreek.Services
 
         public void MarkFileReviewed(string? relativePath)
         {
-            var workspacePath = GetRequiredWorkspacePath();
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var absoluteWorkingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
@@ -64,7 +64,7 @@ namespace HaloCreek.Services
 
         public IReadOnlyList<ReviewFilePath> GetReviewedAgainstHeadFiles()
         {
-            var workspacePath = GetRequiredWorkspacePath();
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
             if (!IsHaloCreekIndexAvailable(workspacePath))
             {
                 return Array.Empty<ReviewFilePath>();
@@ -84,7 +84,7 @@ namespace HaloCreek.Services
 
         public IReadOnlyList<ReviewFilePath> GetWorkingTreeAgainstReviewedFiles()
         {
-            var workspacePath = GetRequiredWorkspacePath();
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
             var reviewedEntries = ReadReviewedIndexEntries(workspacePath)
                 .GroupBy(entry => entry.RelativePath, StringComparer.Ordinal)
                 .ToDictionary(
@@ -215,18 +215,6 @@ namespace HaloCreek.Services
 
             return reviewedBlobId is null
                 || !string.Equals(workingTreeBlobId, reviewedBlobId, StringComparison.OrdinalIgnoreCase);
-        }
-
-        // TODO 考虑将这个模式(空就抛)写到_workspaceRuntimeService
-        private string GetRequiredWorkspacePath()
-        {
-            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                throw new InvalidOperationException("Select a workspace to use Review.");
-            }
-
-            return workspacePath;
         }
 
         private static ReviewedIndexEntry? ParseReviewedIndexEntry(string token)

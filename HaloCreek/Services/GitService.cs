@@ -60,11 +60,7 @@ namespace HaloCreek.Services
 
         public string? GetHeadBlobId(string? relativePath)
         {
-            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                throw new InvalidOperationException("CurrentWorkspacePath is empty!");
-            }
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("CurrentWorkspacePath is empty!");
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var commandResult = RunGit(
@@ -86,12 +82,8 @@ namespace HaloCreek.Services
 
         public string? HashWorkingTreeFile(string? relativePath)
         {
-            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("CurrentWorkspacePath is empty!");
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                throw new InvalidOperationException("CurrentWorkspacePath is empty!");
-            }
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var absoluteFilePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
                 workspacePath,
