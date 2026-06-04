@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -9,33 +10,43 @@ using HaloCreek.Services;
 
 namespace HaloCreek.ViewModels.Tabs
 {
-    public sealed class ReviewViewModel : ViewModelBase, IDisposable
+    public sealed class ReviewViewModel : ViewModelBase, ITabSelectionAware, IDisposable
     {
         private static readonly IBrush MatchedForeground = new SolidColorBrush(Color.Parse("#166534"));
         private static readonly IBrush UnmatchedForeground = new SolidColorBrush(Color.Parse("#854D0E"));
         private static readonly IBrush FrontSessionForeground = new SolidColorBrush(Color.Parse("#334155"));
         private static readonly IBrush DisabledForeground = new SolidColorBrush(Color.Parse("#94A3B8"));
 
+        private readonly ReviewFileService _reviewFileService;
         private readonly ReviewClipboardContextService _reviewClipboardContextService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly AppCommonRuntime _appCommonRuntime;
+        private readonly TransientEventService _transientEventService;
         private ReviewPanelLayoutState _panelLayoutState;
         private ReviewClipboardClipLocateResult? _clipLocateResult;
+        private IReadOnlyList<ReviewFilePath> _unreviewedFiles = Array.Empty<ReviewFilePath>();
+        private ReviewFilePath? _selectedUnreviewedFile;
         private string _clipLocateStatusText = "Unmatched";
         private IBrush _clipLocateButtonForeground = UnmatchedForeground;
         private bool _hasFrontSession;
         private bool _isDisposed;
 
         public ReviewViewModel(
+            ReviewFileService reviewFileService,
+            WorkspaceRuntimeService workspaceRuntimeService,
             ReviewClipboardContextService reviewClipboardContextService,
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime)
         {
+            _reviewFileService = reviewFileService
+                ?? throw new ArgumentNullException(nameof(reviewFileService));
+            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _reviewClipboardContextService = reviewClipboardContextService
                 ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _appCommonRuntime = appCommonRuntime ?? throw new ArgumentNullException(nameof(appCommonRuntime));
+            _transientEventService = _appCommonRuntime.TransientEventService;
             MoveLeftCommand = new RelayCommand(MoveLeft, CanMoveLeft);
             MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
@@ -43,6 +54,7 @@ namespace HaloCreek.ViewModels.Tabs
             SendPromptCommand = new AsyncRelayCommand(SendPromptAsync, CanSendPrompt);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
+            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
             ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
             RefreshFrontSessionState();
         }
@@ -72,6 +84,18 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand ActivateFrontClientCommand { get; }
 
         public IAsyncRelayCommand SendPromptCommand { get; }
+
+        public IReadOnlyList<ReviewFilePath> UnreviewedFiles
+        {
+            get => _unreviewedFiles;
+            private set => SetProperty(ref _unreviewedFiles, value);
+        }
+
+        public ReviewFilePath? SelectedUnreviewedFile
+        {
+            get => _selectedUnreviewedFile;
+            set => SetProperty(ref _selectedUnreviewedFile, value);
+        }
 
         public bool HasFrontSession
         {
@@ -113,6 +137,11 @@ namespace HaloCreek.ViewModels.Tabs
             _isDisposed = true;
             _reviewClipboardContextService.ClipLocateChanged -= OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
+        }
+
+        public void OnSelected()
+        {
+            RefreshUnreviewedFiles();
         }
 
         private void MoveLeft()
@@ -214,6 +243,28 @@ namespace HaloCreek.ViewModels.Tabs
                 && result.ClipLocate is not null;
             ClipLocateStatusText = isMatched ? "Matched" : "Unmatched";
             ClipLocateButtonForeground = isMatched ? MatchedForeground : UnmatchedForeground;
+        }
+
+        private void RefreshUnreviewedFiles()
+        {
+            try
+            {
+                SelectedUnreviewedFile = null;
+                UnreviewedFiles = _reviewFileService.GetUnreviewedFiles();
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Review unreviewed files failed",
+                    ex.Message,
+                    ex);
+            }
+        }
+
+        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
+        {
+            RefreshUnreviewedFiles();
         }
 
         private async Task ShowClipLocateResultAsync()

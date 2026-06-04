@@ -255,6 +255,29 @@ namespace HaloCreek.Infrastructure
                 : path.Trim().Replace('\\', '/');
         }
 
+        public static string NormalizeGitRelativePath(string relativePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+
+            var normalizedPath = relativePath.Trim().Replace('\\', '/');
+            if (normalizedPath.StartsWith("/", StringComparison.Ordinal)
+                || IsWindowsRootedPath(normalizedPath)
+                || Path.IsPathRooted(normalizedPath))
+            {
+                throw new ArgumentException("Git relative path must not be absolute.", nameof(relativePath));
+            }
+
+            var segments = normalizedPath.Split('/');
+            if (segments.Any(segment => segment.Length == 0
+                || segment == "."
+                || segment == ".."))
+            {
+                throw new ArgumentException("Git relative path contains invalid segments.", nameof(relativePath));
+            }
+
+            return normalizedPath;
+        }
+
         public static string CombinePathForCurrentPlatform(string rootPath, string relativePath)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
@@ -263,6 +286,14 @@ namespace HaloCreek.Infrastructure
             return Path.Combine(
                 NormalizePathForCurrentPlatform(rootPath),
                 NormalizePathForCurrentPlatform(relativePath));
+        }
+
+        private static bool IsWindowsRootedPath(string path)
+        {
+            return path.Length >= 3
+                && char.IsAsciiLetter(path[0])
+                && path[1] == ':'
+                && path[2] == '/';
         }
 
         public bool TryGetWslEnvironmentVariable(string name, out string value)
