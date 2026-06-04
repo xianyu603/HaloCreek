@@ -126,8 +126,6 @@
                                 Command="{Binding SendPromptCommand}"/>
                         <Button Classes="reviewBarButton"
                                 Content="Add Note"/>
-                        <Button Classes="reviewBarButton"
-                                Content="Mark Reviewed"/>
                     </ItemsControl>
                 </ScrollViewer>
             </Border>

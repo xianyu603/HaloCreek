@@ -491,7 +491,7 @@ TortoiseGitProc.exe /command:diff /path:<rightPath> /path2:<leftPath>
     - reviewed 文件执行 `Unreviewed` 后从 `Reviewed` 消失。
     - 如果该文件 working tree 仍相对 `HEAD` 有修改，应重新出现在 `Unreviewed`。
 
-- [ ] **R-04 Refresh**
+- [x] **R-04 Refresh**
   - 基础能力：
     - 实现 `RefreshReviewSnapshot(...)`。
     - 枚举 `HaloCreekIndex` 中的 reviewed entry。

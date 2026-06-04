@@ -273,6 +273,8 @@ namespace HaloCreek.ViewModels.Tabs
         {
             try
             {
+                Log.Info("Review", "RefreshReviewSnapshot invoked.");
+                _reviewSnapshotService.RefreshReviewSnapshot();
                 SelectedUnreviewedFile = null;
                 SelectedReviewedFile = null;
                 UnreviewedFiles = _reviewSnapshotService.GetWorkingTreeAgainstReviewedFiles();

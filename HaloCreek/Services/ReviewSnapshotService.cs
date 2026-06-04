@@ -81,6 +81,54 @@ namespace HaloCreek.Services
                 new[] { "update-index", "--force-remove", "--", gitRelativePath });
         }
 
+        public void RefreshReviewSnapshot()
+        {
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+
+            var reviewedEntries = ReadReviewedIndexEntries(workspacePath);
+            if (reviewedEntries.Count == 0)
+            {
+                Log.Info("Review", "RefreshReviewSnapshot completed. cleaned=0 reviewedEntries=0");
+                return;
+            }
+
+            var gitChanges = _gitService.GetChanges();
+            var changesByPath = gitChanges.Changes
+                .Select(change => new
+                {
+                    Change = change,
+                    RelativePath = PlatformInfrastructure.NormalizeGitRelativePath(change.RelativePath),
+                })
+                .GroupBy(item => item.RelativePath, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().Change,
+                    StringComparer.Ordinal);
+
+            var cleanedCount = 0;
+            foreach (var entry in reviewedEntries)
+            {
+                var cleanupReason = GetRefreshCleanupReason(entry, changesByPath);
+                if (cleanupReason is null)
+                {
+                    continue;
+                }
+
+                RunReviewGit(
+                    workspacePath,
+                    GetHaloCreekIndexPath(workspacePath),
+                    new[] { "update-index", "--force-remove", "--", entry.RelativePath });
+                cleanedCount++;
+                Log.Info(
+                    "Review",
+                    $"RefreshReviewSnapshot cleaned entry. File={entry.RelativePath} Reason={cleanupReason}");
+            }
+
+            Log.Info(
+                "Review",
+                $"RefreshReviewSnapshot completed. cleaned={cleanedCount} reviewedEntries={reviewedEntries.Count}");
+        }
+
         public IReadOnlyList<ReviewFilePath> GetReviewedAgainstHeadFiles()
         {
             var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
@@ -212,6 +260,31 @@ namespace HaloCreek.Services
 
             return reviewedBlobId is null
                 || !string.Equals(workingTreeBlobId, reviewedBlobId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string? GetRefreshCleanupReason(
+            ReviewedIndexEntry entry,
+            IReadOnlyDictionary<string, GitChangeInfo> changesByPath)
+        {
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(entry.RelativePath);
+            if (!changesByPath.TryGetValue(gitRelativePath, out var currentChange))
+            {
+                return "No current modified, added, or untracked Git status.";
+            }
+
+            if (!IsReviewSupportedWorkingTreeChange(currentChange))
+            {
+                return $"Unsupported Git status: {currentChange.ChangeType}.";
+            }
+
+            var headBlobId = _gitService.GetHeadBlobId(gitRelativePath);
+            if (headBlobId is not null
+                && string.Equals(headBlobId, entry.BlobId, StringComparison.OrdinalIgnoreCase))
+            {
+                return "Reviewed blob already matches HEAD.";
+            }
+
+            return null;
         }
 
         private static ReviewedIndexEntry? ParseReviewedIndexEntry(string token)
