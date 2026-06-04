@@ -1,4 +1,3 @@
-using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using HaloCreek.Logging;
@@ -42,54 +41,19 @@ namespace HaloCreek.Views.Tabs
             }
         }
 
-        private void UnreviewedItem_OnContextRequested(object? sender, ContextRequestedEventArgs e)
+        private void UnreviewedItem_OnPointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (sender is not Control itemControl)
+            if (!e.GetCurrentPoint(sender as Control).Properties.IsRightButtonPressed)
             {
-                Log.Info("Review", $"Unreviewed context requested with sender={FormatObject(sender)}.");
                 return;
             }
 
-            if (DataContext is not ReviewViewModel viewModel
-                || itemControl.DataContext is not ReviewFilePath file)
+            if (DataContext is ReviewViewModel viewModel
+                && sender is Control { DataContext: ReviewFilePath file })
             {
-                Log.Info(
-                    "Review",
-                    "Unreviewed context requested but command context is unavailable. "
-                    + $"ViewDataContext={FormatObject(DataContext)} "
-                    + $"ItemDataContext={FormatObject(itemControl.DataContext)}");
-                return;
+                viewModel.SelectedUnreviewedFile = file;
+                Log.Info("Review", $"Unreviewed file selected by context request: {file.RelativePath}");
             }
-
-            var menuItem = new MenuItem
-            {
-                Header = "Add Reviewed",
-                Command = viewModel.AddReviewedCommand,
-                CommandParameter = file,
-            };
-            var contextMenu = new ContextMenu();
-            contextMenu.Items.Add(menuItem);
-
-            Log.Info(
-                "Review",
-                "Unreviewed context menu created. "
-                + $"File={file.RelativePath} "
-                + $"CommandCanExecute={viewModel.AddReviewedCommand.CanExecute(file)} "
-                + $"MenuItemCommand={FormatObject(menuItem.Command)} "
-                + $"MenuItemCommandParameter={FormatObject(menuItem.CommandParameter)}");
-
-            contextMenu.Open(itemControl);
-            e.Handled = true;
-        }
-
-        private static string FormatObject(object? value)
-        {
-            if (value is null)
-            {
-                return "<null>";
-            }
-
-            return $"{value.GetType().FullName}:{value}";
         }
     }
 }

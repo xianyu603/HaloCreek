@@ -182,6 +182,13 @@
                                  Padding="0"
                                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add Reviewed"
+                                              Command="{Binding AddReviewedCommand}"
+                                              CommandParameter="{Binding $parent[ListBox].SelectedItem}"/>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
                             <ListBox.Styles>
                                 <Style Selector="ListBoxItem">
                                     <Setter Property="MinHeight" Value="34"/>
@@ -198,7 +205,7 @@
                                     <Grid MinHeight="34"
                                           RowDefinitions="1,*"
                                           Background="Transparent"
-                                          ContextRequested="UnreviewedItem_OnContextRequested">
+                                          PointerPressed="UnreviewedItem_OnPointerPressed">
                                         <Border Grid.Row="0"
                                                 Background="#E2E8F0"/>
                                         <Border Grid.Row="1"
