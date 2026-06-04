@@ -270,9 +270,12 @@
                                               x:CompileBindings="False">
                                     <Grid MinHeight="34"
                                           RowDefinitions="1,*"
-                                          Background="Transparent">
+                                          Background="Transparent"
+                                          DoubleTapped="ReviewedFile_OnDoubleTapped">
                                         <Grid.ContextMenu>
                                             <ContextMenu>
+                                                <MenuItem Header="Diff Against HEAD"
+                                                          Click="DiffReviewedAgainstHeadMenuItem_OnClick"/>
                                                 <MenuItem Header="Diff Against Working Tree"
                                                           Click="DiffReviewedAgainstWorkingTreeMenuItem_OnClick"/>
                                                 <MenuItem Header="Mark Unreviewed"

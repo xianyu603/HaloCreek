@@ -521,7 +521,7 @@ TortoiseGitProc.exe /command:diff /path:<rightPath> /path2:<leftPath>
     - 已 reviewed 后继续修改的文件，可以从 `Unreviewed` 打开 `WorkingTree vs Reviewed` diff。
     - `Reviewed` 列表中的文件可以打开 working tree 与 reviewed 内容的 diff。
 
-- [ ] **R-06 Reviewed Diff Against HEAD**
+- [x] **R-06 Reviewed Diff Against HEAD**
   - 基础能力：
     - 扩展 `GitService.CreateTempHeadFile(...)`，为 `HEAD:path` 创建 temp 文件。
     - `HEAD:path` 不存在时创建空文件，用于 added / untracked 的 head 侧 diff。

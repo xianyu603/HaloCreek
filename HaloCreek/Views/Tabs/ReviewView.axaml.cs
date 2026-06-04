@@ -120,5 +120,37 @@ namespace HaloCreek.Views.Tabs
                 e.Handled = true;
             }
         }
+
+        private void DiffReviewedAgainstHeadMenuItem_OnClick(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not ReviewViewModel viewModel
+                || sender is not Control { DataContext: ReviewFilePath file })
+            {
+                return;
+            }
+
+            if (viewModel.DiffReviewedAgainstHeadCommand.CanExecute(file))
+            {
+                viewModel.SelectedReviewedFile = file;
+                viewModel.DiffReviewedAgainstHeadCommand.Execute(file);
+                e.Handled = true;
+            }
+        }
+
+        private void ReviewedFile_OnDoubleTapped(object? sender, TappedEventArgs e)
+        {
+            if (DataContext is not ReviewViewModel viewModel
+                || sender is not Control { DataContext: ReviewFilePath file })
+            {
+                return;
+            }
+
+            if (viewModel.DiffReviewedAgainstHeadCommand.CanExecute(file))
+            {
+                viewModel.SelectedReviewedFile = file;
+                viewModel.DiffReviewedAgainstHeadCommand.Execute(file);
+                e.Handled = true;
+            }
+        }
     }
 }
