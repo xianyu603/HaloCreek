@@ -16,6 +16,13 @@ using HaloCreek.Services;
 
 namespace HaloCreek.Infrastructure
 {
+    public sealed record PlatformProcessResult(
+        bool Succeeded,
+        int? ExitCode,
+        string Output,
+        string ErrorMessage,
+        Exception? Exception = null);
+
     public sealed class PlatformInfrastructure
     {
         private const int WslCommandTimeoutMilliseconds = 3000;
@@ -286,6 +293,63 @@ namespace HaloCreek.Infrastructure
             return Path.Combine(
                 NormalizePathForCurrentPlatform(rootPath),
                 NormalizePathForCurrentPlatform(relativePath));
+        }
+
+        public static PlatformProcessResult RunProcessWithCapturedOutput(
+            string fileName,
+            IEnumerable<string> arguments,
+            string? workingDirectory = null,
+            IReadOnlyDictionary<string, string?>? environmentVariables = null)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            try
+            {
+                using var process = new Process();
+                process.StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    WorkingDirectory = workingDirectory ?? string.Empty,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8,
+                };
+
+                foreach (var argument in arguments)
+                {
+                    process.StartInfo.ArgumentList.Add(argument);
+                }
+
+                if (environmentVariables is not null)
+                {
+                    foreach (var pair in environmentVariables)
+                    {
+                        process.StartInfo.Environment[pair.Key] = pair.Value;
+                    }
+                }
+
+                process.Start();
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                return new PlatformProcessResult(
+                    process.ExitCode == 0,
+                    process.ExitCode,
+                    output,
+                    error);
+            }
+            catch (Exception ex) when (ex is Win32Exception
+                or InvalidOperationException
+                or IOException
+                or UnauthorizedAccessException)
+            {
+                return new PlatformProcessResult(false, null, string.Empty, ex.Message, ex);
+            }
         }
 
         private static bool IsWindowsRootedPath(string path)

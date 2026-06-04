@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Models;
@@ -197,48 +196,19 @@ namespace HaloCreek.Services
             IEnumerable<string> arguments,
             IReadOnlyDictionary<string, string?>? environmentVariables = null)
         {
-            try
+            var gitArguments = new List<string>
             {
-                using var process = new Process();
-                process.StartInfo = new ProcessStartInfo
-                {
-                    FileName = GitExecutableName,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8,
-                };
-                process.StartInfo.ArgumentList.Add("-C");
-                process.StartInfo.ArgumentList.Add(workspacePath);
-                foreach (var argument in arguments)
-                {
-                    process.StartInfo.ArgumentList.Add(argument);
-                }
+                "-C",
+                workspacePath,
+            };
+            gitArguments.AddRange(arguments);
 
-                if (environmentVariables is not null)
-                {
-                    foreach (var pair in environmentVariables)
-                    {
-                        process.StartInfo.Environment[pair.Key] = pair.Value;
-                    }
-                }
+            var result = PlatformInfrastructure.RunProcessWithCapturedOutput(
+                GitExecutableName,
+                gitArguments,
+                environmentVariables: environmentVariables);
 
-                process.Start();
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-
-                return new GitCommandResult(process.ExitCode == 0, output, error);
-            }
-            catch (Exception ex) when (ex is Win32Exception
-                or InvalidOperationException
-                or IOException
-                or UnauthorizedAccessException)
-            {
-                return new GitCommandResult(false, string.Empty, ex.Message);
-            }
+            return new GitCommandResult(result.Succeeded, result.Output, result.ErrorMessage);
         }
 
         private static string? NormalizeBlobId(string output)

@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using HaloCreek.Infrastructure;
 using HaloCreek.Models;
 
@@ -139,54 +136,34 @@ namespace HaloCreek.Services
                 .ToArray();
         }
 
-        // TODO 这个是不是中转给GitService比较好?
         private string RunReviewGit(
             string workspacePath,
             string haloCreekIndexPath,
             IEnumerable<string> arguments)
         {
-            try
+            var gitArguments = new List<string>
             {
-                using var process = new Process();
-                process.StartInfo = new ProcessStartInfo
-                {
-                    FileName = GitExecutableName,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8,
-                };
-                process.StartInfo.Environment["GIT_INDEX_FILE"] = haloCreekIndexPath;
-                process.StartInfo.ArgumentList.Add("-C");
-                process.StartInfo.ArgumentList.Add(workspacePath);
-                foreach (var argument in arguments)
-                {
-                    process.StartInfo.ArgumentList.Add(argument);
-                }
+                "-C",
+                workspacePath,
+            };
+            gitArguments.AddRange(arguments);
 
-                process.Start();
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
-                process.WaitForExit();
-
-                if (process.ExitCode == 0)
+            var result = PlatformInfrastructure.RunProcessWithCapturedOutput(
+                GitExecutableName,
+                gitArguments,
+                environmentVariables: new Dictionary<string, string?>
                 {
-                    return output;
-                }
-
-                throw new InvalidOperationException(GetGitFailureMessage(
-                    "Review snapshot git command failed.",
-                    error.Trim()));
-            }
-            catch (Exception ex) when (ex is Win32Exception
-                or InvalidOperationException
-                or IOException
-                or UnauthorizedAccessException)
+                    ["GIT_INDEX_FILE"] = haloCreekIndexPath,
+                });
+            if (result.Succeeded)
             {
-                throw new InvalidOperationException(ex.Message, ex);
+                return result.Output;
             }
+
+            var message = GetGitFailureMessage(
+                "Review snapshot git command failed.",
+                result.ErrorMessage.Trim());
+            throw new InvalidOperationException(message, result.Exception);
         }
 
         private bool IsWorkingTreeDifferentFromReviewed(
