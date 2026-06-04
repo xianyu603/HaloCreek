@@ -72,6 +72,7 @@ namespace HaloCreek
             var reviewSnapshotService = new ReviewSnapshotService(
                 workspaceRuntimeService,
                 gitService);
+            var diffService = new DiffService();
             var reviewClipboardContextService = new ReviewClipboardContextService(
                 platformClipboardInfrastructure,
                 gitService);
@@ -87,6 +88,7 @@ namespace HaloCreek
             var review = new ReviewViewModel(
                 reviewSnapshotService,
                 workspaceRuntimeService,
+                diffService,
                 reviewClipboardContextService,
                 sessionLifecycleService,
                 appCommonRuntime);

@@ -172,6 +172,37 @@ namespace HaloCreek.Services
                 .ToArray();
         }
 
+        public string CreateTempReviewedFile(string? relativePath)
+        {
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            if (!IsHaloCreekIndexAvailable(workspacePath))
+            {
+                return _gitService.CreateTempHeadFile(gitRelativePath);
+            }
+
+            var hasReviewedEntry = ReadReviewedIndexEntries(workspacePath)
+                .Any(entry => string.Equals(
+                    entry.RelativePath,
+                    gitRelativePath,
+                    StringComparison.Ordinal));
+            if (!hasReviewedEntry)
+            {
+                return _gitService.CreateTempHeadFile(gitRelativePath);
+            }
+
+            var reviewedContent = RunReviewGit(
+                workspacePath,
+                GetHaloCreekIndexPath(workspacePath),
+                new[] { "show", $":{gitRelativePath}" });
+            var fileName = Path.GetFileName(
+                PlatformInfrastructure.NormalizePathForCurrentPlatform(gitRelativePath));
+            return PlatformInfrastructure.WriteTempFile(
+                $"reviewed-{fileName}",
+                reviewedContent);
+        }
+
         private static string GetHaloCreekIndexPath(string workspacePath)
         {
             return Path.Combine(workspacePath, HaloCreekDirectoryName, HaloCreekIndexFileName);

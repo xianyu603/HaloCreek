@@ -295,6 +295,35 @@ namespace HaloCreek.Infrastructure
                 NormalizePathForCurrentPlatform(relativePath));
         }
 
+        public static string WriteTempFile(string desiredFileName, string content)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(desiredFileName);
+            ArgumentNullException.ThrowIfNull(content);
+
+            var directory = Path.Combine(Path.GetTempPath(), "HaloCreek");
+            Directory.CreateDirectory(directory);
+
+            var safeFileName = SanitizeFileNameSegment(desiredFileName);
+            if (safeFileName.Length == 0)
+            {
+                safeFileName = "file";
+            }
+            var extension = Path.GetExtension(safeFileName);
+            var stem = extension.Length == 0
+                ? safeFileName
+                : safeFileName[..^extension.Length];
+            var randomSuffix = Guid.NewGuid().ToString("N")[..8];
+            var tempPath = Path.Combine(directory, $"{stem}-{randomSuffix}{extension}");
+
+            // External diff tools may read these files after Process.Start returns.
+            // Keep them for now; startup or shutdown can later prune old review-diff files.
+            File.WriteAllText(
+                tempPath,
+                content,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            return tempPath;
+        }
+
         public static PlatformProcessResult RunProcessWithCapturedOutput(
             string fileName,
             IEnumerable<string> arguments,
@@ -544,6 +573,10 @@ namespace HaloCreek.Infrastructure
             Directory.CreateDirectory(directory);
 
             var fileName = SanitizeFileNameSegment(command.FileNameHint);
+            if (fileName.Length == 0)
+            {
+                fileName = "script";
+            }
             if (!fileName.EndsWith(".sh", StringComparison.OrdinalIgnoreCase))
             {
                 fileName += ".sh";
@@ -792,7 +825,7 @@ namespace HaloCreek.Infrastructure
             var segment = builder.ToString().Trim('-', '.', '_');
             if (segment.Length == 0)
             {
-                return "script";
+                return string.Empty;
             }
 
             return segment.Length <= 120 ? segment : segment[..120];

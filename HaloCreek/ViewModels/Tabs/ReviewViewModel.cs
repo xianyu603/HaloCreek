@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
@@ -19,6 +20,7 @@ namespace HaloCreek.ViewModels.Tabs
         private static readonly IBrush DisabledForeground = new SolidColorBrush(Color.Parse("#94A3B8"));
 
         private readonly ReviewSnapshotService _reviewSnapshotService;
+        private readonly DiffService _diffService;
         private readonly ReviewClipboardContextService _reviewClipboardContextService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly AppCommonRuntime _appCommonRuntime;
@@ -29,6 +31,7 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<ReviewFilePath> _reviewedFiles = Array.Empty<ReviewFilePath>();
         private ReviewFilePath? _selectedUnreviewedFile;
         private ReviewFilePath? _selectedReviewedFile;
+        private string? _workspacePath;
         private string _clipLocateStatusText = "Unmatched";
         private IBrush _clipLocateButtonForeground = UnmatchedForeground;
         private bool _hasFrontSession;
@@ -37,6 +40,7 @@ namespace HaloCreek.ViewModels.Tabs
         public ReviewViewModel(
             ReviewSnapshotService reviewSnapshotService,
             WorkspaceRuntimeService workspaceRuntimeService,
+            DiffService diffService,
             ReviewClipboardContextService reviewClipboardContextService,
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime)
@@ -44,6 +48,7 @@ namespace HaloCreek.ViewModels.Tabs
             _reviewSnapshotService = reviewSnapshotService
                 ?? throw new ArgumentNullException(nameof(reviewSnapshotService));
             ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
+            _diffService = diffService ?? throw new ArgumentNullException(nameof(diffService));
             _reviewClipboardContextService = reviewClipboardContextService
                 ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
             _sessionLifecycleService = sessionLifecycleService
@@ -58,6 +63,10 @@ namespace HaloCreek.ViewModels.Tabs
             SendPromptCommand = new AsyncRelayCommand(SendPromptAsync, CanSendPrompt);
             AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed);
             MarkUnreviewedCommand = new RelayCommand<ReviewFilePath>(MarkUnreviewed);
+            DiffUnreviewedAgainstReviewedCommand = new RelayCommand<ReviewFilePath>(
+                DiffWorkingTreeAgainstReviewed);
+            DiffReviewedAgainstWorkingTreeCommand = new RelayCommand<ReviewFilePath>(
+                DiffWorkingTreeAgainstReviewed);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
             workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
@@ -96,6 +105,10 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand<ReviewFilePath> AddReviewedCommand { get; }
 
         public IRelayCommand<ReviewFilePath> MarkUnreviewedCommand { get; }
+
+        public IRelayCommand<ReviewFilePath> DiffUnreviewedAgainstReviewedCommand { get; }
+
+        public IRelayCommand<ReviewFilePath> DiffReviewedAgainstWorkingTreeCommand { get; }
 
         public IReadOnlyList<ReviewFilePath> UnreviewedFiles
         {
@@ -292,6 +305,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
         {
+            _workspacePath = e.WorkspacePath;
             RefreshReviewFiles();
         }
 
@@ -332,6 +346,33 @@ namespace HaloCreek.ViewModels.Tabs
                 _transientEventService.ReportUserActionFailure(
                     "Review",
                     "Mark unreviewed failed",
+                    ex.Message,
+                    ex);
+            }
+        }
+
+        private void DiffWorkingTreeAgainstReviewed(ReviewFilePath? file)
+        {
+            ArgumentNullException.ThrowIfNull(file);
+
+            try
+            {
+                Log.Info("Review", $"DiffWorkingTreeAgainstReviewed invoked. File={file.RelativePath}");
+                var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(file.RelativePath);
+                var reviewedPath = _reviewSnapshotService.CreateTempReviewedFile(gitRelativePath);
+                var workingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
+                    _workspacePath ?? throw new InvalidOperationException("Select a workspace to use Review."),
+                    gitRelativePath);
+                _diffService.OpenDiff(
+                    reviewedPath,
+                    workingTreePath,
+                    $"Working Tree vs Reviewed: {file.RelativePath}");
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Diff failed",
                     ex.Message,
                     ex);
             }

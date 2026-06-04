@@ -104,6 +104,28 @@ namespace HaloCreek.Services
             throw new InvalidOperationException($"Git working tree blob hash failed. {message}");
         }
 
+        public string CreateTempHeadFile(string? relativePath)
+        {
+            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("CurrentWorkspacePath is empty!");
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            var commandResult = RunGit(
+                workspacePath,
+                new[] { "show", $"HEAD:{gitRelativePath}" });
+            if (commandResult.Succeeded)
+            {
+                return WriteTempGitContent("head", gitRelativePath, commandResult.Output);
+            }
+
+            var message = commandResult.ErrorMessage.Trim();
+            if (IsMissingHeadPathError(message))
+            {
+                return WriteTempGitContent("head", gitRelativePath, string.Empty);
+            }
+
+            throw new InvalidOperationException($"Git HEAD file query failed. {message}");
+        }
+
         public GitOperationResult TryRunConfiguredAction(
             GitChangeInfo? selectedChange,
             GitFileBrowserActionConfig action)
@@ -217,6 +239,18 @@ namespace HaloCreek.Services
             return string.IsNullOrWhiteSpace(blobId)
                 ? null
                 : blobId;
+        }
+
+        private static string WriteTempGitContent(
+            string prefix,
+            string gitRelativePath,
+            string content)
+        {
+            var fileName = Path.GetFileName(
+                PlatformInfrastructure.NormalizePathForCurrentPlatform(gitRelativePath));
+            return PlatformInfrastructure.WriteTempFile(
+                $"{prefix}-{fileName}",
+                content);
         }
 
         private static bool IsMissingHeadPathError(string message)

@@ -57,6 +57,38 @@ namespace HaloCreek.Views.Tabs
             }
         }
 
+        private void DiffUnreviewedAgainstReviewedMenuItem_OnClick(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not ReviewViewModel viewModel
+                || sender is not Control { DataContext: ReviewFilePath file })
+            {
+                return;
+            }
+
+            if (viewModel.DiffUnreviewedAgainstReviewedCommand.CanExecute(file))
+            {
+                viewModel.SelectedUnreviewedFile = file;
+                viewModel.DiffUnreviewedAgainstReviewedCommand.Execute(file);
+                e.Handled = true;
+            }
+        }
+
+        private void UnreviewedFile_OnDoubleTapped(object? sender, TappedEventArgs e)
+        {
+            if (DataContext is not ReviewViewModel viewModel
+                || sender is not Control { DataContext: ReviewFilePath file })
+            {
+                return;
+            }
+
+            if (viewModel.DiffUnreviewedAgainstReviewedCommand.CanExecute(file))
+            {
+                viewModel.SelectedUnreviewedFile = file;
+                viewModel.DiffUnreviewedAgainstReviewedCommand.Execute(file);
+                e.Handled = true;
+            }
+        }
+
         private void MarkUnreviewedMenuItem_OnClick(object? sender, RoutedEventArgs e)
         {
             if (DataContext is not ReviewViewModel viewModel
@@ -69,6 +101,22 @@ namespace HaloCreek.Views.Tabs
             {
                 viewModel.SelectedReviewedFile = file;
                 viewModel.MarkUnreviewedCommand.Execute(file);
+                e.Handled = true;
+            }
+        }
+
+        private void DiffReviewedAgainstWorkingTreeMenuItem_OnClick(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not ReviewViewModel viewModel
+                || sender is not Control { DataContext: ReviewFilePath file })
+            {
+                return;
+            }
+
+            if (viewModel.DiffReviewedAgainstWorkingTreeCommand.CanExecute(file))
+            {
+                viewModel.SelectedReviewedFile = file;
+                viewModel.DiffReviewedAgainstWorkingTreeCommand.Execute(file);
                 e.Handled = true;
             }
         }
