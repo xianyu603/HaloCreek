@@ -13,7 +13,6 @@ namespace HaloCreek.Services
         private const long MaxCandidateFileBytes = 2 * 1024 * 1024;
 
         private readonly PlatformClipboardInfrastructure _platformClipboardInfrastructure;
-        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly GitService _gitService;
         private readonly object SyncRoot = new();
         private long _latestScanId;
@@ -22,13 +21,10 @@ namespace HaloCreek.Services
 
         public ReviewClipboardContextService(
             PlatformClipboardInfrastructure platformClipboardInfrastructure,
-            WorkspaceRuntimeService workspaceRuntimeService,
             GitService gitService)
         {
             _platformClipboardInfrastructure = platformClipboardInfrastructure
                 ?? throw new ArgumentNullException(nameof(platformClipboardInfrastructure));
-            _workspaceRuntimeService = workspaceRuntimeService
-                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
 
             _platformClipboardInfrastructure.TextChanged += OnClipboardTextChanged;
@@ -124,7 +120,8 @@ namespace HaloCreek.Services
                     "Clipboard text is empty or whitespace.");
             }
 
-            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
+            var gitChanges = _gitService.GetChanges();
+            var workspacePath = gitChanges.WorkspacePath;
             if (string.IsNullOrWhiteSpace(workspacePath))
             {
                 Log.Info(LogCategory, "Review clip locate scan failed. reason=NoWorkspace");
@@ -135,7 +132,6 @@ namespace HaloCreek.Services
                 LogCategory,
                 $"Review clip locate scan started. clipboardLength={snapshot.Text.Length} workspace={QuoteForLog(workspacePath)}");
 
-            var gitChanges = _gitService.GetChanges(workspacePath);
             var searchedFiles = 0;
             var skippedFiles = 0;
             ReviewClipLocateCandidate? firstMatch = null;

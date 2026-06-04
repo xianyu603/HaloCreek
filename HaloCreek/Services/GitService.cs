@@ -15,8 +15,17 @@ namespace HaloCreek.Services
     {
         private const string GitExecutableName = "git";
 
-        public GitChangesResult GetChanges(string? workspacePath)
+        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
+
+        public GitService(WorkspaceRuntimeService workspaceRuntimeService)
         {
+            _workspaceRuntimeService = workspaceRuntimeService
+                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
+        }
+
+        public GitChangesResult GetChanges()
+        {
+            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
             if (string.IsNullOrWhiteSpace(workspacePath))
             {
                 return new GitChangesResult(
@@ -24,28 +33,7 @@ namespace HaloCreek.Services
                     "Select a workspace to view Git changes.");
             }
 
-            string normalizedWorkspacePath;
-            try
-            {
-                normalizedWorkspacePath = Path.GetFullPath(workspacePath.Trim());
-            }
-            catch (Exception ex) when (ex is ArgumentException
-                or NotSupportedException
-                or PathTooLongException)
-            {
-                return new GitChangesResult(
-                    Array.Empty<GitChangeInfo>(),
-                    $"Invalid workspace path: {workspacePath}");
-            }
-
-            if (!Directory.Exists(normalizedWorkspacePath))
-            {
-                return new GitChangesResult(
-                    Array.Empty<GitChangeInfo>(),
-                    $"Workspace path does not exist: {normalizedWorkspacePath}");
-            }
-
-            var commandResult = RunGitStatus(normalizedWorkspacePath);
+            var commandResult = RunGitStatus(workspacePath);
             if (!commandResult.Succeeded)
             {
                 var message = string.IsNullOrWhiteSpace(commandResult.ErrorMessage)
@@ -56,7 +44,7 @@ namespace HaloCreek.Services
                     message = "Current workspace is not a Git repository.";
                 }
 
-                return new GitChangesResult(Array.Empty<GitChangeInfo>(), message);
+                return new GitChangesResult(Array.Empty<GitChangeInfo>(), message, workspacePath);
             }
 
             var changes = ParsePorcelainStatus(commandResult.Output)
@@ -67,32 +55,20 @@ namespace HaloCreek.Services
                 ? "No Git changes for current workspace."
                 : $"Loaded {changes.Length} Git changes.";
 
-            return new GitChangesResult(changes, loadedMessage);
+            return new GitChangesResult(changes, loadedMessage, workspacePath);
         }
 
         public GitOperationResult TryRunConfiguredAction(
-            string? workspacePath,
             GitChangeInfo? selectedChange,
             GitFileBrowserActionConfig action)
         {
             ArgumentNullException.ThrowIfNull(action);
 
             var actionName = GetActionName(action);
+            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
             if (string.IsNullOrWhiteSpace(workspacePath))
             {
                 return new GitOperationResult(false, $"No workspace selected for {actionName}.");
-            }
-
-            string normalizedWorkspacePath;
-            try
-            {
-                normalizedWorkspacePath = Path.GetFullPath(workspacePath.Trim());
-            }
-            catch (Exception ex) when (ex is ArgumentException
-                or NotSupportedException
-                or PathTooLongException)
-            {
-                return new GitOperationResult(false, $"Invalid workspace path for {actionName}: {workspacePath}");
             }
 
             if (string.IsNullOrWhiteSpace(action.Executable))
@@ -117,7 +93,7 @@ namespace HaloCreek.Services
                 var resolvedArguments = arguments
                     .Select(argument => ReplaceActionTokens(
                         argument,
-                        normalizedWorkspacePath,
+                        workspacePath,
                         selectedChange))
                     .ToArray();
 
@@ -125,15 +101,15 @@ namespace HaloCreek.Services
                     "Git",
                     $"Starting configured action. Action={QuoteForLog(actionName)} "
                     + $"Executable={QuoteForLog(executable)} "
-                    + $"WorkingDirectory={QuoteForLog(normalizedWorkspacePath)} "
-                    + $"SelectedPath={QuoteForLog(ResolveSelectedPath(normalizedWorkspacePath, selectedChange))} "
+                    + $"WorkingDirectory={QuoteForLog(workspacePath)} "
+                    + $"SelectedPath={QuoteForLog(ResolveSelectedPath(workspacePath, selectedChange))} "
                     + $"Arguments={FormatActionArgumentsForLog(arguments, resolvedArguments)}");
 
                 using var process = new Process();
                 process.StartInfo = new ProcessStartInfo
                 {
                     FileName = executable,
-                    WorkingDirectory = normalizedWorkspacePath,
+                    WorkingDirectory = workspacePath,
                     UseShellExecute = false,
                 };
 

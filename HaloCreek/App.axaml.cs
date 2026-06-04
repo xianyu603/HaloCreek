@@ -68,10 +68,9 @@ namespace HaloCreek
                 tmuxService,
                 terminalService,
                 appCommonRuntime);
-            var gitService = new GitService();
+            var gitService = new GitService(workspaceRuntimeService);
             var reviewClipboardContextService = new ReviewClipboardContextService(
                 platformClipboardInfrastructure,
-                workspaceRuntimeService,
                 gitService);
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);

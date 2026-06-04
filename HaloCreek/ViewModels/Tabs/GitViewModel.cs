@@ -122,7 +122,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         public void RefreshChanges()
         {
-            var result = _gitService.GetChanges(WorkspacePath);
+            var result = _gitService.GetChanges();
 
             SelectedChange = null;
             Changes = result.Changes;
@@ -199,7 +199,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void RunConfiguredAction(GitFileBrowserActionConfig action, GitChangeInfo? selectedChange)
         {
-            var result = _gitService.TryRunConfiguredAction(WorkspacePath, selectedChange, action);
+            var result = _gitService.TryRunConfiguredAction(selectedChange, action);
             if (result.Succeeded)
             {
                 Log.Info("Git", result.Message);
