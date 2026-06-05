@@ -41,6 +41,7 @@ namespace HaloCreek.ViewModels.Tabs
         public ReviewViewModel(
             ReviewSnapshotService reviewSnapshotService,
             GitService gitService,
+            GitViewModel modifiedGit,
             WorkspaceRuntimeService workspaceRuntimeService,
             DiffService diffService,
             ReviewClipboardContextService reviewClipboardContextService,
@@ -50,6 +51,7 @@ namespace HaloCreek.ViewModels.Tabs
             _reviewSnapshotService = reviewSnapshotService
                 ?? throw new ArgumentNullException(nameof(reviewSnapshotService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
+            ModifiedGit = modifiedGit ?? throw new ArgumentNullException(nameof(modifiedGit));
             ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _diffService = diffService ?? throw new ArgumentNullException(nameof(diffService));
             _reviewClipboardContextService = reviewClipboardContextService
@@ -116,6 +118,9 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand<ReviewFilePath> DiffReviewedAgainstWorkingTreeCommand { get; }
 
         public IRelayCommand<ReviewFilePath> DiffReviewedAgainstHeadCommand { get; }
+
+        // TODO: Rename GitViewModel to a neutral Git changes/file-browser VM when Git tab ownership is revisited.
+        public GitViewModel ModifiedGit { get; }
 
         public IReadOnlyList<ReviewFilePath> UnreviewedFiles
         {
@@ -299,6 +304,7 @@ namespace HaloCreek.ViewModels.Tabs
                 SelectedReviewedFile = null;
                 UnreviewedFiles = _reviewSnapshotService.GetWorkingTreeAgainstReviewedFiles();
                 ReviewedFiles = _reviewSnapshotService.GetReviewedAgainstHeadFiles();
+                ModifiedGit.RefreshChanges();
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {

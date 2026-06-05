@@ -85,9 +85,14 @@ namespace HaloCreek
                 sessionLifecycleService,
                 workspaceRuntimeService,
                 appCommonRuntime);
+            var git = new GitViewModel(
+                gitService,
+                workspaceRuntimeService,
+                appCommonRuntime);
             var review = new ReviewViewModel(
                 reviewSnapshotService,
                 gitService,
+                git,
                 workspaceRuntimeService,
                 diffService,
                 reviewClipboardContextService,
@@ -96,10 +101,6 @@ namespace HaloCreek
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
-                workspaceRuntimeService,
-                appCommonRuntime);
-            var git = new GitViewModel(
-                gitService,
                 workspaceRuntimeService,
                 appCommonRuntime);
             var logs = new LogPanelViewModel();
