@@ -112,7 +112,6 @@ namespace HaloCreek
                 promptEditor,
                 review,
                 historySessions,
-                git,
                 logs,
                 workspaceFooter);
 

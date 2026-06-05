@@ -119,7 +119,6 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<ReviewFilePath> DiffReviewedAgainstHeadCommand { get; }
 
-        // TODO: Rename GitViewModel to a neutral Git changes/file-browser VM when Git tab ownership is revisited.
         public GitViewModel ModifiedGit { get; }
 
         public IReadOnlyList<ReviewFilePath> UnreviewedFiles

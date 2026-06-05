@@ -19,17 +19,15 @@ namespace HaloCreek.ViewModels
             PromptEditorViewModel promptEditor,
             ReviewViewModel review,
             HistorySessionsViewModel historySessions,
-            GitViewModel git,
             LogPanelViewModel logs,
             WorkspaceFooterViewModel workspaceFooter)
         {
             PromptEditor = promptEditor;
             Review = review;
             HistorySessions = historySessions;
-            Git = git;
             Logs = logs;
             WorkspaceFooter = workspaceFooter;
-            _tabViewModels = new ViewModelBase[] { PromptEditor, Review, Git, HistorySessions, Logs };
+            _tabViewModels = new ViewModelBase[] { PromptEditor, Review, HistorySessions, Logs };
 
             HistorySessions.SetReeditInitialPromptDispatcher(ReeditInitialPrompt);
         }
@@ -39,8 +37,6 @@ namespace HaloCreek.ViewModels
         public ReviewViewModel Review { get; }
 
         public HistorySessionsViewModel HistorySessions { get; }
-
-        public GitViewModel Git { get; }
 
         public LogPanelViewModel Logs { get; }
 

@@ -23,9 +23,6 @@
             <TabItem Header="Review">
                 <tabs:ReviewView DataContext="{Binding Review}"/>
             </TabItem>
-            <TabItem Header="Git">
-                <tabs:GitView DataContext="{Binding Git}"/>
-            </TabItem>
             <TabItem Header="History">
                 <tabs:HistorySessionsView DataContext="{Binding HistorySessions}"/>
             </TabItem>
