@@ -41,7 +41,6 @@ namespace HaloCreek.ViewModels.Tabs
         public ReviewViewModel(
             ReviewSnapshotService reviewSnapshotService,
             GitService gitService,
-            GitViewModel modifiedGit,
             WorkspaceRuntimeService workspaceRuntimeService,
             DiffService diffService,
             ReviewClipboardContextService reviewClipboardContextService,
@@ -51,7 +50,6 @@ namespace HaloCreek.ViewModels.Tabs
             _reviewSnapshotService = reviewSnapshotService
                 ?? throw new ArgumentNullException(nameof(reviewSnapshotService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
-            ModifiedGit = modifiedGit ?? throw new ArgumentNullException(nameof(modifiedGit));
             ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _diffService = diffService ?? throw new ArgumentNullException(nameof(diffService));
             _reviewClipboardContextService = reviewClipboardContextService
@@ -63,6 +61,11 @@ namespace HaloCreek.ViewModels.Tabs
             MoveLeftCommand = new RelayCommand(MoveLeft, CanMoveLeft);
             MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
             RefreshCommand = new RelayCommand(RefreshReviewFiles);
+            ModifiedGit = new GitViewModel(
+                _gitService,
+                workspaceRuntimeService,
+                _appCommonRuntime,
+                RefreshCommand);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
             SendPromptCommand = new AsyncRelayCommand(SendPromptAsync, CanSendPrompt);

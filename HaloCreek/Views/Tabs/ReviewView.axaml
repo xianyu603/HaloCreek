@@ -170,9 +170,6 @@
                               x:CompileBindings="False"
                               RowDefinitions="Auto,*"
                               Background="White">
-                            <Grid.ContextMenu>
-                                <ContextMenu Opened="ModifiedRootContextMenu_OnOpened"/>
-                            </Grid.ContextMenu>
                             <Border Grid.Row="0"
                                     MinHeight="32"
                                     Background="#F8FAFC"
@@ -212,7 +209,15 @@
                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                                 <ListBox.ContextMenu>
-                                    <ContextMenu Opened="ModifiedRootContextMenu_OnOpened"/>
+                                    <ContextMenu Opened="ModifiedRootContextMenu_OnOpened"
+                                                 ItemsSource="{Binding WorkspaceRootActions}">
+                                        <ContextMenu.Styles>
+                                            <Style Selector="MenuItem">
+                                                <Setter Property="Header" Value="{Binding Label}"/>
+                                                <Setter Property="Command" Value="{Binding Command}"/>
+                                            </Style>
+                                        </ContextMenu.Styles>
+                                    </ContextMenu>
                                 </ListBox.ContextMenu>
                                 <ListBox.Styles>
                                     <Style Selector="ListBoxItem">
@@ -232,7 +237,14 @@
                                               Background="Transparent"
                                               DoubleTapped="ModifiedChange_OnDoubleTapped">
                                             <Grid.ContextMenu>
-                                                <ContextMenu Opened="ModifiedChangeContextMenu_OnOpened"/>
+                                                <ContextMenu Opened="ModifiedChangeContextMenu_OnOpened">
+                                                    <ContextMenu.Styles>
+                                                        <Style Selector="MenuItem">
+                                                            <Setter Property="Header" Value="{Binding Label}"/>
+                                                            <Setter Property="Command" Value="{Binding Command}"/>
+                                                        </Style>
+                                                    </ContextMenu.Styles>
+                                                </ContextMenu>
                                             </Grid.ContextMenu>
                                             <Border Grid.Row="0"
                                                     Background="#E2E8F0"/>
@@ -267,21 +279,6 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <Grid Grid.Row="1"
-                                  MinHeight="160"
-                                  Background="White"
-                                  IsVisible="{Binding IsEmptyStateVisible}">
-                                <Grid.ContextMenu>
-                                    <ContextMenu Opened="ModifiedRootContextMenu_OnOpened"/>
-                                </Grid.ContextMenu>
-                                <TextBlock Text="{Binding EmptyStateText}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           TextWrapping="Wrap"
-                                           MaxWidth="360"
-                                           Foreground="#64748B"
-                                           FontSize="12"/>
-                            </Grid>
                         </Grid>
                     </TabItem>
                     <TabItem Classes="reviewInnerTab">

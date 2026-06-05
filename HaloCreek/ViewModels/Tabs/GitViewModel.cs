@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
 using HaloCreek.Models;
@@ -15,8 +16,9 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly GitService _gitService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
-        private IReadOnlyList<GitFileActionViewModel> _selectedFilePathActions = Array.Empty<GitFileActionViewModel>();
-        private IReadOnlyList<GitFileActionViewModel> _workspaceRootActions = Array.Empty<GitFileActionViewModel>();
+        private IReadOnlyList<RelayCommand> _configuredActionCommands = Array.Empty<RelayCommand>();
+        private IReadOnlyList<IGitFileAction> _selectedFilePathActions = Array.Empty<IGitFileAction>();
+        private IReadOnlyList<IGitFileAction> _workspaceRootActions = Array.Empty<IGitFileAction>();
         private GitChangeInfo? _selectedChange;
         private GitFileBrowserActionConfig? _doubleClickAction;
         private string _doubleClickActionId = string.Empty;
@@ -26,15 +28,15 @@ namespace HaloCreek.ViewModels.Tabs
         public GitViewModel(
             GitService gitService,
             WorkspaceRuntimeService workspaceRuntimeService,
-            AppCommonRuntime appCommonRuntime)
+            AppCommonRuntime appCommonRuntime,
+            ICommand refreshCommand)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
             ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _transientEventService = appCommonRuntime.TransientEventService;
-            RefreshCommand = new RelayCommand(RefreshChanges, () => HasWorkspace);
-            RunActionCommand = new RelayCommand<GitFileActionViewModel>(RunAction, CanRunAction);
+            RefreshCommand = refreshCommand ?? throw new ArgumentNullException(nameof(refreshCommand));
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
             workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
         }
@@ -47,7 +49,7 @@ namespace HaloCreek.ViewModels.Tabs
                 if (SetProperty(ref _workspacePath, value))
                 {
                     OnPropertyChanged(nameof(HasWorkspace));
-                    RefreshCommand.NotifyCanExecuteChanged();
+                    NotifyConfiguredActionCanExecuteChanged();
                 }
             }
         }
@@ -72,7 +74,7 @@ namespace HaloCreek.ViewModels.Tabs
             {
                 if (SetProperty(ref _selectedChange, value))
                 {
-                    RunActionCommand.NotifyCanExecuteChanged();
+                    NotifyConfiguredActionCanExecuteChanged();
                     OpenSelectedChangeCommand.NotifyCanExecuteChanged();
                 }
             }
@@ -90,21 +92,19 @@ namespace HaloCreek.ViewModels.Tabs
 
         public bool IsEmptyStateVisible => !HasChanges;
 
-        public IRelayCommand RefreshCommand { get; }
+        public ICommand RefreshCommand { get; }
 
-        public IReadOnlyList<GitFileActionViewModel> SelectedFilePathActions
+        public IReadOnlyList<IGitFileAction> SelectedFilePathActions
         {
             get => _selectedFilePathActions;
             private set => SetProperty(ref _selectedFilePathActions, value);
         }
 
-        public IReadOnlyList<GitFileActionViewModel> WorkspaceRootActions
+        public IReadOnlyList<IGitFileAction> WorkspaceRootActions
         {
             get => _workspaceRootActions;
             private set => SetProperty(ref _workspaceRootActions, value);
         }
-
-        public IRelayCommand<GitFileActionViewModel> RunActionCommand { get; }
 
         public IRelayCommand<GitChangeInfo> OpenSelectedChangeCommand { get; }
 
@@ -135,46 +135,61 @@ namespace HaloCreek.ViewModels.Tabs
                     configuredAction.Id,
                     _doubleClickActionId,
                     StringComparison.OrdinalIgnoreCase));
-            SelectedFilePathActions = BuildActions(
-                config.GitFileBrowserActions,
-                GitFileBrowserActionTarget.SelectedFilePath);
-            WorkspaceRootActions = BuildActions(
-                config.GitFileBrowserActions,
-                GitFileBrowserActionTarget.WorkspaceRoot);
-            RunActionCommand.NotifyCanExecuteChanged();
+            var selectedFilePathActions = BuildSelectedFilePathActions(config.GitFileBrowserActions);
+            var workspaceRootActions = BuildWorkspaceRootActions(config.GitFileBrowserActions);
+            _configuredActionCommands = selectedFilePathActions
+                .Concat(workspaceRootActions)
+                .Select(action => action.Command)
+                .OfType<RelayCommand>()
+                .ToArray();
+            SelectedFilePathActions = selectedFilePathActions;
+            WorkspaceRootActions = new IGitFileAction[]
+                {
+                    new GitFileAction("Refresh", RefreshCommand),
+                }
+                .Concat(workspaceRootActions)
+                .ToArray();
+            NotifyConfiguredActionCanExecuteChanged();
             OpenSelectedChangeCommand.NotifyCanExecuteChanged();
         }
 
-        private static IReadOnlyList<GitFileActionViewModel> BuildActions(
-            IReadOnlyList<GitFileBrowserActionConfig> actions,
-            GitFileBrowserActionTarget target)
+        private IReadOnlyList<IGitFileAction> BuildSelectedFilePathActions(
+            IEnumerable<GitFileBrowserActionConfig> actions)
         {
             return actions
-                .Where(action => action.Target == target)
-                .Select(action => new GitFileActionViewModel(action))
+                .Where(action => action.Target == GitFileBrowserActionTarget.SelectedFilePath)
+                .Select(action => new GitFileAction(
+                    action.Label,
+                    new RelayCommand(
+                        () => RunConfiguredAction(action, SelectedChange),
+                        () => HasWorkspace && SelectedChange is not null)))
                 .ToArray();
         }
 
-        private bool CanRunAction(GitFileActionViewModel? action)
+        private IReadOnlyList<IGitFileAction> BuildWorkspaceRootActions(
+            IEnumerable<GitFileBrowserActionConfig> actions)
         {
-            return action is not null
-                && HasWorkspace
-                && (!action.Action.RequiresSelectedChange || SelectedChange is not null);
+            return actions
+                .Where(action => action.Target == GitFileBrowserActionTarget.WorkspaceRoot)
+                .Select(action => new GitFileAction(
+                    action.Label,
+                    new RelayCommand(
+                        () => RunConfiguredAction(action, null),
+                        () => HasWorkspace)))
+                .ToArray();
+        }
+
+        private void NotifyConfiguredActionCanExecuteChanged()
+        {
+            foreach (var command in _configuredActionCommands)
+            {
+                command.NotifyCanExecuteChanged();
+            }
         }
 
         private bool CanOpenSelectedChange(GitChangeInfo? change)
         {
             return HasWorkspace && change is not null;
-        }
-
-        private void RunAction(GitFileActionViewModel? action)
-        {
-            if (action is null)
-            {
-                return;
-            }
-
-            RunConfiguredAction(action.Action, SelectedChange);
         }
 
         private void OpenSelectedChange(GitChangeInfo? change)
@@ -223,6 +238,19 @@ namespace HaloCreek.ViewModels.Tabs
         private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
         {
             ApplyWorkspacePath(e.WorkspacePath, e.EffectiveConfig);
+        }
+
+        private sealed class GitFileAction : IGitFileAction
+        {
+            public GitFileAction(string label, ICommand command)
+            {
+                Label = label ?? throw new ArgumentNullException(nameof(label));
+                Command = command ?? throw new ArgumentNullException(nameof(command));
+            }
+
+            public string Label { get; }
+
+            public ICommand Command { get; }
         }
     }
 }
