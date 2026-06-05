@@ -132,6 +132,7 @@ namespace HaloCreek.Services
         {
             ArgumentNullException.ThrowIfNull(action);
 
+            // TODO 前面的错误处理也走异常
             var actionName = GetActionName(action);
             var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
             if (string.IsNullOrWhiteSpace(workspacePath))
@@ -272,6 +273,7 @@ namespace HaloCreek.Services
                     "SelectedFilePath actions must include the {SelectedPath} token.",
                 GitFileBrowserActionTarget.SelectedFilePath when selectedChange is null =>
                     "SelectedFilePath actions require a selected Git change.",
+                GitFileBrowserActionTarget.SelectedFilePath => null,
                 GitFileBrowserActionTarget.WorkspaceRoot when action.UsesSelectedPathToken =>
                     "WorkspaceRoot actions cannot include the {SelectedPath} token.",
                 GitFileBrowserActionTarget.WorkspaceRoot => null,

@@ -11,8 +11,6 @@ namespace HaloCreek.ViewModels.Tabs
 {
     public sealed class GitViewModel : ViewModelBase
     {
-        private const string InitialEmptyStateText = "Select a workspace to view Git changes";
-
         private readonly GitService _gitService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
@@ -22,7 +20,6 @@ namespace HaloCreek.ViewModels.Tabs
         private GitChangeInfo? _selectedChange;
         private GitFileBrowserActionConfig? _doubleClickAction;
         private string _doubleClickActionId = string.Empty;
-        private string _emptyStateText = InitialEmptyStateText;
         private string? _workspacePath;
 
         public GitViewModel(
@@ -57,14 +54,7 @@ namespace HaloCreek.ViewModels.Tabs
         public IReadOnlyList<GitChangeInfo> Changes
         {
             get => _changes;
-            private set
-            {
-                if (SetProperty(ref _changes, value))
-                {
-                    OnPropertyChanged(nameof(HasChanges));
-                    OnPropertyChanged(nameof(IsEmptyStateVisible));
-                }
-            }
+            private set => SetProperty(ref _changes, value);
         }
 
         public GitChangeInfo? SelectedChange
@@ -80,17 +70,7 @@ namespace HaloCreek.ViewModels.Tabs
             }
         }
 
-        public string EmptyStateText
-        {
-            get => _emptyStateText;
-            private set => SetProperty(ref _emptyStateText, value);
-        }
-
         public bool HasWorkspace => !string.IsNullOrWhiteSpace(WorkspacePath);
-
-        public bool HasChanges => Changes.Count > 0;
-
-        public bool IsEmptyStateVisible => !HasChanges;
 
         public ICommand RefreshCommand { get; }
 
@@ -121,9 +101,6 @@ namespace HaloCreek.ViewModels.Tabs
 
             SelectedChange = null;
             Changes = result.Changes;
-            EmptyStateText = result.Changes.Count == 0
-                ? result.Message
-                : string.Empty;
             Log.Info("Git", result.Message);
         }
 

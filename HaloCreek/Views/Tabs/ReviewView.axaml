@@ -202,7 +202,6 @@
                                      ItemsSource="{Binding Changes}"
                                      SelectedItem="{Binding SelectedChange, Mode=TwoWay}"
                                      SelectionMode="Single"
-                                     IsVisible="{Binding HasChanges}"
                                      BorderThickness="0"
                                      Background="White"
                                      Padding="0"
