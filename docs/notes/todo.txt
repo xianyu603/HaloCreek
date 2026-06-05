@@ -7,3 +7,6 @@ resume with prompt
 A - 追问和Agent修改 这种路径 exploreTo会出问题
 Reviewed相关文件操作走异步
 偶现退出重进tmux command failed wsl 重启就好了
+git 列表右键删除 git 列表revert
+git 列表批量commit
+git 列表header删去
