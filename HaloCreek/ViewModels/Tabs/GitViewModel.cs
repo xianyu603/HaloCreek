@@ -15,8 +15,8 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly GitService _gitService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
-        private IReadOnlyList<GitFileActionButtonViewModel> _leftActionButtons = Array.Empty<GitFileActionButtonViewModel>();
-        private IReadOnlyList<GitFileActionButtonViewModel> _rightActionButtons = Array.Empty<GitFileActionButtonViewModel>();
+        private IReadOnlyList<GitFileActionViewModel> _selectedFilePathActions = Array.Empty<GitFileActionViewModel>();
+        private IReadOnlyList<GitFileActionViewModel> _workspaceRootActions = Array.Empty<GitFileActionViewModel>();
         private GitChangeInfo? _selectedChange;
         private GitFileBrowserActionConfig? _doubleClickAction;
         private string _doubleClickActionId = string.Empty;
@@ -34,7 +34,7 @@ namespace HaloCreek.ViewModels.Tabs
             ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _transientEventService = appCommonRuntime.TransientEventService;
             RefreshCommand = new RelayCommand(RefreshChanges, () => HasWorkspace);
-            RunActionCommand = new RelayCommand<GitFileActionButtonViewModel>(RunAction, CanRunAction);
+            RunActionCommand = new RelayCommand<GitFileActionViewModel>(RunAction, CanRunAction);
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
             workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
         }
@@ -92,19 +92,19 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand RefreshCommand { get; }
 
-        public IReadOnlyList<GitFileActionButtonViewModel> LeftActionButtons
+        public IReadOnlyList<GitFileActionViewModel> SelectedFilePathActions
         {
-            get => _leftActionButtons;
-            private set => SetProperty(ref _leftActionButtons, value);
+            get => _selectedFilePathActions;
+            private set => SetProperty(ref _selectedFilePathActions, value);
         }
 
-        public IReadOnlyList<GitFileActionButtonViewModel> RightActionButtons
+        public IReadOnlyList<GitFileActionViewModel> WorkspaceRootActions
         {
-            get => _rightActionButtons;
-            private set => SetProperty(ref _rightActionButtons, value);
+            get => _workspaceRootActions;
+            private set => SetProperty(ref _workspaceRootActions, value);
         }
 
-        public IRelayCommand<GitFileActionButtonViewModel> RunActionCommand { get; }
+        public IRelayCommand<GitFileActionViewModel> RunActionCommand { get; }
 
         public IRelayCommand<GitChangeInfo> OpenSelectedChangeCommand { get; }
 
@@ -135,27 +135,31 @@ namespace HaloCreek.ViewModels.Tabs
                     configuredAction.Id,
                     _doubleClickActionId,
                     StringComparison.OrdinalIgnoreCase));
-            LeftActionButtons = BuildActionButtons(config.GitFileBrowserActions, GitFileBrowserActionPlacement.Left);
-            RightActionButtons = BuildActionButtons(config.GitFileBrowserActions, GitFileBrowserActionPlacement.Right);
+            SelectedFilePathActions = BuildActions(
+                config.GitFileBrowserActions,
+                GitFileBrowserActionTarget.SelectedFilePath);
+            WorkspaceRootActions = BuildActions(
+                config.GitFileBrowserActions,
+                GitFileBrowserActionTarget.WorkspaceRoot);
             RunActionCommand.NotifyCanExecuteChanged();
             OpenSelectedChangeCommand.NotifyCanExecuteChanged();
         }
 
-        private static IReadOnlyList<GitFileActionButtonViewModel> BuildActionButtons(
+        private static IReadOnlyList<GitFileActionViewModel> BuildActions(
             IReadOnlyList<GitFileBrowserActionConfig> actions,
-            GitFileBrowserActionPlacement placement)
+            GitFileBrowserActionTarget target)
         {
             return actions
-                .Where(action => action.ShowAsButton && action.Placement == placement)
-                .Select(action => new GitFileActionButtonViewModel(action))
+                .Where(action => action.Target == target)
+                .Select(action => new GitFileActionViewModel(action))
                 .ToArray();
         }
 
-        private bool CanRunAction(GitFileActionButtonViewModel? button)
+        private bool CanRunAction(GitFileActionViewModel? action)
         {
-            return button is not null
+            return action is not null
                 && HasWorkspace
-                && (!button.Action.RequiresSelectedChange || SelectedChange is not null);
+                && (!action.Action.RequiresSelectedChange || SelectedChange is not null);
         }
 
         private bool CanOpenSelectedChange(GitChangeInfo? change)
@@ -163,14 +167,14 @@ namespace HaloCreek.ViewModels.Tabs
             return HasWorkspace && change is not null;
         }
 
-        private void RunAction(GitFileActionButtonViewModel? button)
+        private void RunAction(GitFileActionViewModel? action)
         {
-            if (button is null)
+            if (action is null)
             {
                 return;
             }
 
-            RunConfiguredAction(button.Action, SelectedChange);
+            RunConfiguredAction(action.Action, SelectedChange);
         }
 
         private void OpenSelectedChange(GitChangeInfo? change)
@@ -186,6 +190,15 @@ namespace HaloCreek.ViewModels.Tabs
                     "Git",
                     "Open failed",
                     $"Double click action not found: {_doubleClickActionId}");
+                return;
+            }
+
+            if (_doubleClickAction.Target != GitFileBrowserActionTarget.SelectedFilePath)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Git",
+                    "Open failed",
+                    $"Double click action must target {GitFileBrowserActionTarget.SelectedFilePath}: {_doubleClickActionId}");
                 return;
             }
 

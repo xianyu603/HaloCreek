@@ -23,43 +23,37 @@ namespace HaloCreek.Models
                 new GitFileBrowserActionConfig(
                     "OpenDiff",
                     "OpenDiff",
-                    true,
-                    GitFileBrowserActionPlacement.Left,
+                    GitFileBrowserActionTarget.SelectedFilePath,
                     "TortoiseGitProc.exe",
                     new[] { "/command:diff", "/path:{SelectedPath}" }),
                 new GitFileBrowserActionConfig(
                     "Open",
                     "Open",
-                    false,
-                    GitFileBrowserActionPlacement.Left,
+                    GitFileBrowserActionTarget.SelectedFilePath,
                     "explorer.exe",
                     new[] { "{SelectedPath}" }),
                 new GitFileBrowserActionConfig(
                     "ExploreTo",
                     "ExploreTo",
-                    true,
-                    GitFileBrowserActionPlacement.Left,
+                    GitFileBrowserActionTarget.SelectedFilePath,
                     "explorer.exe",
                     new[] { "/select,{SelectedPath}" }),
                 new GitFileBrowserActionConfig(
                     "Edit",
                     "Edit",
-                    true,
-                    GitFileBrowserActionPlacement.Left,
+                    GitFileBrowserActionTarget.SelectedFilePath,
                     "notepad.exe",
                     new[] { "{SelectedPath}" }),
                 new GitFileBrowserActionConfig(
                     "Commit",
                     "Commit",
-                    true,
-                    GitFileBrowserActionPlacement.Right,
+                    GitFileBrowserActionTarget.WorkspaceRoot,
                     "TortoiseGitProc.exe",
                     new[] { "/command:commit", "/path:{WorkspaceRoot}" }),
                 new GitFileBrowserActionConfig(
                     "ShowLog",
                     "Show Log",
-                    true,
-                    GitFileBrowserActionPlacement.Right,
+                    GitFileBrowserActionTarget.WorkspaceRoot,
                     "TortoiseGitProc.exe",
                     new[] { "/command:log", "/path:{WorkspaceRoot}" }),
             });
@@ -68,22 +62,23 @@ namespace HaloCreek.Models
     public sealed record GitFileBrowserActionConfig(
         string Id,
         string Label,
-        bool ShowAsButton,
-        GitFileBrowserActionPlacement Placement,
+        GitFileBrowserActionTarget Target,
         string Executable,
         IReadOnlyList<string> Arguments)
     {
-        public bool RequiresSelectedChange => (Arguments ?? Array.Empty<string>()).Any(UsesSelectedToken);
+        public bool RequiresSelectedChange => Target == GitFileBrowserActionTarget.SelectedFilePath;
 
-        private static bool UsesSelectedToken(string argument)
+        public bool UsesSelectedPathToken => (Arguments ?? Array.Empty<string>()).Any(UsesSelectedPathTokenInArgument);
+
+        private static bool UsesSelectedPathTokenInArgument(string argument)
         {
             return argument?.Contains("{SelectedPath}", StringComparison.Ordinal) == true;
         }
     }
 
-    public enum GitFileBrowserActionPlacement
+    public enum GitFileBrowserActionTarget
     {
-        Left,
-        Right
+        SelectedFilePath = 1,
+        WorkspaceRoot = 2
     }
 }

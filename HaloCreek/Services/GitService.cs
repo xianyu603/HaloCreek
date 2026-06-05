@@ -144,15 +144,16 @@ namespace HaloCreek.Services
                 return new GitOperationResult(false, $"Executable is empty for {actionName}.");
             }
 
-            if (action.RequiresSelectedChange && selectedChange is null)
-            {
-                return new GitOperationResult(false, $"{actionName} requires a selected Git change.");
-            }
-
             var arguments = action.Arguments ?? Array.Empty<string>();
             if (arguments.Any(argument => argument is null))
             {
                 return new GitOperationResult(false, $"Argument is null for {actionName}.");
+            }
+
+            var validationError = ValidateConfiguredAction(action, selectedChange);
+            if (validationError is not null)
+            {
+                return new GitOperationResult(false, $"{actionName} configuration is invalid: {validationError}");
             }
 
             try
@@ -259,6 +260,23 @@ namespace HaloCreek.Services
                 || message.Contains("exists on disk, but not in", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("invalid object name 'HEAD'", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("ambiguous argument 'HEAD:", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string? ValidateConfiguredAction(
+            GitFileBrowserActionConfig action,
+            GitChangeInfo? selectedChange)
+        {
+            return action.Target switch
+            {
+                GitFileBrowserActionTarget.SelectedFilePath when !action.UsesSelectedPathToken =>
+                    "SelectedFilePath actions must include the {SelectedPath} token.",
+                GitFileBrowserActionTarget.SelectedFilePath when selectedChange is null =>
+                    "SelectedFilePath actions require a selected Git change.",
+                GitFileBrowserActionTarget.WorkspaceRoot when action.UsesSelectedPathToken =>
+                    "WorkspaceRoot actions cannot include the {SelectedPath} token.",
+                GitFileBrowserActionTarget.WorkspaceRoot => null,
+                _ => "Target must be SelectedFilePath or WorkspaceRoot.",
+            };
         }
 
         private static IReadOnlyList<GitChangeInfo> ParsePorcelainStatus(string output)

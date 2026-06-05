@@ -2,9 +2,9 @@ using HaloCreek.Models;
 
 namespace HaloCreek.ViewModels.Tabs
 {
-    public sealed class GitFileActionButtonViewModel
+    public sealed class GitFileActionViewModel
     {
-        public GitFileActionButtonViewModel(GitFileBrowserActionConfig action)
+        public GitFileActionViewModel(GitFileBrowserActionConfig action)
         {
             Action = action;
             Label = string.IsNullOrWhiteSpace(action.Label)

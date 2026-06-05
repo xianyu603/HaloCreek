@@ -62,13 +62,13 @@ namespace HaloCreek.Views.Tabs
                 },
             };
 
-            if (viewModel.ModifiedGit.RightActionButtons.Count > 0)
+            if (viewModel.ModifiedGit.WorkspaceRootActions.Count > 0)
             {
                 items.Add(new Separator());
             }
 
             viewModel.ModifiedGit.SelectedChange = null;
-            foreach (var action in viewModel.ModifiedGit.RightActionButtons)
+            foreach (var action in viewModel.ModifiedGit.WorkspaceRootActions)
             {
                 items.Add(CreateGitActionMenuItem(viewModel.ModifiedGit, null, action));
             }
@@ -87,7 +87,7 @@ namespace HaloCreek.Views.Tabs
 
             viewModel.ModifiedGit.SelectedChange = change;
             var items = new List<object>();
-            foreach (var action in viewModel.ModifiedGit.LeftActionButtons)
+            foreach (var action in viewModel.ModifiedGit.SelectedFilePathActions)
             {
                 items.Add(CreateGitActionMenuItem(viewModel.ModifiedGit, change, action));
             }
@@ -129,7 +129,7 @@ namespace HaloCreek.Views.Tabs
         private static MenuItem CreateGitActionMenuItem(
             GitViewModel viewModel,
             GitChangeInfo? change,
-            GitFileActionButtonViewModel action)
+            GitFileActionViewModel action)
         {
             var menuItem = new MenuItem
             {
@@ -278,6 +278,6 @@ namespace HaloCreek.Views.Tabs
         private sealed record GitActionMenuContext(
             GitViewModel ViewModel,
             GitChangeInfo? Change,
-            GitFileActionButtonViewModel Action);
+            GitFileActionViewModel Action);
     }
 }
