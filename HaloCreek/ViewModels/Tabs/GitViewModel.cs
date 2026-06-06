@@ -199,17 +199,20 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void RunConfiguredAction(GitFileBrowserActionConfig action, GitChangeInfo? selectedChange)
         {
-            var result = _gitService.TryRunConfiguredAction(selectedChange, action);
-            if (result.Succeeded)
+            try
             {
-                Log.Info("Git", result.Message);
-                return;
+                _gitService.RunConfiguredAction(selectedChange, action);
             }
-
-            _transientEventService.ReportUserActionFailure(
-                "Git",
-                "Git action failed",
-                result.Message);
+            catch (Exception ex) when (ex is InvalidOperationException
+                or System.ComponentModel.Win32Exception
+                or ArgumentException
+                or NotSupportedException)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Git",
+                    "Git action failed",
+                    ex.Message);
+            }
         }
 
         private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)

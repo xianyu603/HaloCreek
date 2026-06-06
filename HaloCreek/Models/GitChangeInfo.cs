@@ -32,10 +32,5 @@ namespace HaloCreek.Models
     public sealed record GitChangesResult(
         IReadOnlyList<GitChangeInfo> Changes,
         string Message,
-        string? WorkspacePath = null);
-
-    // TODO 这个没啥用 应当改成失败抛异常
-    public sealed record GitOperationResult(
-        bool Succeeded,
-        string Message);
+        string WorkspacePath);
 }

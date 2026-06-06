@@ -97,7 +97,7 @@ namespace HaloCreek
                 tmuxService,
                 terminalService,
                 appCommonRuntime);
-            var gitService = new GitService(workspaceRuntimeService);
+            var gitService = new GitService();
             var reviewSnapshotService = new ReviewSnapshotService(
                 workspaceRuntimeService,
                 gitService);

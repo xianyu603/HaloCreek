@@ -14,23 +14,9 @@ namespace HaloCreek.Services
     {
         private const string GitExecutableName = "git";
 
-        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
-
-        public GitService(WorkspaceRuntimeService workspaceRuntimeService)
-        {
-            _workspaceRuntimeService = workspaceRuntimeService
-                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
-        }
-
         public GitChangesResult GetChanges()
         {
-            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                return new GitChangesResult(
-                    Array.Empty<GitChangeInfo>(),
-                    "Select a workspace to view Git changes.");
-            }
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
 
             var commandResult = RunGitStatus(workspacePath);
             if (!commandResult.Succeeded)
@@ -38,10 +24,6 @@ namespace HaloCreek.Services
                 var message = string.IsNullOrWhiteSpace(commandResult.ErrorMessage)
                     ? "Git status failed."
                     : commandResult.ErrorMessage.Trim();
-                if (message.Contains("not a git repository", StringComparison.OrdinalIgnoreCase))
-                {
-                    message = "Current workspace is not a Git repository.";
-                }
 
                 return new GitChangesResult(Array.Empty<GitChangeInfo>(), message, workspacePath);
             }
@@ -59,7 +41,7 @@ namespace HaloCreek.Services
 
         public string? GetHeadBlobId(string? relativePath)
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("CurrentWorkspacePath is empty!");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var commandResult = RunGit(
@@ -81,7 +63,7 @@ namespace HaloCreek.Services
 
         public string? HashWorkingTreeFile(string? relativePath)
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("CurrentWorkspacePath is empty!");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var absoluteFilePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
@@ -106,7 +88,7 @@ namespace HaloCreek.Services
 
         public string CreateTempHeadFile(string? relativePath)
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("CurrentWorkspacePath is empty!");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var commandResult = RunGit(
@@ -126,35 +108,31 @@ namespace HaloCreek.Services
             throw new InvalidOperationException($"Git HEAD file query failed. {message}");
         }
 
-        public GitOperationResult TryRunConfiguredAction(
+        public void RunConfiguredAction(
             GitChangeInfo? selectedChange,
             GitFileBrowserActionConfig action)
         {
             ArgumentNullException.ThrowIfNull(action);
 
-            // TODO 前面的错误处理也走异常
             var actionName = GetActionName(action);
-            var workspacePath = _workspaceRuntimeService.CurrentWorkspacePath;
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                return new GitOperationResult(false, $"No workspace selected for {actionName}.");
-            }
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
 
             if (string.IsNullOrWhiteSpace(action.Executable))
             {
-                return new GitOperationResult(false, $"Executable is empty for {actionName}.");
+                throw new InvalidOperationException($"Executable is empty for {actionName}.");
             }
 
             var arguments = action.Arguments ?? Array.Empty<string>();
             if (arguments.Any(argument => argument is null))
             {
-                return new GitOperationResult(false, $"Argument is null for {actionName}.");
+                throw new InvalidOperationException($"Argument is null for {actionName}.");
             }
 
             var validationError = ValidateConfiguredAction(action, selectedChange);
             if (validationError is not null)
             {
-                return new GitOperationResult(false, $"{actionName} configuration is invalid: {validationError}");
+                throw new InvalidOperationException(
+                    $"{actionName} configuration is invalid: {validationError}");
             }
 
             try
@@ -194,7 +172,6 @@ namespace HaloCreek.Services
                     $"Started configured action. Action={QuoteForLog(actionName)} "
                     + $"Executable={QuoteForLog(executable)} "
                     + $"ProcessId={process.Id}");
-                return new GitOperationResult(true, $"Started {actionName}.");
             }
             catch (Exception ex) when (ex is Win32Exception
                 or InvalidOperationException
@@ -204,7 +181,7 @@ namespace HaloCreek.Services
                 or NotSupportedException)
             {
                 Log.Error("Git", ex, $"Failed to start configured action. Action={QuoteForLog(actionName)}");
-                return new GitOperationResult(false, $"Failed to start {actionName}: {ex.Message}");
+                throw new InvalidOperationException($"Failed to start {actionName}: {ex.Message}", ex);
             }
         }
 
