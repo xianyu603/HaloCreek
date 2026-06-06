@@ -13,7 +13,6 @@ namespace HaloCreek.ViewModels.Tabs
     {
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
-        private AppConfig? _effectiveConfig;
         private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
         private string _promptText = string.Empty;
         private OngoingSessionInfo? _selectedOngoingSession;
@@ -90,10 +89,10 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
 
-        private void ApplyWorkspacePath(string workspacePath, AppConfig config)
+        private void ApplyWorkspacePath(string workspacePath)
         {
             WorkspacePath = workspacePath;
-            _effectiveConfig = config;
+            // TODO: 收束 workspace changed 与 session refresh 的边界；后续专门工作项处理。
             RefreshOngoingSessions();
         }
 
@@ -104,13 +103,7 @@ namespace HaloCreek.ViewModels.Tabs
                 return new SessionLaunchResult(false, "Prompt is empty.", null);
             }
 
-            var config = _effectiveConfig
-                ?? throw new InvalidOperationException("Workspace runtime is not initialized.");
-            return _sessionLifecycleService.Launch(
-                WorkspacePath!,
-                PromptText,
-                config.CodexExecutableName,
-                config.CodexLaunchArguments);
+            return _sessionLifecycleService.Launch(PromptText);
         }
 
         private void Launch()
@@ -141,7 +134,7 @@ namespace HaloCreek.ViewModels.Tabs
         private void RefreshOngoingSessions()
         {
             var selectedSessionId = SelectedOngoingSession?.Id;
-            OngoingSessions = _sessionLifecycleService.GetOngoingSessions(WorkspacePath);
+            OngoingSessions = _sessionLifecycleService.GetCurrentWorkspaceOngoingSessions();
             SelectedOngoingSession = OngoingSessions.FirstOrDefault(
                 session => string.Equals(session.Id, selectedSessionId, StringComparison.Ordinal));
         }
@@ -181,22 +174,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
         {
-            var previousWorkspacePath = WorkspacePath;
-            ApplyWorkspacePath(e.WorkspacePath, e.EffectiveConfig);
-            ExitWorkspaceOngoingSessions(previousWorkspacePath);
-        }
-
-        private void ExitWorkspaceOngoingSessions(string? workspacePath)
-        {
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                return;
-            }
-
-            foreach (var session in _sessionLifecycleService.GetOngoingSessions(workspacePath))
-            {
-                _sessionLifecycleService.Exit(session.Id);
-            }
+            ApplyWorkspacePath(e.WorkspacePath);
         }
     }
 }

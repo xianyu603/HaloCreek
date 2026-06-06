@@ -28,6 +28,7 @@ namespace HaloCreek.Services
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             _transientEventService = appCommonRuntime.TransientEventService;
             _tmuxService.StateChanged += HandleTmuxStateChanged;
+            WorkspaceRuntime.Changed += HandleWorkspaceChanged;
         }
 
         // 只向外部汇报session或其状态发生了变化 先不实现复杂的消息通知 卡了再优化
@@ -51,6 +52,7 @@ namespace HaloCreek.Services
 
             _isDisposed = true;
             _tmuxService.StateChanged -= HandleTmuxStateChanged;
+            WorkspaceRuntime.Changed -= HandleWorkspaceChanged;
 
             var sessionIds = _sessionsById.Keys.ToArray();
 
@@ -80,30 +82,23 @@ namespace HaloCreek.Services
         }
 
         // TODO 可以考虑这里的部分错误throw 之后再说
-        public SessionLaunchResult Launch(
-            string workspacePath,
-            string promptText,
-            string codexExecutableName,
-            IReadOnlyList<string> codexLaunchArguments)
+        public SessionLaunchResult Launch(string promptText)
         {
             RequireUiThread();
-
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                return new SessionLaunchResult(false, "No workspace selected.", null);
-            }
 
             if (string.IsNullOrWhiteSpace(promptText))
             {
                 return new SessionLaunchResult(false, "Prompt is empty.", null);
             }
 
-            if (string.IsNullOrWhiteSpace(codexExecutableName))
+            var workspace = WorkspaceRuntime.Current;
+            var config = workspace.EffectiveConfig;
+            if (string.IsNullOrWhiteSpace(config.CodexExecutableName))
             {
                 return new SessionLaunchResult(false, "Codex executable is not available.", null);
             }
 
-            ArgumentNullException.ThrowIfNull(codexLaunchArguments);
+            ArgumentNullException.ThrowIfNull(config.CodexLaunchArguments);
 
             var title = BuildFirstPromptSummary(promptText);
             if (string.IsNullOrWhiteSpace(title))
@@ -115,9 +110,9 @@ namespace HaloCreek.Services
             try
             {
                 identifier = _tmuxService.Launch(new TmuxLaunchRequest(
-                    workspacePath,
-                    codexExecutableName,
-                    codexLaunchArguments.Concat(new[] { promptText }).ToArray(),
+                    workspace.WorkspacePath,
+                    config.CodexExecutableName,
+                    config.CodexLaunchArguments.Concat(new[] { promptText }).ToArray(),
                     title));
             }
             catch (InvalidOperationException ex)
@@ -129,7 +124,7 @@ namespace HaloCreek.Services
             var session = new OngoingSessionInfo(
                 identifier,
                 title,
-                workspacePath,
+                workspace.WorkspacePath,
                 now,
                 OngoingSessionState.BackgroundRunning);
 
@@ -141,11 +136,7 @@ namespace HaloCreek.Services
             return new SessionLaunchResult(true, "Codex session launch requested.", session);
         }
 
-        public SessionResumeResult Resume(
-            HistorySessionInfo? session,
-            string currentWorkspacePath,
-            string codexExecutableName,
-            IReadOnlyList<string> codexLaunchArguments)
+        public SessionResumeResult Resume(HistorySessionInfo? session)
         {
             RequireUiThread();
 
@@ -154,22 +145,19 @@ namespace HaloCreek.Services
                 return new SessionResumeResult(false, "No session selected.");
             }
 
-            if (string.IsNullOrWhiteSpace(currentWorkspacePath))
-            {
-                return new SessionResumeResult(false, "No workspace selected.");
-            }
-
             if (string.IsNullOrWhiteSpace(session.Id))
             {
                 return new SessionResumeResult(false, "Session id is empty.");
             }
 
-            if (string.IsNullOrWhiteSpace(codexExecutableName))
+            var workspace = WorkspaceRuntime.Current;
+            var config = workspace.EffectiveConfig;
+            if (string.IsNullOrWhiteSpace(config.CodexExecutableName))
             {
                 return new SessionResumeResult(false, "Codex executable is not available.");
             }
 
-            ArgumentNullException.ThrowIfNull(codexLaunchArguments);
+            ArgumentNullException.ThrowIfNull(config.CodexLaunchArguments);
 
             var title = BuildFirstPromptSummary(session.InitialPrompt);
             if (string.IsNullOrWhiteSpace(title))
@@ -181,9 +169,9 @@ namespace HaloCreek.Services
             try
             {
                 identifier = _tmuxService.Launch(new TmuxLaunchRequest(
-                    currentWorkspacePath,
-                    codexExecutableName,
-                    codexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
+                    workspace.WorkspacePath,
+                    config.CodexExecutableName,
+                    config.CodexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
                     title));
             }
             catch (InvalidOperationException ex)
@@ -195,7 +183,7 @@ namespace HaloCreek.Services
             var ongoingSession = new OngoingSessionInfo(
                 identifier,
                 title,
-                currentWorkspacePath,
+                workspace.WorkspacePath,
                 now,
                 OngoingSessionState.BackgroundRunning);
 
@@ -207,18 +195,21 @@ namespace HaloCreek.Services
             return new SessionResumeResult(true, "Codex session resume requested.");
         }
 
-        public IReadOnlyList<OngoingSessionInfo> GetOngoingSessions(string? workspacePath)
+        public IReadOnlyList<OngoingSessionInfo> GetCurrentWorkspaceOngoingSessions()
         {
             RequireUiThread();
 
-            var sessions = _sessionsById.Values.AsEnumerable();
-            if (!string.IsNullOrWhiteSpace(workspacePath))
-            {
-                sessions = sessions.Where(session =>
-                    string.Equals(session.WorkspacePath, workspacePath, StringComparison.Ordinal));
-            }
+            return GetOngoingSessionsForWorkspace(WorkspaceRuntime.Current.WorkspacePath);
+        }
 
-            return sessions
+        private IReadOnlyList<OngoingSessionInfo> GetOngoingSessionsForWorkspace(string workspacePath)
+        {
+            RequireUiThread();
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
+            return _sessionsById.Values
+                .Where(session =>
+                    string.Equals(session.WorkspacePath, workspacePath, StringComparison.Ordinal))
                 .OrderBy(session => session.StartedAt)
                 .ToArray();
         }
@@ -325,6 +316,33 @@ namespace HaloCreek.Services
             }
 
             SessionsChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void HandleWorkspaceChanged(WorkspaceContext workspace)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => HandleWorkspaceChanged(workspace));
+                return;
+            }
+
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            ArgumentNullException.ThrowIfNull(workspace);
+
+            var sessionIds = _sessionsById.Values
+                .Where(session =>
+                    !string.Equals(session.WorkspacePath, workspace.WorkspacePath, StringComparison.Ordinal))
+                .Select(session => session.Id)
+                .ToArray();
+
+            foreach (var sessionId in sessionIds)
+            {
+                Exit(sessionId);
+            }
         }
 
         private void HandleTmuxStateChanged(object? sender, TmuxSessionStateChangedEventArgs args)

@@ -224,13 +224,7 @@ namespace HaloCreek.ViewModels.Tabs
                 return;
             }
 
-            var config = _effectiveConfig
-                ?? throw new InvalidOperationException("Workspace runtime is not initialized.");
-            var result = _sessionLifecycleService.Resume(
-                session,
-                WorkspacePath!,
-                config.CodexExecutableName,
-                config.CodexLaunchArguments);
+            var result = _sessionLifecycleService.Resume(session);
             if (result.Started)
             {
                 Log.Info("HistorySessions", result.StatusMessage);
