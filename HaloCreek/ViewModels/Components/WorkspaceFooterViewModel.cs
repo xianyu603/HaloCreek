@@ -9,26 +9,28 @@ namespace HaloCreek.ViewModels.Components
     public sealed class WorkspaceFooterViewModel : ViewModelBase
     {
         private const string NoWorkspaceSelectedText = "No workspace selected";
-        private const string InvalidWorkspacePathStatusText = "Invalid workspace path";
         private const string SelectingWorkspaceStatusText = "Selecting workspace...";
         private const string WorkspaceCategory = "Workspace";
+        private const string WorkspaceSwitchFailureTitle = "Workspace switch failed";
 
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly ApplicationStatusService _applicationStatusService;
         private readonly TransientEventService _transientEventService;
-        private readonly Func<string, bool> _setWorkspacePath;
+        private readonly WorkspaceRuntimeLegacyBridge _workspaceRuntimeLegacyBridge;
         private string _workspacePath = NoWorkspaceSelectedText;
         private string _statusText = string.Empty;
 
         public WorkspaceFooterViewModel(
             WorkspaceRuntimeService workspaceRuntimeService,
+            WorkspaceRuntimeLegacyBridge workspaceRuntimeLegacyBridge,
             AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
             _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
-            _setWorkspacePath = workspaceRuntimeService.SetWorkspacePath;
+            _workspaceRuntimeLegacyBridge = workspaceRuntimeLegacyBridge
+                ?? throw new ArgumentNullException(nameof(workspaceRuntimeLegacyBridge));
             _applicationStatusService = appCommonRuntime.ApplicationStatusService;
             _transientEventService = appCommonRuntime.TransientEventService;
             _applicationStatusService.StatusTextChanged += OnStatusTextChanged;
@@ -77,12 +79,21 @@ namespace HaloCreek.ViewModels.Components
                 return;
             }
 
-            if (!_setWorkspacePath(selectedPath))
+            try
+            {
+                _workspaceRuntimeLegacyBridge.SwitchWorkspace(selectedPath);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException
+                or System.IO.IOException
+                or UnauthorizedAccessException
+                or NotSupportedException
+                or ArgumentException)
             {
                 _transientEventService.ReportUserActionFailure(
                     WorkspaceCategory,
-                    InvalidWorkspacePathStatusText,
-                    "Selected workspace path is invalid or unavailable.");
+                    WorkspaceSwitchFailureTitle,
+                    ex.Message,
+                    ex);
                 return;
             }
         }

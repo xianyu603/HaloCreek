@@ -1,7 +1,9 @@
 using System;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Services;
@@ -25,16 +27,34 @@ namespace HaloCreek
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var mainWindow = new MainWindow();
-                var appDisposeScope = CreateAppDisposeScope(mainWindow);
-                mainWindow.DataContext = appDisposeScope.MainWindowViewModel;
-                desktop.Exit += (_, _) => appDisposeScope.Dispose();
                 desktop.MainWindow = mainWindow;
+                Dispatcher.UIThread.Post(async () => await InitializeMainWindowAsync(desktop, mainWindow));
             }
 
             base.OnFrameworkInitializationCompleted();
         }
 
-        private static AppDisposeScope CreateAppDisposeScope(MainWindow mainWindow)
+        private static async Task InitializeMainWindowAsync(
+            IClassicDesktopStyleApplicationLifetime desktop,
+            MainWindow mainWindow)
+        {
+            try
+            {
+                var appDisposeScope = await CreateAppDisposeScopeAsync(mainWindow);
+                mainWindow.DataContext = appDisposeScope.MainWindowViewModel;
+                desktop.Exit += (_, _) => appDisposeScope.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Startup", ex, "Application startup failed.");
+                await new PlatformInfrastructure(mainWindow).ShowErrorDialogAsync(
+                    "Startup failed",
+                    ex.Message);
+                desktop.Shutdown(1);
+            }
+        }
+
+        private static async Task<AppDisposeScope> CreateAppDisposeScopeAsync(MainWindow mainWindow)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
             PlatformClipboardInfrastructure platformClipboardInfrastructure;
@@ -61,7 +81,16 @@ namespace HaloCreek
                 appCommonRuntime,
                 workspaceCacheService,
                 configService);
-            workspaceRuntimeService.InitializeStartupWorkspace();
+            WorkspaceRuntime.Initialize(
+                appCommonRuntime,
+                workspaceCacheService,
+                configService);
+            var workspaceRuntimeLegacyBridge = new WorkspaceRuntimeLegacyBridge(workspaceRuntimeService);
+            var workspaceStartupSelector = new WorkspaceStartupSelector(
+                appCommonRuntime,
+                workspaceCacheService,
+                workspaceRuntimeLegacyBridge);
+            await workspaceStartupSelector.SelectRequiredWorkspaceAsync();
             var tmuxService = new TmuxService(appCommonRuntime);
             var terminalService = new TerminalService(appCommonRuntime);
             var sessionLifecycleService = new SessionLifecycleService(
@@ -101,6 +130,7 @@ namespace HaloCreek
             var logs = new LogPanelViewModel();
             var workspaceFooter = new WorkspaceFooterViewModel(
                 workspaceRuntimeService,
+                workspaceRuntimeLegacyBridge,
                 appCommonRuntime);
 
             var mainWindowViewModel = new MainWindowViewModel(
