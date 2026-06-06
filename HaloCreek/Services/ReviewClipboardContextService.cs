@@ -120,13 +120,8 @@ namespace HaloCreek.Services
                     "Clipboard text is empty or whitespace.");
             }
 
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             var gitChanges = _gitService.GetChanges();
-            var workspacePath = gitChanges.WorkspacePath;
-            if (string.IsNullOrWhiteSpace(workspacePath))
-            {
-                Log.Info(LogCategory, "Review clip locate scan failed. reason=NoWorkspace");
-                return CreateFailureResult(snapshot, "NoWorkspace", "No workspace is available.");
-            }
 
             Log.Info(
                 LogCategory,

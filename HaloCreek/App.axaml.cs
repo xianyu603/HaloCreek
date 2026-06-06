@@ -98,9 +98,7 @@ namespace HaloCreek
                 terminalService,
                 appCommonRuntime);
             var gitService = new GitService();
-            var reviewSnapshotService = new ReviewSnapshotService(
-                workspaceRuntimeService,
-                gitService);
+            var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var diffService = new DiffService();
             var reviewClipboardContextService = new ReviewClipboardContextService(
                 platformClipboardInfrastructure,

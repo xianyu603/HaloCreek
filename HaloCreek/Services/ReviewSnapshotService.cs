@@ -14,21 +14,16 @@ namespace HaloCreek.Services
         private const string HaloCreekDirectoryName = ".HaloCreek";
         private const string HaloCreekIndexFileName = "HaloCreekIndex";
 
-        private readonly WorkspaceRuntimeService _workspaceRuntimeService;
         private readonly GitService _gitService;
 
-        public ReviewSnapshotService(
-            WorkspaceRuntimeService workspaceRuntimeService,
-            GitService gitService)
+        public ReviewSnapshotService(GitService gitService)
         {
-            _workspaceRuntimeService = workspaceRuntimeService
-                ?? throw new ArgumentNullException(nameof(workspaceRuntimeService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
         }
 
         public void MarkFileReviewed(string? relativePath)
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var absoluteWorkingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
@@ -62,7 +57,7 @@ namespace HaloCreek.Services
 
         public void MarkFileUnreviewed(string? relativePath)
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             if (!IsHaloCreekIndexAvailable(workspacePath))
             {
@@ -83,7 +78,7 @@ namespace HaloCreek.Services
 
         public void RefreshReviewSnapshot()
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
 
             var reviewedEntries = ReadReviewedIndexEntries(workspacePath);
             if (reviewedEntries.Count == 0)
@@ -131,7 +126,7 @@ namespace HaloCreek.Services
 
         public IReadOnlyList<ReviewFilePath> GetReviewedAgainstHeadFiles()
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             if (!IsHaloCreekIndexAvailable(workspacePath))
             {
                 return Array.Empty<ReviewFilePath>();
@@ -151,7 +146,7 @@ namespace HaloCreek.Services
 
         public IReadOnlyList<ReviewFilePath> GetWorkingTreeAgainstReviewedFiles()
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             var reviewedEntries = ReadReviewedIndexEntries(workspacePath)
                 .GroupBy(entry => entry.RelativePath, StringComparer.Ordinal)
                 .ToDictionary(
@@ -174,7 +169,7 @@ namespace HaloCreek.Services
 
         public string CreateTempReviewedFile(string? relativePath)
         {
-            var workspacePath = _workspaceRuntimeService.GetRequiredWorkspacePath("Select a workspace to use Review.");
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             if (!IsHaloCreekIndexAvailable(workspacePath))
