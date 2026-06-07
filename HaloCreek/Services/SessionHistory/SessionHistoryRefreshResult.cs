@@ -1,7 +1,7 @@
 namespace HaloCreek.Services.SessionHistory
 {
     public sealed record SessionHistoryRefreshResult(
-        string? WorkspacePath,
+        string WorkspacePath,
         SessionHistoryResult? HistoryResult,
         string? ErrorMessage);
 }

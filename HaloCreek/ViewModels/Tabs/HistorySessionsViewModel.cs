@@ -14,18 +14,15 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
-        private AppConfig? _effectiveConfig;
         private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
         private HistorySessionInfo? _selectedSession;
         private Action<HistorySessionInfo>? _reeditInitialPromptDispatcher;
-        private string? _workspacePath;
 
         public HistorySessionsViewModel(
             SessionHistoryRefreshService sessionHistoryRefreshService,
             SessionLifecycleService sessionLifecycleService,
-            WorkspaceRuntimeService workspaceRuntimeService,
             AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
@@ -34,12 +31,10 @@ namespace HaloCreek.ViewModels.Tabs
                 ?? throw new ArgumentNullException(nameof(sessionHistoryRefreshService));
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
-            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _transientEventService = appCommonRuntime.TransientEventService;
             _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
             ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
-            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
         }
 
         public string SearchText
@@ -52,12 +47,6 @@ namespace HaloCreek.ViewModels.Tabs
                     ApplySearch();
                 }
             }
-        }
-
-        public string? WorkspacePath
-        {
-            get => _workspacePath;
-            private set => SetProperty(ref _workspacePath, value);
         }
 
         public IReadOnlyList<HistorySessionInfo> Sessions
@@ -85,15 +74,6 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand<HistorySessionInfo> ResumeCommand { get; }
 
         public IRelayCommand<HistorySessionInfo> ReeditInitialPromptCommand { get; }
-
-        private void ApplyWorkspacePath(string workspacePath, AppConfig config)
-        {
-            WorkspacePath = workspacePath;
-            _effectiveConfig = config;
-            _loadedSessions = Array.Empty<HistorySessionInfo>();
-            ApplySearch();
-            _sessionHistoryRefreshService.SetWorkspacePath(workspacePath, config.MaxSessionHistoryFiles);
-        }
 
         public void SetReeditInitialPromptDispatcher(Action<HistorySessionInfo> reeditInitialPromptDispatcher)
         {
@@ -191,11 +171,6 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void HandleRefreshCompleted(SessionHistoryRefreshResult refreshResult)
         {
-            if (!string.Equals(WorkspacePath, refreshResult.WorkspacePath, StringComparison.Ordinal))
-            {
-                return;
-            }
-
             if (refreshResult.HistoryResult is null)
             {
                 if (!string.IsNullOrWhiteSpace(refreshResult.ErrorMessage))
@@ -264,11 +239,6 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _reeditInitialPromptDispatcher.Invoke(session);
-        }
-
-        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
-        {
-            ApplyWorkspacePath(e.WorkspacePath, e.EffectiveConfig);
         }
     }
 }

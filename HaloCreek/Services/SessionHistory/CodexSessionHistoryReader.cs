@@ -29,9 +29,11 @@ namespace HaloCreek.Services.SessionHistory
             _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
         }
 
-        public SessionHistoryResult ReadSessions(string? workspacePath, int maxSessionHistoryFiles)
+        public SessionHistoryResult ReadSessions(string workspacePath, int maxSessionHistoryFiles)
         {
-            if (string.IsNullOrWhiteSpace(workspacePath) || maxSessionHistoryFiles <= 0)
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
+            if (maxSessionHistoryFiles <= 0)
             {
                 return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
             }

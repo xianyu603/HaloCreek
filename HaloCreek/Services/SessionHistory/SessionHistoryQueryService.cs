@@ -11,7 +11,7 @@ namespace HaloCreek.Services.SessionHistory
             _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         }
 
-        public SessionHistoryResult GetSessions(string? workspacePath, int maxSessionHistoryFiles)
+        public SessionHistoryResult GetSessions(string workspacePath, int maxSessionHistoryFiles)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
 

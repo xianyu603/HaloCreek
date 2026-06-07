@@ -51,36 +51,27 @@ namespace HaloCreek.Services.SessionHistory
         {
         }
 
-        // TODO 这个接口可以考虑改名 并非SetWorkSpacePath
-        public void SetWorkspacePath(string? workspacePath, int maxSessionHistoryFiles)
+        private void ApplyWorkspaceTarget(WorkspaceContext workspaceContext)
         {
+            ArgumentNullException.ThrowIfNull(workspaceContext);
+
             var shouldStartRefresh = false;
             string? refreshWorkspacePath = null;
             var refreshMaxSessionHistoryFiles = 0;
 
             lock (_lock)
             {
-                ObjectDisposedException.ThrowIf(_state == RefreshState.Disposed, this);// 契约 还想让我setworkspace不应该在那之前销毁我
+                ObjectDisposedException.ThrowIf(_state == RefreshState.Disposed, this);
 
-                _workspacePath = workspacePath;
-                _maxSessionHistoryFiles = maxSessionHistoryFiles;
+                _workspacePath = workspaceContext.WorkspacePath;
+                _maxSessionHistoryFiles = workspaceContext.EffectiveConfig.MaxSessionHistoryFiles;
                 _refreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-
-                if (string.IsNullOrWhiteSpace(workspacePath))
-                {
-                    if (_state != RefreshState.Refreshing)
-                    {
-                        _state = RefreshState.Idle;
-                    }
-
-                    return;
-                }
 
                 if (_state != RefreshState.Refreshing)
                 {
                     _state = RefreshState.Refreshing;
-                    refreshWorkspacePath = workspacePath;
-                    refreshMaxSessionHistoryFiles = maxSessionHistoryFiles;
+                    refreshWorkspacePath = _workspacePath;
+                    refreshMaxSessionHistoryFiles = _maxSessionHistoryFiles;
                     shouldStartRefresh = true;
                 }
             }
@@ -94,6 +85,8 @@ namespace HaloCreek.Services.SessionHistory
         public void SetRefreshCompletedHandler(Action<SessionHistoryRefreshResult> refreshCompleted)
         {
             _refreshCompleted = refreshCompleted ?? throw new ArgumentNullException(nameof(refreshCompleted));
+            WorkspaceRuntime.Changed += OnWorkspaceChanged;
+            ApplyWorkspaceTarget(WorkspaceRuntime.Current);
         }
 
         public void Dispose()
@@ -109,6 +102,14 @@ namespace HaloCreek.Services.SessionHistory
             }
 
             _refreshTimer.Dispose();
+            WorkspaceRuntime.Changed -= OnWorkspaceChanged;
+        }
+
+        private void OnWorkspaceChanged(WorkspaceContext workspaceContext)
+        {
+            // TODO: Workspace 切换时当前版本不立即清空旧列表；
+            // 后续如果需要避免短暂展示旧 workspace history，在这里引入 reset/refresh-started 通知。
+            ApplyWorkspaceTarget(workspaceContext);
         }
 
         private void OnRefreshTimerTick(object? state)

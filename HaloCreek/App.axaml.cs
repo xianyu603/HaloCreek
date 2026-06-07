@@ -123,7 +123,6 @@ namespace HaloCreek
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
                 sessionLifecycleService,
-                workspaceRuntimeService,
                 appCommonRuntime);
             var logs = new LogPanelViewModel();
             var workspaceFooter = new WorkspaceFooterViewModel(
