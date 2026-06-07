@@ -82,7 +82,7 @@ namespace HaloCreek.Services.SessionHistory
             }
         }
 
-        public void SetRefreshCompletedHandler(Action<SessionHistoryRefreshResult> refreshCompleted)
+        public void StartRefreshAndListen(Action<SessionHistoryRefreshResult> refreshCompleted)
         {
             _refreshCompleted = refreshCompleted ?? throw new ArgumentNullException(nameof(refreshCompleted));
             WorkspaceRuntime.Changed += OnWorkspaceChanged;

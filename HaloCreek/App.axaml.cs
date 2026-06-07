@@ -110,7 +110,6 @@ namespace HaloCreek
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
-                workspaceRuntimeService,
                 appCommonRuntime);
             var review = new ReviewViewModel(
                 reviewSnapshotService,

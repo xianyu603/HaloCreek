@@ -32,7 +32,9 @@ namespace HaloCreek.ViewModels.Tabs
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _transientEventService = appCommonRuntime.TransientEventService;
-            _sessionHistoryRefreshService.SetRefreshCompletedHandler(HandleRefreshCompleted);
+            // 如果后续要拆成独立注册和启动，需要先明确“多处注册后再启动”
+            // 或“先启动再允许多处注册”的调用约束，避免刷新结果分发语义含混。
+            _sessionHistoryRefreshService.StartRefreshAndListen(HandleRefreshCompleted);
             ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
         }

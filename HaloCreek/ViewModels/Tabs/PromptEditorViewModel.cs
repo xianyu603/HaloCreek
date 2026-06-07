@@ -16,18 +16,15 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
         private string _promptText = string.Empty;
         private OngoingSessionInfo? _selectedOngoingSession;
-        private string? _workspacePath;
 
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
-            WorkspaceRuntimeService workspaceRuntimeService,
             AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
-            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _transientEventService = appCommonRuntime.TransientEventService;
 
             LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
@@ -35,8 +32,9 @@ namespace HaloCreek.ViewModels.Tabs
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
+            // Prompt editor 与 SessionLifecycleService 同应用生命周期，当前不做显式退订。
             _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
-            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
+            RefreshOngoingSessions();
         }
 
         public string PromptText
@@ -50,12 +48,6 @@ namespace HaloCreek.ViewModels.Tabs
                     SendToFrontCommand.NotifyCanExecuteChanged();
                 }
             }
-        }
-
-        public string? WorkspacePath
-        {
-            get => _workspacePath;
-            private set => SetProperty(ref _workspacePath, value);
         }
 
         public IReadOnlyList<OngoingSessionInfo> OngoingSessions
@@ -88,13 +80,6 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand<OngoingSessionInfo> BringToFrontCommand { get; }
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
-
-        private void ApplyWorkspacePath(string workspacePath)
-        {
-            WorkspacePath = workspacePath;
-            // TODO: 收束 workspace changed 与 session refresh 的边界；后续专门工作项处理。
-            RefreshOngoingSessions();
-        }
 
         public SessionLaunchResult LaunchPrompt()
         {
@@ -170,11 +155,6 @@ namespace HaloCreek.ViewModels.Tabs
         {
             // 走一下post防同步重入 现在已经不会从别的线程到这了
             Dispatcher.UIThread.Post(RefreshOngoingSessions);
-        }
-
-        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
-        {
-            ApplyWorkspacePath(e.WorkspacePath);
         }
     }
 }
