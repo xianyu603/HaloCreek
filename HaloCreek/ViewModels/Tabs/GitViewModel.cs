@@ -20,35 +20,19 @@ namespace HaloCreek.ViewModels.Tabs
         private GitChangeInfo? _selectedChange;
         private GitFileBrowserActionConfig? _doubleClickAction;
         private string _doubleClickActionId = string.Empty;
-        private string? _workspacePath;
 
         public GitViewModel(
             GitService gitService,
-            WorkspaceRuntimeService workspaceRuntimeService,
             AppCommonRuntime appCommonRuntime,
             ICommand refreshCommand)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
-            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _transientEventService = appCommonRuntime.TransientEventService;
             RefreshCommand = refreshCommand ?? throw new ArgumentNullException(nameof(refreshCommand));
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
-            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
-        }
-
-        public string? WorkspacePath
-        {
-            get => _workspacePath;
-            private set
-            {
-                if (SetProperty(ref _workspacePath, value))
-                {
-                    OnPropertyChanged(nameof(HasWorkspace));
-                    NotifyConfiguredActionCanExecuteChanged();
-                }
-            }
+            ApplyWorkspaceConfig(WorkspaceRuntime.Current.EffectiveConfig);
         }
 
         public IReadOnlyList<GitChangeInfo> Changes
@@ -70,8 +54,6 @@ namespace HaloCreek.ViewModels.Tabs
             }
         }
 
-        public bool HasWorkspace => !string.IsNullOrWhiteSpace(WorkspacePath);
-
         public ICommand RefreshCommand { get; }
 
         public IReadOnlyList<IGitFileAction> SelectedFilePathActions
@@ -88,11 +70,10 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<GitChangeInfo> OpenSelectedChangeCommand { get; }
 
-        private void ApplyWorkspacePath(string workspacePath, AppConfig config)
+        public void ApplyWorkspaceConfig(AppConfig config)
         {
-            WorkspacePath = workspacePath;
+            ArgumentNullException.ThrowIfNull(config);
             LoadActionConfig(config);
-            RefreshChanges();
         }
 
         public void RefreshChanges()
@@ -139,7 +120,7 @@ namespace HaloCreek.ViewModels.Tabs
                     action.Label,
                     new RelayCommand(
                         () => RunConfiguredAction(action, SelectedChange),
-                        () => HasWorkspace && SelectedChange is not null)))
+                        () => SelectedChange is not null)))
                 .ToArray();
         }
 
@@ -151,8 +132,7 @@ namespace HaloCreek.ViewModels.Tabs
                 .Select(action => new GitFileAction(
                     action.Label,
                     new RelayCommand(
-                        () => RunConfiguredAction(action, null),
-                        () => HasWorkspace)))
+                        () => RunConfiguredAction(action, null))))
                 .ToArray();
         }
 
@@ -166,7 +146,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private bool CanOpenSelectedChange(GitChangeInfo? change)
         {
-            return HasWorkspace && change is not null;
+            return change is not null;
         }
 
         private void OpenSelectedChange(GitChangeInfo? change)
@@ -213,11 +193,6 @@ namespace HaloCreek.ViewModels.Tabs
                     "Git action failed",
                     ex.Message);
             }
-        }
-
-        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
-        {
-            ApplyWorkspacePath(e.WorkspacePath, e.EffectiveConfig);
         }
 
         private sealed class GitFileAction : IGitFileAction

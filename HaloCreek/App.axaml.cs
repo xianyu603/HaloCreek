@@ -114,7 +114,6 @@ namespace HaloCreek
             var review = new ReviewViewModel(
                 reviewSnapshotService,
                 gitService,
-                workspaceRuntimeService,
                 diffService,
                 reviewClipboardContextService,
                 sessionLifecycleService,

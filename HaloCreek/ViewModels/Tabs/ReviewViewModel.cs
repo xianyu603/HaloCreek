@@ -32,7 +32,6 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<ReviewFilePath> _reviewedFiles = Array.Empty<ReviewFilePath>();
         private ReviewFilePath? _selectedUnreviewedFile;
         private ReviewFilePath? _selectedReviewedFile;
-        private string? _workspacePath;
         private string _clipLocateStatusText = "Unmatched";
         private IBrush _clipLocateButtonForeground = UnmatchedForeground;
         private bool _hasFrontSession;
@@ -41,7 +40,6 @@ namespace HaloCreek.ViewModels.Tabs
         public ReviewViewModel(
             ReviewSnapshotService reviewSnapshotService,
             GitService gitService,
-            WorkspaceRuntimeService workspaceRuntimeService,
             DiffService diffService,
             ReviewClipboardContextService reviewClipboardContextService,
             SessionLifecycleService sessionLifecycleService,
@@ -50,7 +48,6 @@ namespace HaloCreek.ViewModels.Tabs
             _reviewSnapshotService = reviewSnapshotService
                 ?? throw new ArgumentNullException(nameof(reviewSnapshotService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
-            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
             _diffService = diffService ?? throw new ArgumentNullException(nameof(diffService));
             _reviewClipboardContextService = reviewClipboardContextService
                 ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
@@ -63,7 +60,6 @@ namespace HaloCreek.ViewModels.Tabs
             RefreshCommand = new RelayCommand(RefreshReviewFiles);
             ModifiedGit = new GitViewModel(
                 _gitService,
-                workspaceRuntimeService,
                 _appCommonRuntime,
                 RefreshCommand);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
@@ -79,7 +75,8 @@ namespace HaloCreek.ViewModels.Tabs
                 DiffReviewedAgainstHead);
             _reviewClipboardContextService.ClipLocateChanged += OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
-            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
+            WorkspaceRuntime.Changed += OnWorkspaceChanged;
+            OnWorkspaceChanged(WorkspaceRuntime.Current);
             ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
             RefreshFrontSessionState();
         }
@@ -186,6 +183,7 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _isDisposed = true;
+            WorkspaceRuntime.Changed -= OnWorkspaceChanged;
             _reviewClipboardContextService.ClipLocateChanged -= OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
         }
@@ -318,9 +316,10 @@ namespace HaloCreek.ViewModels.Tabs
             }
         }
 
-        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
+        private void OnWorkspaceChanged(WorkspaceContext workspace)
         {
-            _workspacePath = e.WorkspacePath;
+            ArgumentNullException.ThrowIfNull(workspace);
+            ModifiedGit.ApplyWorkspaceConfig(workspace.EffectiveConfig);
             RefreshReviewFiles();
         }
 
@@ -376,7 +375,7 @@ namespace HaloCreek.ViewModels.Tabs
                 var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(file.RelativePath);
                 var reviewedPath = _reviewSnapshotService.CreateTempReviewedFile(gitRelativePath);
                 var workingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
-                    _workspacePath ?? throw new InvalidOperationException("Select a workspace to use Review."),
+                    WorkspaceRuntime.Current.GitRootPath,
                     gitRelativePath);
                 _diffService.OpenDiff(
                     reviewedPath,

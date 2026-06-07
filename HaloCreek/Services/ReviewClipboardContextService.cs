@@ -120,8 +120,8 @@ namespace HaloCreek.Services
                     "Clipboard text is empty or whitespace.");
             }
 
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             var gitChanges = _gitService.GetChanges();
+            var workspacePath = gitChanges.WorkspacePath;
 
             Log.Info(
                 LogCategory,
