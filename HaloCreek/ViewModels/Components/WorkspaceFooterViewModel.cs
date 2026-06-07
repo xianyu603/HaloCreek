@@ -6,7 +6,7 @@ using HaloCreek.Services;
 
 namespace HaloCreek.ViewModels.Components
 {
-    public sealed class WorkspaceFooterViewModel : ViewModelBase
+    public sealed class WorkspaceFooterViewModel : ViewModelBase, IDisposable
     {
         private const string NoWorkspaceSelectedText = "No workspace selected";
         private const string SelectingWorkspaceStatusText = "Selecting workspace...";
@@ -16,26 +16,21 @@ namespace HaloCreek.ViewModels.Components
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly ApplicationStatusService _applicationStatusService;
         private readonly TransientEventService _transientEventService;
-        private readonly WorkspaceRuntimeLegacyBridge _workspaceRuntimeLegacyBridge;
         private string _workspacePath = NoWorkspaceSelectedText;
         private string _statusText = string.Empty;
+        private bool _isDisposed;
 
-        public WorkspaceFooterViewModel(
-            WorkspaceRuntimeService workspaceRuntimeService,
-            WorkspaceRuntimeLegacyBridge workspaceRuntimeLegacyBridge,
-            AppCommonRuntime appCommonRuntime)
+        public WorkspaceFooterViewModel(AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
             _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
-            ArgumentNullException.ThrowIfNull(workspaceRuntimeService);
-            _workspaceRuntimeLegacyBridge = workspaceRuntimeLegacyBridge
-                ?? throw new ArgumentNullException(nameof(workspaceRuntimeLegacyBridge));
             _applicationStatusService = appCommonRuntime.ApplicationStatusService;
             _transientEventService = appCommonRuntime.TransientEventService;
             _applicationStatusService.StatusTextChanged += OnStatusTextChanged;
+            WorkspaceRuntime.Changed += OnWorkspaceChanged;
             ChooseWorkspaceCommand = new AsyncRelayCommand(ChooseWorkspaceAsync);
-            workspaceRuntimeService.ApplyCurrentWorkspaceAndSubscribe(OnWorkspaceChanged);
+            OnWorkspaceChanged(WorkspaceRuntime.Current);
         }
 
         public string WorkspacePath
@@ -51,6 +46,18 @@ namespace HaloCreek.ViewModels.Components
         }
 
         public IAsyncRelayCommand ChooseWorkspaceCommand { get; }
+
+        public void Dispose()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            _applicationStatusService.StatusTextChanged -= OnStatusTextChanged;
+            WorkspaceRuntime.Changed -= OnWorkspaceChanged;
+        }
 
         private async Task ChooseWorkspaceAsync()
         {
@@ -81,7 +88,7 @@ namespace HaloCreek.ViewModels.Components
 
             try
             {
-                _workspaceRuntimeLegacyBridge.SwitchWorkspace(selectedPath);
+                WorkspaceRuntime.SwitchWorkspace(selectedPath);
             }
             catch (Exception ex) when (ex is InvalidOperationException
                 or System.IO.IOException
@@ -103,9 +110,10 @@ namespace HaloCreek.ViewModels.Components
             StatusText = statusText;
         }
 
-        private void OnWorkspaceChanged(object? sender, WorkspaceRuntimeChangedEventArgs e)
+        private void OnWorkspaceChanged(WorkspaceContext workspace)
         {
-            WorkspacePath = e.WorkspacePath;
+            ArgumentNullException.ThrowIfNull(workspace);
+            WorkspacePath = workspace.WorkspacePath;
         }
     }
 }

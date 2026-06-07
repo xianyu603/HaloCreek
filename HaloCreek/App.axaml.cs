@@ -123,10 +123,7 @@ namespace HaloCreek
                 sessionLifecycleService,
                 appCommonRuntime);
             var logs = new LogPanelViewModel();
-            var workspaceFooter = new WorkspaceFooterViewModel(
-                workspaceRuntimeService,
-                workspaceRuntimeLegacyBridge,
-                appCommonRuntime);
+            var workspaceFooter = new WorkspaceFooterViewModel(appCommonRuntime);
 
             var mainWindowViewModel = new MainWindowViewModel(
                 promptEditor,
@@ -137,6 +134,7 @@ namespace HaloCreek
 
             return new AppDisposeScope(
                 mainWindowViewModel,
+                workspaceFooter,
                 review,
                 logs,
                 sessionLifecycleService,
@@ -151,6 +149,7 @@ namespace HaloCreek
         private sealed class AppDisposeScope : IDisposable
         {
             private readonly LogPanelViewModel _logs;
+            private readonly WorkspaceFooterViewModel _workspaceFooter;
             private readonly ReviewViewModel _review;
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
@@ -161,6 +160,7 @@ namespace HaloCreek
 
             public AppDisposeScope(
                 MainWindowViewModel mainWindowViewModel,
+                WorkspaceFooterViewModel workspaceFooter,
                 ReviewViewModel review,
                 LogPanelViewModel logs,
                 SessionLifecycleService sessionLifecycleService,
@@ -170,6 +170,7 @@ namespace HaloCreek
                 PlatformClipboardInfrastructure platformClipboardInfrastructure)
             {
                 MainWindowViewModel = mainWindowViewModel;
+                _workspaceFooter = workspaceFooter ?? throw new ArgumentNullException(nameof(workspaceFooter));
                 _review = review ?? throw new ArgumentNullException(nameof(review));
                 _logs = logs;
                 _sessionLifecycleService = sessionLifecycleService;
@@ -191,6 +192,7 @@ namespace HaloCreek
                 }
 
                 _isDisposed = true;
+                _workspaceFooter.Dispose();
                 _review.Dispose();
                 _reviewClipboardContextService.Dispose();
                 _platformClipboardInfrastructure.Dispose();
