@@ -77,19 +77,13 @@ namespace HaloCreek
                 transientEventService);
             var workspaceCacheService = new WorkspaceCacheService();
             var configService = new ConfigService();
-            var workspaceRuntimeService = new WorkspaceRuntimeService(
-                appCommonRuntime,
-                workspaceCacheService,
-                configService);
             WorkspaceRuntime.Initialize(
                 appCommonRuntime,
                 workspaceCacheService,
                 configService);
-            var workspaceRuntimeLegacyBridge = new WorkspaceRuntimeLegacyBridge(workspaceRuntimeService);
             var workspaceStartupSelector = new WorkspaceStartupSelector(
                 appCommonRuntime,
-                workspaceCacheService,
-                workspaceRuntimeLegacyBridge);
+                workspaceCacheService);
             await workspaceStartupSelector.SelectRequiredWorkspaceAsync();
             var tmuxService = new TmuxService(appCommonRuntime);
             var terminalService = new TerminalService(appCommonRuntime);

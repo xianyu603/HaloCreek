@@ -13,19 +13,15 @@ namespace HaloCreek.Services
 
         private readonly AppCommonRuntime _appCommonRuntime;
         private readonly WorkspaceCacheService _workspaceCacheService;
-        private readonly WorkspaceRuntimeLegacyBridge _workspaceRuntimeLegacyBridge;
 
         public WorkspaceStartupSelector(
             AppCommonRuntime appCommonRuntime,
-            WorkspaceCacheService workspaceCacheService,
-            WorkspaceRuntimeLegacyBridge workspaceRuntimeLegacyBridge)
+            WorkspaceCacheService workspaceCacheService)
         {
             _appCommonRuntime = appCommonRuntime
                 ?? throw new ArgumentNullException(nameof(appCommonRuntime));
             _workspaceCacheService = workspaceCacheService
                 ?? throw new ArgumentNullException(nameof(workspaceCacheService));
-            _workspaceRuntimeLegacyBridge = workspaceRuntimeLegacyBridge
-                ?? throw new ArgumentNullException(nameof(workspaceRuntimeLegacyBridge));
         }
 
         public async Task<WorkspaceContext> SelectRequiredWorkspaceAsync()
@@ -35,7 +31,7 @@ namespace HaloCreek.Services
             {
                 try
                 {
-                    return _workspaceRuntimeLegacyBridge.SwitchWorkspace(cachedWorkspacePath);
+                    return WorkspaceRuntime.SwitchWorkspace(cachedWorkspacePath);
                 }
                 catch (Exception ex) when (ex is InvalidOperationException
                     or IOException
@@ -78,7 +74,7 @@ namespace HaloCreek.Services
 
                 try
                 {
-                    return _workspaceRuntimeLegacyBridge.SwitchWorkspace(selectedPath);
+                    return WorkspaceRuntime.SwitchWorkspace(selectedPath);
                 }
                 catch (Exception ex) when (ex is InvalidOperationException
                     or IOException
