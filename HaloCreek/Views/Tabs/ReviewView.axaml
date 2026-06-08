@@ -146,37 +146,9 @@
                         </TabItem.Header>
                         <Grid DataContext="{Binding ModifiedGit}"
                               x:CompileBindings="False"
-                              RowDefinitions="Auto,*"
+                              RowDefinitions="*"
                               Background="White">
-                            <Border Grid.Row="0"
-                                    MinHeight="32"
-                                    Background="#F8FAFC"
-                                    Padding="10,0">
-                                <Grid ColumnDefinitions="76,84,*"
-                                      ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0"
-                                               Text="Status"
-                                               VerticalAlignment="Center"
-                                               Foreground="#475569"
-                                               FontSize="11"
-                                               FontWeight="SemiBold"/>
-                                    <TextBlock Grid.Column="1"
-                                               Text="Stage"
-                                               VerticalAlignment="Center"
-                                               Foreground="#475569"
-                                               FontSize="11"
-                                               FontWeight="SemiBold"/>
-                                    <TextBlock Grid.Column="2"
-                                               Text="Path"
-                                               VerticalAlignment="Center"
-                                               Foreground="#475569"
-                                               FontSize="11"
-                                               FontWeight="SemiBold"/>
-                                </Grid>
-                            </Border>
-
                             <ListBox x:Name="ModifiedChangesList"
-                                     Grid.Row="1"
                                      ItemsSource="{Binding Changes}"
                                      SelectedItem="{Binding SelectedChange, Mode=TwoWay}"
                                      SelectionMode="Single"

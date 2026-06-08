@@ -7,11 +7,8 @@ resume 切回来 或者每次新起session都先自动置于前台
 日志面板只在前台监听日志变化
 A - 追问和Agent修改 这种路径 exploreTo会出问题
 Reviewed相关文件操作走异步 或者打下点看看有没有优化空间
-偶现退出重进tmux command failed wsl 重启就好了
 git 列表批量commit
-git 列表header删去
 review VM有点过载 目前已经承载了Reviewed Unreviewed的业务语义和视图切换语义 加批注之后可能收不太住
 文件归属有点乱 git VM现在已经不是tab而是组件了 另外似乎不应该将VM按UI组织
 unreviewed的open选项 或者reviewed为空直接双击open
-modified的revert和delete选项
 常量考虑走一个文件 避免分叉
