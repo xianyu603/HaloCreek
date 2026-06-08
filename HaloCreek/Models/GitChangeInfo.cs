@@ -8,9 +8,17 @@ namespace HaloCreek.Models
         bool IsStaged,
         string? OriginalRelativePath = null)
     {
-        public string ChangeTypeText => ChangeType.ToString();
-
-        public string StageText => IsStaged ? "Staged" : "Unstaged";
+        public string ChangeTypeText => ChangeType switch
+        {
+            GitChangeType.Added => "A",
+            GitChangeType.Modified => "M",
+            GitChangeType.Deleted => "D",
+            GitChangeType.Renamed => "R",
+            GitChangeType.Copied => "C",
+            GitChangeType.Untracked => "?",
+            GitChangeType.Conflicted => "U",
+            _ => "?",
+        };
 
         public string DisplayPath => string.IsNullOrWhiteSpace(OriginalRelativePath)
             ? RelativePath
