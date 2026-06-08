@@ -25,7 +25,7 @@ namespace HaloCreek.Infrastructure
 
     public sealed class PlatformInfrastructure
     {
-        private const int WslCommandTimeoutMilliseconds = 3000;
+        private const int WslCommandTimeoutMilliseconds = 10000;
 
         private readonly Window _owner;
         private IReadOnlyList<string>? _wslDistributionNames;
