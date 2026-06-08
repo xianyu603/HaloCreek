@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
@@ -26,7 +25,6 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly AppCommonRuntime _appCommonRuntime;
         private readonly TransientEventService _transientEventService;
-        private ReviewPanelLayoutState _panelLayoutState;
         private ReviewClipboardClipLocateResult? _clipLocateResult;
         private IReadOnlyList<ReviewFilePath> _unreviewedFiles = Array.Empty<ReviewFilePath>();
         private IReadOnlyList<ReviewFilePath> _reviewedFiles = Array.Empty<ReviewFilePath>();
@@ -55,8 +53,6 @@ namespace HaloCreek.ViewModels.Tabs
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _appCommonRuntime = appCommonRuntime ?? throw new ArgumentNullException(nameof(appCommonRuntime));
             _transientEventService = _appCommonRuntime.TransientEventService;
-            MoveLeftCommand = new RelayCommand(MoveLeft, CanMoveLeft);
-            MoveRightCommand = new RelayCommand(MoveRight, CanMoveRight);
             RefreshCommand = new RelayCommand(RefreshReviewFiles);
             ModifiedGit = new GitViewModel(
                 _gitService,
@@ -80,26 +76,6 @@ namespace HaloCreek.ViewModels.Tabs
             ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
             RefreshFrontSessionState();
         }
-
-        public bool IsLeftPanelExpanded => _panelLayoutState != ReviewPanelLayoutState.LeftCollapsed;
-
-        public bool IsRightPanelExpanded => _panelLayoutState != ReviewPanelLayoutState.RightCollapsed;
-
-        public GridLength LeftPanelWidth => _panelLayoutState == ReviewPanelLayoutState.LeftCollapsed
-            ? new GridLength(0)
-            : new GridLength(1, GridUnitType.Star);
-
-        public GridLength RightPanelWidth => _panelLayoutState == ReviewPanelLayoutState.RightCollapsed
-            ? new GridLength(0)
-            : new GridLength(1, GridUnitType.Star);
-
-        public GridLength PanelGapWidth => IsLeftPanelExpanded && IsRightPanelExpanded
-            ? new GridLength(12)
-            : new GridLength(0);
-
-        public IRelayCommand MoveLeftCommand { get; }
-
-        public IRelayCommand MoveRightCommand { get; }
 
         public IRelayCommand RefreshCommand { get; }
 
@@ -191,53 +167,6 @@ namespace HaloCreek.ViewModels.Tabs
         public void OnSelected()
         {
             RefreshReviewFiles();
-        }
-
-        private void MoveLeft()
-        {
-            PanelLayoutState = _panelLayoutState == ReviewPanelLayoutState.RightCollapsed
-                ? ReviewPanelLayoutState.BothExpanded
-                : ReviewPanelLayoutState.LeftCollapsed;
-        }
-
-        private bool CanMoveLeft()
-        {
-            return _panelLayoutState != ReviewPanelLayoutState.LeftCollapsed;
-        }
-
-        private void MoveRight()
-        {
-            PanelLayoutState = _panelLayoutState == ReviewPanelLayoutState.LeftCollapsed
-                ? ReviewPanelLayoutState.BothExpanded
-                : ReviewPanelLayoutState.RightCollapsed;
-        }
-
-        private bool CanMoveRight()
-        {
-            return _panelLayoutState != ReviewPanelLayoutState.RightCollapsed;
-        }
-
-        private ReviewPanelLayoutState PanelLayoutState
-        {
-            set
-            {
-                if (_panelLayoutState != value)
-                {
-                    _panelLayoutState = value;
-                    OnPanelLayoutChanged();
-                }
-            }
-        }
-
-        private void OnPanelLayoutChanged()
-        {
-            OnPropertyChanged(nameof(IsLeftPanelExpanded));
-            OnPropertyChanged(nameof(IsRightPanelExpanded));
-            OnPropertyChanged(nameof(LeftPanelWidth));
-            OnPropertyChanged(nameof(RightPanelWidth));
-            OnPropertyChanged(nameof(PanelGapWidth));
-            MoveLeftCommand.NotifyCanExecuteChanged();
-            MoveRightCommand.NotifyCanExecuteChanged();
         }
 
         private void ActivateFrontClient()
@@ -446,13 +375,6 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _sessionLifecycleService.SendMessageToFrontSession(message);
-        }
-
-        private enum ReviewPanelLayoutState
-        {
-            BothExpanded,
-            LeftCollapsed,
-            RightCollapsed
         }
     }
 }
