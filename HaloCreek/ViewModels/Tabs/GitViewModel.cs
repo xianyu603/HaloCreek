@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
@@ -76,9 +77,9 @@ namespace HaloCreek.ViewModels.Tabs
             LoadActionConfig(config);
         }
 
-        public void RefreshChanges()
+        public async Task RefreshChangesAsync()
         {
-            var result = _gitService.GetChanges();
+            var result = await Task.Run(_gitService.GetChanges);
 
             SelectedChange = null;
             Changes = result.Changes;

@@ -53,7 +53,7 @@ namespace HaloCreek.ViewModels.Tabs
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _appCommonRuntime = appCommonRuntime ?? throw new ArgumentNullException(nameof(appCommonRuntime));
             _transientEventService = _appCommonRuntime.TransientEventService;
-            RefreshCommand = new RelayCommand(RefreshReviewFiles);
+            RefreshCommand = new AsyncRelayCommand(RefreshReviewFilesAsync);
             ModifiedGit = new GitViewModel(
                 _gitService,
                 _appCommonRuntime,
@@ -77,7 +77,7 @@ namespace HaloCreek.ViewModels.Tabs
             RefreshFrontSessionState();
         }
 
-        public IRelayCommand RefreshCommand { get; }
+        public IAsyncRelayCommand RefreshCommand { get; }
 
         public IAsyncRelayCommand ShowClipLocateLineCommand { get; }
 
@@ -166,7 +166,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         public void OnSelected()
         {
-            RefreshReviewFiles();
+            RequestRefreshReviewFiles();
         }
 
         private void ActivateFrontClient()
@@ -223,17 +223,41 @@ namespace HaloCreek.ViewModels.Tabs
             ClipLocateButtonForeground = isMatched ? MatchedForeground : UnmatchedForeground;
         }
 
-        private void RefreshReviewFiles()
+        private void RequestRefreshReviewFiles()
+        {
+            // AsyncRelayCommand defaults to one in-flight execution, so quick repeated refresh
+            // requests are ignored instead of running concurrent review index updates. If workspace
+            // switching needs stale async result cancellation, keep that as a WorkspaceRuntime-bound
+            // operation rather than adding per-view-model pending/generation handling here.
+            if (RefreshCommand.CanExecute(null))
+            {
+                RefreshCommand.Execute(null);
+            }
+        }
+
+        private async Task RefreshReviewFilesAsync()
         {
             try
             {
                 Log.Info("Review", "RefreshReviewSnapshot invoked.");
-                _reviewSnapshotService.RefreshReviewSnapshot();
+                var result = await Task.Run(() =>
+                {
+                    _reviewSnapshotService.RefreshReviewSnapshot();
+                    return new ReviewFilesRefreshResult(
+                        _reviewSnapshotService.GetWorkingTreeAgainstReviewedFiles(),
+                        _reviewSnapshotService.GetReviewedAgainstHeadFiles());
+                });
+
+                if (_isDisposed)
+                {
+                    return;
+                }
+
                 SelectedUnreviewedFile = null;
                 SelectedReviewedFile = null;
-                UnreviewedFiles = _reviewSnapshotService.GetWorkingTreeAgainstReviewedFiles();
-                ReviewedFiles = _reviewSnapshotService.GetReviewedAgainstHeadFiles();
-                ModifiedGit.RefreshChanges();
+                UnreviewedFiles = result.UnreviewedFiles;
+                ReviewedFiles = result.ReviewedFiles;
+                await ModifiedGit.RefreshChangesAsync();
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
@@ -249,7 +273,7 @@ namespace HaloCreek.ViewModels.Tabs
         {
             ArgumentNullException.ThrowIfNull(workspace);
             ModifiedGit.ApplyWorkspaceConfig(workspace.EffectiveConfig);
-            RefreshReviewFiles();
+            RequestRefreshReviewFiles();
         }
 
         private void AddReviewed(ReviewFilePath? file)
@@ -261,7 +285,7 @@ namespace HaloCreek.ViewModels.Tabs
                 Log.Info("Review", $"AddReviewed invoked. File={file.RelativePath}");
                 _reviewSnapshotService.MarkFileReviewed(file.RelativePath);
                 Log.Info("Review", $"Marked reviewed: {file.RelativePath}");
-                RefreshReviewFiles();
+                RequestRefreshReviewFiles();
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
@@ -282,7 +306,7 @@ namespace HaloCreek.ViewModels.Tabs
                 Log.Info("Review", $"MarkUnreviewed invoked. File={file.RelativePath}");
                 _reviewSnapshotService.MarkFileUnreviewed(file.RelativePath);
                 Log.Info("Review", $"Marked unreviewed: {file.RelativePath}");
-                RefreshReviewFiles();
+                RequestRefreshReviewFiles();
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
@@ -376,5 +400,9 @@ namespace HaloCreek.ViewModels.Tabs
 
             _sessionLifecycleService.SendMessageToFrontSession(message);
         }
+
+        private sealed record ReviewFilesRefreshResult(
+            IReadOnlyList<ReviewFilePath> UnreviewedFiles,
+            IReadOnlyList<ReviewFilePath> ReviewedFiles);
     }
 }
