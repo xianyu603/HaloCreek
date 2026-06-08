@@ -45,6 +45,28 @@ namespace HaloCreek.Models
                     "notepad.exe",
                     new[] { "{SelectedPath}" }),
                 new GitFileBrowserActionConfig(
+                    "Revert",
+                    "Revert",
+                    GitFileBrowserActionTarget.SelectedFilePath,
+                    "cmd.exe",
+                    new[]
+                    {
+                        "/c",
+                        "git",
+                        "restore",
+                        "--source=HEAD",
+                        "--staged",
+                        "--worktree",
+                        "--",
+                        "{SelectedPath}",
+                    }),
+                new GitFileBrowserActionConfig(
+                    "Delete",
+                    "Delete",
+                    GitFileBrowserActionTarget.SelectedFilePath,
+                    "cmd.exe",
+                    new[] { "/c", "del", "/f", "/q", "{SelectedPath}" }),
+                new GitFileBrowserActionConfig(
                     "Commit",
                     "Commit",
                     GitFileBrowserActionTarget.WorkspaceRoot,
