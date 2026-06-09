@@ -30,6 +30,7 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<ReviewFilePath> _reviewedFiles = Array.Empty<ReviewFilePath>();
         private ReviewFilePath? _selectedUnreviewedFile;
         private ReviewFilePath? _selectedReviewedFile;
+        private string _reviewPromptText = string.Empty;
         private string _clipLocateStatusText = "Unmatched";
         private IBrush _clipLocateButtonForeground = UnmatchedForeground;
         private bool _hasFrontSession;
@@ -60,7 +61,8 @@ namespace HaloCreek.ViewModels.Tabs
                 RefreshCommand);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
-            SendPromptCommand = new AsyncRelayCommand(SendPromptAsync, CanSendPrompt);
+            SendPromptCommand = new RelayCommand(SendPrompt, CanSendPrompt);
+            LaunchPromptCommand = new RelayCommand(LaunchPrompt, CanLaunchPrompt);
             AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed);
             MarkUnreviewedCommand = new RelayCommand<ReviewFilePath>(MarkUnreviewed);
             DiffUnreviewedAgainstReviewedCommand = new RelayCommand<ReviewFilePath>(
@@ -83,7 +85,9 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand ActivateFrontClientCommand { get; }
 
-        public IAsyncRelayCommand SendPromptCommand { get; }
+        public IRelayCommand SendPromptCommand { get; }
+
+        public IRelayCommand LaunchPromptCommand { get; }
 
         public IRelayCommand<ReviewFilePath> AddReviewedCommand { get; }
 
@@ -119,6 +123,19 @@ namespace HaloCreek.ViewModels.Tabs
         {
             get => _selectedReviewedFile;
             set => SetProperty(ref _selectedReviewedFile, value);
+        }
+
+        public string ReviewPromptText
+        {
+            get => _reviewPromptText;
+            set
+            {
+                if (SetProperty(ref _reviewPromptText, value ?? string.Empty))
+                {
+                    SendPromptCommand.NotifyCanExecuteChanged();
+                    LaunchPromptCommand.NotifyCanExecuteChanged();
+                }
+            }
         }
 
         public bool HasFrontSession
@@ -181,7 +198,17 @@ namespace HaloCreek.ViewModels.Tabs
 
         private bool CanSendPrompt()
         {
-            return HasFrontSession;
+            return HasFrontSession && HasReviewPromptText();
+        }
+
+        private bool CanLaunchPrompt()
+        {
+            return HasReviewPromptText();
+        }
+
+        private bool HasReviewPromptText()
+        {
+            return !string.IsNullOrWhiteSpace(ReviewPromptText);
         }
 
         private void RefreshFrontSessionState(object? sender = null, EventArgs? e = null)
@@ -379,26 +406,24 @@ namespace HaloCreek.ViewModels.Tabs
                 message);
         }
 
-        private async Task SendPromptAsync()
+        private void SendPrompt()
         {
-            var initialText = _clipLocateResult?.Status == ReviewClipboardClipLocateStatus.UniqueMatch
-                && _clipLocateResult.ClipLocate is not null
-                    ? _clipLocateResult.ClipLocate.FormatLocationText()
-                        + Environment.NewLine
-                    : string.Empty;
+            _sessionLifecycleService.SendMessageToFrontSession(ReviewPromptText);
+        }
 
-            var message = await _appCommonRuntime.PlatformInfrastructure.ShowTextInputDialogAsync(
-                "Send Prompt",
-                initialText,
-                "Send",
-                "Cancel");
-
-            if (message is null || string.IsNullOrWhiteSpace(message))
+        private void LaunchPrompt()
+        {
+            var result = _sessionLifecycleService.Launch(ReviewPromptText);
+            if (result.Started)
             {
+                Log.Info("Review", result.StatusMessage);
                 return;
             }
 
-            _sessionLifecycleService.SendMessageToFrontSession(message);
+            _transientEventService.ReportUserActionFailure(
+                "Review",
+                "Launch failed",
+                result.StatusMessage);
         }
 
         private sealed record ReviewFilesRefreshResult(

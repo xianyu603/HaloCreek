@@ -310,12 +310,20 @@
                     Background="#FFFFFF"
                     ClipToBounds="True">
                 <TextBox AcceptsReturn="True"
+                         Text="{Binding ReviewPromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          TextWrapping="Wrap"
                          PlaceholderText="Prompt / instructions"
                          BorderThickness="0"
                          Background="Transparent"
                          Padding="10"
-                         VerticalContentAlignment="Top"/>
+                         VerticalContentAlignment="Top">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Alt+Enter"
+                                    Command="{Binding SendPromptCommand}"/>
+                        <KeyBinding Gesture="Ctrl+Enter"
+                                    Command="{Binding LaunchPromptCommand}"/>
+                    </TextBox.KeyBindings>
+                </TextBox>
             </Border>
 
             <Border Grid.Row="4"
@@ -332,7 +340,8 @@
                             Command="{Binding SendPromptCommand}"/>
                     <Button Grid.Column="1"
                             Classes="reviewActionButton"
-                            Content="Launch New"/>
+                            Content="Launch New"
+                            Command="{Binding LaunchPromptCommand}"/>
                 </Grid>
             </Border>
         </Grid>
