@@ -5,9 +5,10 @@
              x:DataType="vm:ReviewViewModel"
              x:Class="HaloCreek.Views.Tabs.ReviewView">
     <UserControl.Styles>
-        <Style Selector="Button.reviewBarButton">
+        <Style Selector="Button.reviewActionButton">
             <Setter Property="MinWidth" Value="116"/>
             <Setter Property="Height" Value="36"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -17,9 +18,10 @@
             <Setter Property="Padding" Value="10,0"/>
         </Style>
 
-        <Style Selector="Border.reviewBarStatus">
+        <Style Selector="Border.reviewStatusPill">
             <Setter Property="MinWidth" Value="116"/>
             <Setter Property="Height" Value="36"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -27,7 +29,7 @@
             <Setter Property="Padding" Value="10,0"/>
         </Style>
 
-        <Style Selector="TextBlock.reviewBarStatusText">
+        <Style Selector="TextBlock.reviewStatusText">
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="TextAlignment" Value="Center"/>
@@ -58,79 +60,115 @@
             <Setter Property="MinHeight" Value="20"/>
             <Setter Property="Height" Value="25"/>
         </Style>
+
+        <Style Selector="ListBox.reviewFileList">
+            <Setter Property="SelectionMode" Value="Single"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+        </Style>
+
+        <Style Selector="ListBox.reviewFileList ListBoxItem">
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*"
-          Margin="20"
-          RowSpacing="12">
-        <Grid Grid.Row="0"
-              ColumnDefinitions="Auto,*"
-              ColumnSpacing="12">
-            <Border Grid.Column="0"
+    <Grid Margin="20"
+          ColumnDefinitions="*,320"
+          ColumnSpacing="12">
+        <Grid Grid.Column="0"
+              RowDefinitions="*,12,*">
+            <Border Grid.Row="0"
                     BorderBrush="#CBD5E1"
                     BorderThickness="1"
-                    CornerRadius="6"
-                    Background="#E2E8F0"
-                    Padding="8">
-                <ItemsControl>
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal"
-                                        Spacing="8"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
+                    CornerRadius="3"
+                    Background="#FFFFFF"
+                    ClipToBounds="True">
+                <Grid RowDefinitions="Auto,*">
+                    <Border Grid.Row="0"
+                            BorderBrush="#E2E8F0"
+                            BorderThickness="0,0,0,1"
+                            Padding="10,7"
+                            Background="#F8FAFC">
+                        <TextBlock Classes="reviewPanelTitle"
+                                   Text="Modified"/>
+                    </Border>
 
-                    <Border Classes="reviewBarStatus"
-                            DoubleTapped="ClipLocateStatus_OnDoubleTapped">
-                        <TextBlock Classes="reviewBarStatusText"
-                                   Text="{Binding ClipLocateStatusText}"
-                                   Foreground="{Binding ClipLocateButtonForeground}"/>
-                    </Border>
-                    <Border Classes="reviewBarStatus"
-                            IsEnabled="{Binding HasFrontSession}"
-                            DoubleTapped="FrontSession_OnDoubleTapped">
-                        <TextBlock Classes="reviewBarStatusText"
-                                   Text="Front Session"
-                                   Foreground="{Binding FrontSessionButtonForeground}"/>
-                    </Border>
-                </ItemsControl>
+                    <Grid Grid.Row="1"
+                          DataContext="{Binding ModifiedGit}"
+                          x:CompileBindings="False"
+                          Background="White">
+                        <ListBox x:Name="ModifiedChangesList"
+                                 Classes="reviewFileList"
+                                 ItemsSource="{Binding Changes}"
+                                 SelectedItem="{Binding SelectedChange, Mode=TwoWay}">
+                            <ListBox.ContextMenu>
+                                <ContextMenu Opened="ModifiedRootContextMenu_OnOpened"
+                                             ItemsSource="{Binding WorkspaceRootActions}">
+                                    <ContextMenu.Styles>
+                                        <Style Selector="MenuItem">
+                                            <Setter Property="Header" Value="{Binding Label}"/>
+                                            <Setter Property="Command" Value="{Binding Command}"/>
+                                        </Style>
+                                    </ContextMenu.Styles>
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="model:GitChangeInfo"
+                                              x:CompileBindings="False">
+                                    <Grid MinHeight="34"
+                                          RowDefinitions="1,*"
+                                          Background="Transparent"
+                                          DoubleTapped="ModifiedChange_OnDoubleTapped">
+                                        <Grid.ContextMenu>
+                                            <ContextMenu Opened="ModifiedChangeContextMenu_OnOpened">
+                                                <ContextMenu.Styles>
+                                                    <Style Selector="MenuItem">
+                                                        <Setter Property="Header" Value="{Binding Label}"/>
+                                                        <Setter Property="Command" Value="{Binding Command}"/>
+                                                    </Style>
+                                                </ContextMenu.Styles>
+                                            </ContextMenu>
+                                        </Grid.ContextMenu>
+                                        <Border Grid.Row="0"
+                                                Background="#E2E8F0"/>
+                                        <Border Grid.Row="1"
+                                                Padding="10,0"
+                                                Background="Transparent">
+                                            <Grid ColumnDefinitions="24,*"
+                                                  ColumnSpacing="8">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding ChangeTypeText}"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Foreground="#334155"
+                                                           FontSize="12"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding DisplayPath}"
+                                                           VerticalAlignment="Center"
+                                                           TextWrapping="NoWrap"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Foreground="#334155"
+                                                           FontSize="12"/>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Grid>
             </Border>
 
-            <Border Grid.Column="1"
-                    BorderBrush="#CBD5E1"
-                    BorderThickness="1"
-                    CornerRadius="6"
-                    Background="#E2E8F0"
-                    Padding="8">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Disabled">
-                    <ItemsControl>
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal"
-                                            Spacing="8"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-
-                        <Button Classes="reviewBarButton"
-                                Content="Send Prompt"
-                                Command="{Binding SendPromptCommand}"/>
-                        <Button Classes="reviewBarButton"
-                                Content="Add Note"/>
-                    </ItemsControl>
-                </ScrollViewer>
-            </Border>
-
-        </Grid>
-
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0"
+            <Border Grid.Row="2"
                     BorderBrush="#CBD5E1"
                     BorderThickness="1"
                     CornerRadius="3"
@@ -141,119 +179,18 @@
                             SelectedIndex="0">
                     <TabItem Classes="reviewInnerTab">
                         <TabItem.Header>
-                            <TextBlock Text="Modified"
-                                       FontSize="13"/>
-                        </TabItem.Header>
-                        <Grid DataContext="{Binding ModifiedGit}"
-                              x:CompileBindings="False"
-                              RowDefinitions="*"
-                              Background="White">
-                            <ListBox x:Name="ModifiedChangesList"
-                                     ItemsSource="{Binding Changes}"
-                                     SelectedItem="{Binding SelectedChange, Mode=TwoWay}"
-                                     SelectionMode="Single"
-                                     BorderThickness="0"
-                                     Background="White"
-                                     Padding="0"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                <ListBox.ContextMenu>
-                                    <ContextMenu Opened="ModifiedRootContextMenu_OnOpened"
-                                                 ItemsSource="{Binding WorkspaceRootActions}">
-                                        <ContextMenu.Styles>
-                                            <Style Selector="MenuItem">
-                                                <Setter Property="Header" Value="{Binding Label}"/>
-                                                <Setter Property="Command" Value="{Binding Command}"/>
-                                            </Style>
-                                        </ContextMenu.Styles>
-                                    </ContextMenu>
-                                </ListBox.ContextMenu>
-                                <ListBox.Styles>
-                                    <Style Selector="ListBoxItem">
-                                        <Setter Property="MinHeight" Value="34"/>
-                                        <Setter Property="Padding" Value="0"/>
-                                        <Setter Property="Margin" Value="0"/>
-                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-                                        <Setter Property="Background" Value="Transparent"/>
-                                    </Style>
-                                </ListBox.Styles>
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate DataType="model:GitChangeInfo"
-                                                  x:CompileBindings="False">
-                                        <Grid MinHeight="34"
-                                              RowDefinitions="1,*"
-                                              Background="Transparent"
-                                              DoubleTapped="ModifiedChange_OnDoubleTapped">
-                                            <Grid.ContextMenu>
-                                                <ContextMenu Opened="ModifiedChangeContextMenu_OnOpened">
-                                                    <ContextMenu.Styles>
-                                                        <Style Selector="MenuItem">
-                                                            <Setter Property="Header" Value="{Binding Label}"/>
-                                                            <Setter Property="Command" Value="{Binding Command}"/>
-                                                        </Style>
-                                                    </ContextMenu.Styles>
-                                                </ContextMenu>
-                                            </Grid.ContextMenu>
-                                            <Border Grid.Row="0"
-                                                    Background="#E2E8F0"/>
-                                            <Border Grid.Row="1"
-                                                    Padding="10,0"
-                                                    Background="Transparent">
-                                                <Grid ColumnDefinitions="24,*"
-                                                      ColumnSpacing="8">
-                                                    <TextBlock Grid.Column="0"
-                                                               Text="{Binding ChangeTypeText}"
-                                                               VerticalAlignment="Center"
-                                                               HorizontalAlignment="Center"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               Foreground="#334155"
-                                                               FontSize="12"/>
-                                                    <TextBlock Grid.Column="1"
-                                                               Text="{Binding DisplayPath}"
-                                                               VerticalAlignment="Center"
-                                                               TextWrapping="NoWrap"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               Foreground="#334155"
-                                                               FontSize="12"/>
-                                                </Grid>
-                                            </Border>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-
-                        </Grid>
-                    </TabItem>
-                    <TabItem Classes="reviewInnerTab">
-                        <TabItem.Header>
                             <TextBlock Text="Unreviewed"
                                        FontSize="13"/>
                         </TabItem.Header>
-                        <ListBox ItemsSource="{Binding UnreviewedFiles}"
-                                 SelectedItem="{Binding SelectedUnreviewedFile, Mode=TwoWay}"
-                                 SelectionMode="Single"
-                                 BorderThickness="0"
-                                 Background="White"
-                                 Padding="0"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox Classes="reviewFileList"
+                                 ItemsSource="{Binding UnreviewedFiles}"
+                                 SelectedItem="{Binding SelectedUnreviewedFile, Mode=TwoWay}">
                             <ListBox.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="Refresh"
                                               Command="{Binding RefreshCommand}"/>
                                 </ContextMenu>
                             </ListBox.ContextMenu>
-                            <ListBox.Styles>
-                                <Style Selector="ListBoxItem">
-                                    <Setter Property="MinHeight" Value="34"/>
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Margin" Value="0"/>
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                </Style>
-                            </ListBox.Styles>
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="model:ReviewFilePath"
                                               x:CompileBindings="False">
@@ -291,30 +228,15 @@
                             <TextBlock Text="Reviewed"
                                        FontSize="13"/>
                         </TabItem.Header>
-                        <ListBox ItemsSource="{Binding ReviewedFiles}"
-                                 SelectedItem="{Binding SelectedReviewedFile, Mode=TwoWay}"
-                                 SelectionMode="Single"
-                                 BorderThickness="0"
-                                 Background="White"
-                                 Padding="0"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox Classes="reviewFileList"
+                                 ItemsSource="{Binding ReviewedFiles}"
+                                 SelectedItem="{Binding SelectedReviewedFile, Mode=TwoWay}">
                             <ListBox.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="Refresh"
                                               Command="{Binding RefreshCommand}"/>
                                 </ContextMenu>
                             </ListBox.ContextMenu>
-                            <ListBox.Styles>
-                                <Style Selector="ListBoxItem">
-                                    <Setter Property="MinHeight" Value="34"/>
-                                    <Setter Property="Padding" Value="0"/>
-                                    <Setter Property="Margin" Value="0"/>
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                </Style>
-                            </ListBox.Styles>
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="model:ReviewFilePath"
                                               x:CompileBindings="False">
@@ -351,14 +273,67 @@
                     </TabItem>
                 </TabControl>
             </Border>
+        </Grid>
 
-            <Border Grid.Column="2"
+        <Grid Grid.Column="1"
+              RowDefinitions="Auto,12,*,12,Auto">
+            <Border Grid.Row="0"
+                    BorderBrush="#CBD5E1"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Background="#FFFFFF"
+                    Padding="10">
+                <Grid ColumnDefinitions="*,*"
+                      ColumnSpacing="8">
+                    <Border Grid.Column="0"
+                            Classes="reviewStatusPill"
+                            DoubleTapped="ClipLocateStatus_OnDoubleTapped">
+                        <TextBlock Classes="reviewStatusText"
+                                   Text="{Binding ClipLocateStatusText}"
+                                   Foreground="{Binding ClipLocateButtonForeground}"/>
+                    </Border>
+                    <Border Grid.Column="1"
+                            Classes="reviewStatusPill"
+                            IsEnabled="{Binding HasFrontSession}"
+                            DoubleTapped="FrontSession_OnDoubleTapped">
+                        <TextBlock Classes="reviewStatusText"
+                                   Text="Front Session"
+                                   Foreground="{Binding FrontSessionButtonForeground}"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="2"
                     BorderBrush="#CBD5E1"
                     BorderThickness="1"
                     CornerRadius="3"
                     Background="#FFFFFF"
                     ClipToBounds="True">
-                <Grid Background="#FFFFFF"/>
+                <TextBox AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         PlaceholderText="Prompt / instructions"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         Padding="10"
+                         VerticalContentAlignment="Top"/>
+            </Border>
+
+            <Border Grid.Row="4"
+                    BorderBrush="#CBD5E1"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Background="#FFFFFF"
+                    Padding="10">
+                <Grid ColumnDefinitions="*,*"
+                      ColumnSpacing="8">
+                    <Button Grid.Column="0"
+                            Classes="reviewActionButton"
+                            Content="SendToFront"
+                            Command="{Binding SendPromptCommand}"/>
+                    <Button Grid.Column="1"
+                            Classes="reviewActionButton"
+                            Content="Launch New"/>
+                </Grid>
             </Border>
         </Grid>
     </Grid>
