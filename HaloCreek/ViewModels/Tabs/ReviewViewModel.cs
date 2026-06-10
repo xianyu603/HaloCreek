@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -17,6 +18,7 @@ namespace HaloCreek.ViewModels.Tabs
         private static readonly IBrush UnmatchedForeground = new SolidColorBrush(Color.Parse("#854D0E"));
         private static readonly IBrush FrontSessionForeground = new SolidColorBrush(Color.Parse("#334155"));
         private static readonly IBrush DisabledForeground = new SolidColorBrush(Color.Parse("#94A3B8"));
+        private static readonly TimeSpan AutoRefreshInterval = TimeSpan.FromSeconds(10);
 
         private readonly ReviewSnapshotService _reviewSnapshotService;
         private readonly GitService _gitService;
@@ -25,6 +27,7 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly AppCommonRuntime _appCommonRuntime;
         private readonly TransientEventService _transientEventService;
+        private readonly DispatcherTimer _autoRefreshTimer;
         private ReviewClipboardClipLocateResult? _clipLocateResult;
         private IReadOnlyList<ReviewFilePath> _unreviewedFiles = Array.Empty<ReviewFilePath>();
         private IReadOnlyList<ReviewFilePath> _reviewedFiles = Array.Empty<ReviewFilePath>();
@@ -77,6 +80,11 @@ namespace HaloCreek.ViewModels.Tabs
             OnWorkspaceChanged(WorkspaceRuntime.Current);
             ApplyClipLocateResult(_reviewClipboardContextService.CurrentClipLocateResult);
             RefreshFrontSessionState();
+            _autoRefreshTimer = new DispatcherTimer(
+                AutoRefreshInterval,
+                DispatcherPriority.Background,
+                OnAutoRefreshTimerTick);
+            _autoRefreshTimer.Start();
         }
 
         public IAsyncRelayCommand RefreshCommand { get; }
@@ -176,6 +184,8 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _isDisposed = true;
+            _autoRefreshTimer.Stop();
+            _autoRefreshTimer.Tick -= OnAutoRefreshTimerTick;
             WorkspaceRuntime.Changed -= OnWorkspaceChanged;
             _reviewClipboardContextService.ClipLocateChanged -= OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
@@ -250,6 +260,14 @@ namespace HaloCreek.ViewModels.Tabs
             ClipLocateButtonForeground = isMatched ? MatchedForeground : UnmatchedForeground;
         }
 
+        private void OnAutoRefreshTimerTick(object? sender, EventArgs e)
+        {
+            if (!_isDisposed)
+            {
+                RequestRefreshReviewFiles();
+            }
+        }
+
         private void RequestRefreshReviewFiles()
         {
             // AsyncRelayCommand defaults to one in-flight execution, so quick repeated refresh
@@ -280,10 +298,15 @@ namespace HaloCreek.ViewModels.Tabs
                     return;
                 }
 
-                SelectedUnreviewedFile = null;
-                SelectedReviewedFile = null;
-                UnreviewedFiles = result.UnreviewedFiles;
-                ReviewedFiles = result.ReviewedFiles;
+                if (!UnreviewedFiles.SequenceEqual(result.UnreviewedFiles)
+                    || !ReviewedFiles.SequenceEqual(result.ReviewedFiles))
+                {
+                    SelectedUnreviewedFile = null;
+                    SelectedReviewedFile = null;
+                    UnreviewedFiles = result.UnreviewedFiles;
+                    ReviewedFiles = result.ReviewedFiles;
+                }
+
                 await ModifiedGit.RefreshChangesAsync();
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
