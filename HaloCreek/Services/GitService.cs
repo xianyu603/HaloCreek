@@ -159,6 +159,7 @@ namespace HaloCreek.Services
                     FileName = executable,
                     WorkingDirectory = workspacePath,
                     UseShellExecute = false,
+                    CreateNoWindow = true,
                 };
 
                 foreach (var argument in resolvedArguments)

@@ -48,11 +48,9 @@ namespace HaloCreek.Models
                     "Revert",
                     "Revert",
                     GitFileBrowserActionTarget.SelectedFilePath,
-                    "cmd.exe",
+                    "git",
                     new[]
                     {
-                        "/c",
-                        "git",
                         "restore",
                         "--source=HEAD",
                         "--staged",
