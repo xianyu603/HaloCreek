@@ -68,6 +68,8 @@ namespace HaloCreek.ViewModels.Tabs
             LaunchPromptCommand = new RelayCommand(LaunchPrompt, CanLaunchPrompt);
             AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed);
             MarkUnreviewedCommand = new RelayCommand<ReviewFilePath>(MarkUnreviewed);
+            MarkAllReviewedCommand = new RelayCommand(MarkAllReviewed, HasUnreviewedFiles);
+            MarkAllUnreviewedCommand = new RelayCommand(MarkAllUnreviewed, HasReviewedFiles);
             DiffUnreviewedAgainstReviewedCommand = new RelayCommand<ReviewFilePath>(
                 DiffWorkingTreeAgainstReviewed);
             DiffReviewedAgainstWorkingTreeCommand = new RelayCommand<ReviewFilePath>(
@@ -101,6 +103,10 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<ReviewFilePath> MarkUnreviewedCommand { get; }
 
+        public IRelayCommand MarkAllReviewedCommand { get; }
+
+        public IRelayCommand MarkAllUnreviewedCommand { get; }
+
         public IRelayCommand<ReviewFilePath> DiffUnreviewedAgainstReviewedCommand { get; }
 
         public IRelayCommand<ReviewFilePath> DiffReviewedAgainstWorkingTreeCommand { get; }
@@ -112,13 +118,25 @@ namespace HaloCreek.ViewModels.Tabs
         public IReadOnlyList<ReviewFilePath> UnreviewedFiles
         {
             get => _unreviewedFiles;
-            private set => SetProperty(ref _unreviewedFiles, value);
+            private set
+            {
+                if (SetProperty(ref _unreviewedFiles, value))
+                {
+                    MarkAllReviewedCommand.NotifyCanExecuteChanged();
+                }
+            }
         }
 
         public IReadOnlyList<ReviewFilePath> ReviewedFiles
         {
             get => _reviewedFiles;
-            private set => SetProperty(ref _reviewedFiles, value);
+            private set
+            {
+                if (SetProperty(ref _reviewedFiles, value))
+                {
+                    MarkAllUnreviewedCommand.NotifyCanExecuteChanged();
+                }
+            }
         }
 
         public ReviewFilePath? SelectedUnreviewedFile
@@ -347,6 +365,37 @@ namespace HaloCreek.ViewModels.Tabs
             }
         }
 
+        private bool HasUnreviewedFiles()
+        {
+            return UnreviewedFiles.Count > 0;
+        }
+
+        private void MarkAllReviewed()
+        {
+            var files = UnreviewedFiles.ToArray();
+
+            try
+            {
+                Log.Info("Review", $"MarkAllReviewed invoked. Count={files.Length}");
+                foreach (var file in files)
+                {
+                    _reviewSnapshotService.MarkFileReviewed(file.RelativePath);
+                }
+
+                Log.Info("Review", $"Marked all reviewed. Count={files.Length}");
+                RequestRefreshReviewFiles();
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                RequestRefreshReviewFiles();
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Mark all reviewed failed",
+                    ex.Message,
+                    ex);
+            }
+        }
+
         private void MarkUnreviewed(ReviewFilePath? file)
         {
             ArgumentNullException.ThrowIfNull(file);
@@ -363,6 +412,37 @@ namespace HaloCreek.ViewModels.Tabs
                 _transientEventService.ReportUserActionFailure(
                     "Review",
                     "Mark unreviewed failed",
+                    ex.Message,
+                    ex);
+            }
+        }
+
+        private bool HasReviewedFiles()
+        {
+            return ReviewedFiles.Count > 0;
+        }
+
+        private void MarkAllUnreviewed()
+        {
+            var files = ReviewedFiles.ToArray();
+
+            try
+            {
+                Log.Info("Review", $"MarkAllUnreviewed invoked. Count={files.Length}");
+                foreach (var file in files)
+                {
+                    _reviewSnapshotService.MarkFileUnreviewed(file.RelativePath);
+                }
+
+                Log.Info("Review", $"Marked all unreviewed. Count={files.Length}");
+                RequestRefreshReviewFiles();
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                RequestRefreshReviewFiles();
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Mark all unreviewed failed",
                     ex.Message,
                     ex);
             }

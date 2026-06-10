@@ -187,6 +187,8 @@
                                  SelectedItem="{Binding SelectedUnreviewedFile, Mode=TwoWay}">
                             <ListBox.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="All Reviewed"
+                                              Command="{Binding MarkAllReviewedCommand}"/>
                                     <MenuItem Header="Refresh"
                                               Command="{Binding RefreshCommand}"/>
                                 </ContextMenu>
@@ -233,6 +235,8 @@
                                  SelectedItem="{Binding SelectedReviewedFile, Mode=TwoWay}">
                             <ListBox.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="All Unreviewed"
+                                              Command="{Binding MarkAllUnreviewedCommand}"/>
                                     <MenuItem Header="Refresh"
                                               Command="{Binding RefreshCommand}"/>
                                 </ContextMenu>
