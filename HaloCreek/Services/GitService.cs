@@ -108,6 +108,23 @@ namespace HaloCreek.Services
             throw new InvalidOperationException($"Git HEAD file query failed. {message}");
         }
 
+        public void RestoreFileFromHead(string? relativePath)
+        {
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            var commandResult = RunGit(
+                workspacePath,
+                new[] { "restore", "--source=HEAD", "--worktree", "--", gitRelativePath });
+            if (commandResult.Succeeded)
+            {
+                return;
+            }
+
+            var message = commandResult.ErrorMessage.Trim();
+            throw new InvalidOperationException($"Git HEAD file restore failed. {message}");
+        }
+
         public void RunConfiguredAction(
             GitChangeInfo? selectedChange,
             GitFileBrowserActionConfig action)

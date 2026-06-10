@@ -1,3 +1,2 @@
-unreviewed 面板的单个文件revert to reviewed 和 所有文件revert to reviewed
 unreviewed的open选项 或者reviewed为空直接双击open
 new session自动front

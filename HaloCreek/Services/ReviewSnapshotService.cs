@@ -76,6 +76,52 @@ namespace HaloCreek.Services
                 new[] { "update-index", "--force-remove", "--", gitRelativePath });
         }
 
+        public void RevertWorkingTreeFileToReviewed(string? relativePath)
+        {
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            var absoluteWorkingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
+                workspacePath,
+                gitRelativePath);
+
+            var reviewedEntry = ReadReviewedIndexEntries(workspacePath)
+                .FirstOrDefault(entry => string.Equals(
+                    entry.RelativePath,
+                    gitRelativePath,
+                    StringComparison.Ordinal));
+            if (reviewedEntry is not null)
+            {
+                var parentDirectory = Path.GetDirectoryName(absoluteWorkingTreePath);
+                if (!string.IsNullOrWhiteSpace(parentDirectory))
+                {
+                    Directory.CreateDirectory(parentDirectory);
+                }
+
+                RunReviewGit(
+                    workspacePath,
+                    GetHaloCreekIndexPath(workspacePath),
+                    new[] { "checkout-index", "--force", "--", gitRelativePath });
+                return;
+            }
+
+            if (_gitService.GetHeadBlobId(gitRelativePath) is not null)
+            {
+                _gitService.RestoreFileFromHead(gitRelativePath);
+                return;
+            }
+
+            if (Directory.Exists(absoluteWorkingTreePath))
+            {
+                throw new InvalidOperationException("Revert to reviewed only supports files.");
+            }
+
+            if (File.Exists(absoluteWorkingTreePath))
+            {
+                File.Delete(absoluteWorkingTreePath);
+            }
+        }
+
         public void RefreshReviewSnapshot()
         {
             var workspacePath = WorkspaceRuntime.Current.GitRootPath;

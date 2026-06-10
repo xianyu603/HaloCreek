@@ -67,8 +67,10 @@ namespace HaloCreek.ViewModels.Tabs
             SendPromptCommand = new RelayCommand(SendPrompt, CanSendPrompt);
             LaunchPromptCommand = new RelayCommand(LaunchPrompt, CanLaunchPrompt);
             AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed);
+            RevertToReviewedCommand = new RelayCommand<ReviewFilePath>(RevertToReviewed);
             MarkUnreviewedCommand = new RelayCommand<ReviewFilePath>(MarkUnreviewed);
             MarkAllReviewedCommand = new RelayCommand(MarkAllReviewed, HasUnreviewedFiles);
+            RevertAllToReviewedCommand = new RelayCommand(RevertAllToReviewed, HasUnreviewedFiles);
             MarkAllUnreviewedCommand = new RelayCommand(MarkAllUnreviewed, HasReviewedFiles);
             DiffUnreviewedAgainstReviewedCommand = new RelayCommand<ReviewFilePath>(
                 DiffWorkingTreeAgainstReviewed);
@@ -101,9 +103,13 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<ReviewFilePath> AddReviewedCommand { get; }
 
+        public IRelayCommand<ReviewFilePath> RevertToReviewedCommand { get; }
+
         public IRelayCommand<ReviewFilePath> MarkUnreviewedCommand { get; }
 
         public IRelayCommand MarkAllReviewedCommand { get; }
+
+        public IRelayCommand RevertAllToReviewedCommand { get; }
 
         public IRelayCommand MarkAllUnreviewedCommand { get; }
 
@@ -123,6 +129,7 @@ namespace HaloCreek.ViewModels.Tabs
                 if (SetProperty(ref _unreviewedFiles, value))
                 {
                     MarkAllReviewedCommand.NotifyCanExecuteChanged();
+                    RevertAllToReviewedCommand.NotifyCanExecuteChanged();
                 }
             }
         }
@@ -391,6 +398,59 @@ namespace HaloCreek.ViewModels.Tabs
                 _transientEventService.ReportUserActionFailure(
                     "Review",
                     "Mark all reviewed failed",
+                    ex.Message,
+                    ex);
+            }
+        }
+
+        private void RevertToReviewed(ReviewFilePath? file)
+        {
+            ArgumentNullException.ThrowIfNull(file);
+
+            try
+            {
+                Log.Info("Review", $"RevertToReviewed invoked. File={file.RelativePath}");
+                _reviewSnapshotService.RevertWorkingTreeFileToReviewed(file.RelativePath);
+                Log.Info("Review", $"Reverted to reviewed: {file.RelativePath}");
+                RequestRefreshReviewFiles();
+            }
+            catch (Exception ex) when (ex is ArgumentException
+                or InvalidOperationException
+                or UnauthorizedAccessException
+                or System.IO.IOException)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Revert to reviewed failed",
+                    ex.Message,
+                    ex);
+            }
+        }
+
+        private void RevertAllToReviewed()
+        {
+            var files = UnreviewedFiles.ToArray();
+
+            try
+            {
+                Log.Info("Review", $"RevertAllToReviewed invoked. Count={files.Length}");
+                foreach (var file in files)
+                {
+                    _reviewSnapshotService.RevertWorkingTreeFileToReviewed(file.RelativePath);
+                }
+
+                Log.Info("Review", $"Reverted all to reviewed. Count={files.Length}");
+                RequestRefreshReviewFiles();
+            }
+            catch (Exception ex) when (ex is ArgumentException
+                or InvalidOperationException
+                or UnauthorizedAccessException
+                or System.IO.IOException)
+            {
+                RequestRefreshReviewFiles();
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Revert all to reviewed failed",
                     ex.Message,
                     ex);
             }

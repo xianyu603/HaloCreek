@@ -125,6 +125,22 @@ namespace HaloCreek.Views.Tabs
             }
         }
 
+        private void RevertUnreviewedToReviewedMenuItem_OnClick(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is not ReviewViewModel viewModel
+                || sender is not Control { DataContext: ReviewFilePath file })
+            {
+                return;
+            }
+
+            if (viewModel.RevertToReviewedCommand.CanExecute(file))
+            {
+                viewModel.SelectedUnreviewedFile = file;
+                viewModel.RevertToReviewedCommand.Execute(file);
+                e.Handled = true;
+            }
+        }
+
         private void UnreviewedFile_OnDoubleTapped(object? sender, TappedEventArgs e)
         {
             if (DataContext is not ReviewViewModel viewModel

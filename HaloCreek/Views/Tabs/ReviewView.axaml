@@ -189,6 +189,8 @@
                                 <ContextMenu>
                                     <MenuItem Header="All Reviewed"
                                               Command="{Binding MarkAllReviewedCommand}"/>
+                                    <MenuItem Header="Revert All to Reviewed"
+                                              Command="{Binding RevertAllToReviewedCommand}"/>
                                     <MenuItem Header="Refresh"
                                               Command="{Binding RefreshCommand}"/>
                                 </ContextMenu>
@@ -204,6 +206,8 @@
                                             <ContextMenu>
                                                 <MenuItem Header="Diff Against Reviewed"
                                                           Click="DiffUnreviewedAgainstReviewedMenuItem_OnClick"/>
+                                                <MenuItem Header="Revert to Reviewed"
+                                                          Click="RevertUnreviewedToReviewedMenuItem_OnClick"/>
                                                 <MenuItem Header="Mark Reviewed"
                                                           Click="AddReviewedMenuItem_OnClick"/>
                                             </ContextMenu>
