@@ -45,8 +45,10 @@ namespace HaloCreek.Services
         private readonly string _keeperSessionId;
         private readonly object _watchStateLock = new();
         private readonly object _sessionOperationTasksLock = new();
+        private readonly object _ownedSessionsLock = new();
         private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Task> _sessionOperationTasks = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _ownedSessionIds = new(StringComparer.Ordinal);
         private readonly Timer _watchTimer;
         private readonly FrontClientSwitcher _frontClientSwitcher;
         private WatchState _watchState;
@@ -102,6 +104,11 @@ namespace HaloCreek.Services
             await QueueSessionOperation(identifier, () =>
             {
                 RunTmuxCommand(arguments, "launch tmux session");
+                lock (_ownedSessionsLock)
+                {
+                    _ownedSessionIds.Add(identifier);
+                }
+
                 StartHeartbeatPipe(identifier);
                 TryRunTmuxCommand(new[] { "set-option", "-t", identifier, "mouse", "on" }, out _);
                 SetSessionMetadata(identifier, wslWorkspacePath, request.Title);
@@ -117,6 +124,10 @@ namespace HaloCreek.Services
             {
                 _frontClientSwitcher.SwitchOutIfFront(identifier);
                 TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
+                lock (_ownedSessionsLock)
+                {
+                    _ownedSessionIds.Remove(identifier);
+                }
             });
         }
 
@@ -179,6 +190,18 @@ namespace HaloCreek.Services
 
             _watchTimer.Dispose();
             WaitForSessionOperationsToComplete();
+            string[] ownedSessionIds;
+            lock (_ownedSessionsLock)
+            {
+                ownedSessionIds = _ownedSessionIds.ToArray();
+                _ownedSessionIds.Clear();
+            }
+
+            foreach (var ownedSessionId in ownedSessionIds)
+            {
+                TryRunTmuxCommand(new[] { "kill-session", "-t", ownedSessionId }, out _);
+            }
+
             _frontClientSwitcher.Clear();
             TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
         }
