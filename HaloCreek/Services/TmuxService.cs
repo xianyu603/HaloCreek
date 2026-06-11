@@ -78,7 +78,7 @@ namespace HaloCreek.Services
 
         public event EventHandler<TmuxSessionStateChangedEventArgs>? StateChanged;
 
-        public async Task<string> LaunchAsync(TmuxLaunchRequest request)
+        public Task LaunchAsync(TmuxLaunchRequest request, out string identifier)
         {
             ArgumentNullException.ThrowIfNull(request);
             ArgumentException.ThrowIfNullOrWhiteSpace(request.WorkspacePath);
@@ -86,13 +86,14 @@ namespace HaloCreek.Services
             ArgumentNullException.ThrowIfNull(request.Arguments);
 
             var wslWorkspacePath = _platformInfrastructure.ConvertPathToWsl(request.WorkspacePath);
-            var identifier = CreateSessionIdentifier(wslWorkspacePath);
+            var sessionIdentifier = CreateSessionIdentifier(wslWorkspacePath);
+            identifier = sessionIdentifier;
             var arguments = new[]
                 {
                     "new-session",
                     "-d",
                     "-s",
-                    identifier,
+                    sessionIdentifier,
                     "-c",
                     wslWorkspacePath,
                     "--",
@@ -101,20 +102,18 @@ namespace HaloCreek.Services
                 .Concat(request.Arguments)
                 .ToArray();
 
-            await QueueSessionOperation(identifier, () =>
+            return QueueSessionOperation(sessionIdentifier, () =>
             {
                 RunTmuxCommand(arguments, "launch tmux session");
                 lock (_ownedSessionsLock)
                 {
-                    _ownedSessionIds.Add(identifier);
+                    _ownedSessionIds.Add(sessionIdentifier);
                 }
 
-                StartHeartbeatPipe(identifier);
-                TryRunTmuxCommand(new[] { "set-option", "-t", identifier, "mouse", "on" }, out _);
-                SetSessionMetadata(identifier, wslWorkspacePath, request.Title);
+                StartHeartbeatPipe(sessionIdentifier);
+                TryRunTmuxCommand(new[] { "set-option", "-t", sessionIdentifier, "mouse", "on" }, out _);
+                SetSessionMetadata(sessionIdentifier, wslWorkspacePath, request.Title);
             });
-
-            return identifier;
         }
 
         public void Exit(string identifier)

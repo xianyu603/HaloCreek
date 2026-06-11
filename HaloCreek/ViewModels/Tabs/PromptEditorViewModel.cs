@@ -30,7 +30,7 @@ namespace HaloCreek.ViewModels.Tabs
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, CanLaunchPrompt);
             SendToFrontCommand = new RelayCommand(SendToFront, CanLaunchPrompt);
-            BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);
+            BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
             // Prompt editor 与 SessionLifecycleService 同应用生命周期，当前不做显式退订。
@@ -60,6 +60,8 @@ namespace HaloCreek.ViewModels.Tabs
                 {
                     OnPropertyChanged(nameof(HasOngoingSessions));
                     OnPropertyChanged(nameof(IsOngoingSessionsEmpty));
+                    BringToFrontCommand.NotifyCanExecuteChanged();
+                    ExitSessionCommand.NotifyCanExecuteChanged();
                 }
             }
         }
@@ -141,6 +143,12 @@ namespace HaloCreek.ViewModels.Tabs
         private static bool HasOngoingSession(OngoingSessionInfo? session)
         {
             return session is not null;
+        }
+
+        private static bool CanBringToFront(OngoingSessionInfo? session)
+        {
+            return session is not null
+                && session.State != OngoingSessionState.Launching;
         }
 
         private void HandleSessionsChanged(object? sender, EventArgs e)

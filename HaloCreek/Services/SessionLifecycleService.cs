@@ -137,26 +137,12 @@ namespace HaloCreek.Services
                 title = "Codex session";
             }
 
-            var identifier = await _tmuxService.LaunchAsync(new TmuxLaunchRequest(
+            var launchTask = _tmuxService.LaunchAsync(new TmuxLaunchRequest(
                 workspace.WorkspacePath,
                 config.CodexExecutableName,
                 config.CodexLaunchArguments.Concat(codexArguments).ToArray(),
-                title));
-
-            if (_isDisposed)
-            {
-                _tmuxService.Exit(identifier);
-                throw new InvalidOperationException("Application is closing.");
-            }
-
-            if (!string.Equals(
-                    WorkspaceRuntime.Current.WorkspacePath,
-                    workspace.WorkspacePath,
-                    StringComparison.Ordinal))
-            {
-                _tmuxService.Exit(identifier);
-                throw new InvalidOperationException("Workspace changed before session launch completed.");
-            }
+                title),
+                out var identifier);
 
             var now = DateTimeOffset.Now;
             var session = new OngoingSessionInfo(
@@ -164,9 +150,59 @@ namespace HaloCreek.Services
                 title,
                 workspace.WorkspacePath,
                 now,
-                OngoingSessionState.BackgroundRunning);
+                OngoingSessionState.Launching);
 
             _sessionsById.Add(identifier, session);
+            SessionsChanged?.Invoke(this, EventArgs.Empty);
+
+            var launchCompleted = false;
+            try
+            {
+                await launchTask;
+
+                if (_isDisposed)
+                {
+                    _tmuxService.Exit(identifier);
+                    throw new InvalidOperationException("Application is closing.");
+                }
+
+                if (!string.Equals(
+                        WorkspaceRuntime.Current.WorkspacePath,
+                        workspace.WorkspacePath,
+                        StringComparison.Ordinal))
+                {
+                    _tmuxService.Exit(identifier);
+                    throw new InvalidOperationException("Workspace changed before session launch completed.");
+                }
+
+                if (!_sessionsById.TryGetValue(identifier, out session))
+                {
+                    _tmuxService.Exit(identifier);
+                    throw new InvalidOperationException("Session closed before launch completed.");
+                }
+
+                session = session with
+                {
+                    State = OngoingSessionState.BackgroundRunning
+                };
+                _sessionsById[identifier] = session;
+                SessionsChanged?.Invoke(this, EventArgs.Empty);
+
+                launchCompleted = true;
+            }
+            finally
+            {
+                if (!launchCompleted
+                    && _sessionsById.Remove(identifier))
+                {
+                    if (string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
+                    {
+                        _frontSessionId = null;
+                    }
+
+                    SessionsChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
 
             // TODO 如果卡顿把这里的BringToFront也改成异步
             BringToFront(identifier);
@@ -199,7 +235,8 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
             string? previousFrontSessionId = null;
-            if (!_sessionsById.ContainsKey(sessionId))
+            if (!_sessionsById.TryGetValue(sessionId, out var session)
+                || session.State == OngoingSessionState.Launching)
             {
                 return;
             }

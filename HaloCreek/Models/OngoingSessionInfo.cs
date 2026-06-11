@@ -11,6 +11,7 @@ namespace HaloCreek.Models
 
     public enum OngoingSessionState
     {
+        Launching,
         Front,
         BackgroundRunning,
         BackgroundIdle,
