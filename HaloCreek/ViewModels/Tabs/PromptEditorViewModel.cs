@@ -82,29 +82,20 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
 
-        public Task<SessionLaunchResult> LaunchPromptAsync()
-        {
-            if (string.IsNullOrWhiteSpace(PromptText))
-            {
-                return Task.FromResult(new SessionLaunchResult(false, "Prompt is empty.", null));
-            }
-
-            return _sessionLifecycleService.LaunchAsync(PromptText);
-        }
-
         private async Task LaunchAsync()
         {
-            var result = await LaunchPromptAsync();
-            if (result.Started)
+            try
             {
-                Log.Info("PromptEditor", result.StatusMessage);
-                return;
+                var session = await _sessionLifecycleService.LaunchAsync(PromptText);
+                Log.Info("PromptEditor", $"Codex session launch requested: {session.Id}");
             }
-
-            _transientEventService.ReportUserActionFailure(
-                "PromptEditor",
-                "Launch failed",
-                result.StatusMessage);
+            catch (InvalidOperationException ex)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "PromptEditor",
+                    "Launch failed",
+                    ex.Message);
+            }
         }
 
         private void SendToFront()

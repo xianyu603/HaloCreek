@@ -82,49 +82,71 @@ namespace HaloCreek.Services
             _frontSessionId = null;
         }
 
-        // TODO 可以考虑这里的部分错误throw 之后再说
-        public async Task<SessionLaunchResult> LaunchAsync(string promptText)
+        public Task<OngoingSessionInfo> LaunchAsync(string promptText)
         {
             RequireUiThread();
 
             if (string.IsNullOrWhiteSpace(promptText))
             {
-                return new SessionLaunchResult(false, "Prompt is empty.", null);
+                throw new InvalidOperationException("Prompt is empty.");
             }
+
+            return StartCodexSessionAsync(
+                new[] { promptText },
+                promptText);
+        }
+
+        public Task<OngoingSessionInfo> ResumeAsync(HistorySessionInfo? session)
+        {
+            RequireUiThread();
+
+            if (session is null)
+            {
+                throw new InvalidOperationException("No session selected.");
+            }
+
+            if (string.IsNullOrWhiteSpace(session.Id))
+            {
+                throw new InvalidOperationException("Session id is empty.");
+            }
+
+            return StartCodexSessionAsync(
+                new[] { "resume", session.Id },
+                session.InitialPrompt);
+        }
+
+        private async Task<OngoingSessionInfo> StartCodexSessionAsync(
+            IReadOnlyList<string> codexArguments,
+            string titleSource)
+        {
+            RequireUiThread();
+            ArgumentNullException.ThrowIfNull(codexArguments);
 
             var workspace = WorkspaceRuntime.Current;
             var config = workspace.EffectiveConfig;
             if (string.IsNullOrWhiteSpace(config.CodexExecutableName))
             {
-                return new SessionLaunchResult(false, "Codex executable is not available.", null);
+                throw new InvalidOperationException("Codex executable is not available.");
             }
 
             ArgumentNullException.ThrowIfNull(config.CodexLaunchArguments);
 
-            var title = BuildFirstPromptSummary(promptText);
+            var title = BuildFirstPromptSummary(titleSource);
             if (string.IsNullOrWhiteSpace(title))
             {
                 title = "Codex session";
             }
 
-            string identifier;
-            try
-            {
-                identifier = await _tmuxService.LaunchAsync(new TmuxLaunchRequest(
-                    workspace.WorkspacePath,
-                    config.CodexExecutableName,
-                    config.CodexLaunchArguments.Concat(new[] { promptText }).ToArray(),
-                    title));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return new SessionLaunchResult(false, ex.Message, null);
-            }
+            var identifier = await _tmuxService.LaunchAsync(new TmuxLaunchRequest(
+                workspace.WorkspacePath,
+                config.CodexExecutableName,
+                config.CodexLaunchArguments.Concat(codexArguments).ToArray(),
+                title));
 
             if (_isDisposed)
             {
                 _tmuxService.Exit(identifier);
-                return new SessionLaunchResult(false, "Application is closing.", null);
+                throw new InvalidOperationException("Application is closing.");
             }
 
             if (!string.Equals(
@@ -133,7 +155,7 @@ namespace HaloCreek.Services
                     StringComparison.Ordinal))
             {
                 _tmuxService.Exit(identifier);
-                return new SessionLaunchResult(false, "Workspace changed before launch completed.", null);
+                throw new InvalidOperationException("Workspace changed before session launch completed.");
             }
 
             var now = DateTimeOffset.Now;
@@ -149,80 +171,7 @@ namespace HaloCreek.Services
             // TODO 如果卡顿把这里的BringToFront也改成异步
             BringToFront(identifier);
 
-            return new SessionLaunchResult(true, "Codex session launch requested.", session);
-        }
-
-        public async Task<SessionResumeResult> ResumeAsync(HistorySessionInfo? session)
-        {
-            RequireUiThread();
-
-            if (session is null)
-            {
-                return new SessionResumeResult(false, "No session selected.");
-            }
-
-            if (string.IsNullOrWhiteSpace(session.Id))
-            {
-                return new SessionResumeResult(false, "Session id is empty.");
-            }
-
-            var workspace = WorkspaceRuntime.Current;
-            var config = workspace.EffectiveConfig;
-            if (string.IsNullOrWhiteSpace(config.CodexExecutableName))
-            {
-                return new SessionResumeResult(false, "Codex executable is not available.");
-            }
-
-            ArgumentNullException.ThrowIfNull(config.CodexLaunchArguments);
-
-            var title = BuildFirstPromptSummary(session.InitialPrompt);
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                title = "Codex resume session";
-            }
-
-            string identifier;
-            try
-            {
-                identifier = await _tmuxService.LaunchAsync(new TmuxLaunchRequest(
-                    workspace.WorkspacePath,
-                    config.CodexExecutableName,
-                    config.CodexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
-                    title));
-            }
-            catch (InvalidOperationException ex)
-            {
-                return new SessionResumeResult(false, ex.Message);
-            }
-
-            if (_isDisposed)
-            {
-                _tmuxService.Exit(identifier);
-                return new SessionResumeResult(false, "Application is closing.");
-            }
-
-            if (!string.Equals(
-                    WorkspaceRuntime.Current.WorkspacePath,
-                    workspace.WorkspacePath,
-                    StringComparison.Ordinal))
-            {
-                _tmuxService.Exit(identifier);
-                return new SessionResumeResult(false, "Workspace changed before resume completed.");
-            }
-
-            var now = DateTimeOffset.Now;
-            var ongoingSession = new OngoingSessionInfo(
-                identifier,
-                title,
-                workspace.WorkspacePath,
-                now,
-                OngoingSessionState.BackgroundRunning);
-
-            _sessionsById.Add(identifier, ongoingSession);
-
-            BringToFront(identifier);
-
-            return new SessionResumeResult(true, "Codex session resume requested.");
+            return session;
         }
 
         public IReadOnlyList<OngoingSessionInfo> GetCurrentWorkspaceOngoingSessions()
@@ -463,12 +412,4 @@ namespace HaloCreek.Services
         }
     }
 
-    public sealed record SessionLaunchResult(
-        bool Started,
-        string StatusMessage,
-        OngoingSessionInfo? Session);
-
-    public sealed record SessionResumeResult(
-        bool Started,
-        string StatusMessage);
 }

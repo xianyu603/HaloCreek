@@ -576,17 +576,18 @@ namespace HaloCreek.ViewModels.Tabs
 
         private async Task LaunchPromptAsync()
         {
-            var result = await _sessionLifecycleService.LaunchAsync(ReviewPromptText);
-            if (result.Started)
+            try
             {
-                Log.Info("Review", result.StatusMessage);
-                return;
+                var session = await _sessionLifecycleService.LaunchAsync(ReviewPromptText);
+                Log.Info("Review", $"Codex session launch requested: {session.Id}");
             }
-
-            _transientEventService.ReportUserActionFailure(
-                "Review",
-                "Launch failed",
-                result.StatusMessage);
+            catch (InvalidOperationException ex)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Review",
+                    "Launch failed",
+                    ex.Message);
+            }
         }
 
         private sealed record ReviewFilesRefreshResult(

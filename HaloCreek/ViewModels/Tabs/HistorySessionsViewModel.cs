@@ -202,17 +202,18 @@ namespace HaloCreek.ViewModels.Tabs
                 return;
             }
 
-            var result = await _sessionLifecycleService.ResumeAsync(session);
-            if (result.Started)
+            try
             {
-                Log.Info("HistorySessions", result.StatusMessage);
-                return;
+                var resumedSession = await _sessionLifecycleService.ResumeAsync(session);
+                Log.Info("HistorySessions", $"Codex session resume requested: {resumedSession.Id}");
             }
-
-            _transientEventService.ReportUserActionFailure(
-                "HistorySessions",
-                "Resume failed",
-                result.StatusMessage);
+            catch (InvalidOperationException ex)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "HistorySessions",
+                    "Resume failed",
+                    ex.Message);
+            }
         }
 
         private static bool HasSelectedSession(HistorySessionInfo? session)
