@@ -1,2 +1,1 @@
 unreviewed的open选项 或者reviewed为空直接双击open
-new session自动front
