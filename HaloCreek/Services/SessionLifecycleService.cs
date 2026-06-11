@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using HaloCreek.Models;
 
@@ -50,6 +51,10 @@ namespace HaloCreek.Services
                 return;
             }
 
+            // TODO: LaunchAsync/ResumeAsync may still be waiting for tmux launch.
+            // If the app exits while tmux is creating a session, that session can be
+            // created after this service has already collected _sessionsById and
+            // become an orphan. Handle pending launch/resume cleanup separately.
             _isDisposed = true;
             _tmuxService.StateChanged -= HandleTmuxStateChanged;
             WorkspaceRuntime.Changed -= HandleWorkspaceChanged;
@@ -82,7 +87,7 @@ namespace HaloCreek.Services
         }
 
         // TODO 可以考虑这里的部分错误throw 之后再说
-        public SessionLaunchResult Launch(string promptText)
+        public async Task<SessionLaunchResult> LaunchAsync(string promptText)
         {
             RequireUiThread();
 
@@ -109,7 +114,7 @@ namespace HaloCreek.Services
             string identifier;
             try
             {
-                identifier = _tmuxService.Launch(new TmuxLaunchRequest(
+                identifier = await _tmuxService.LaunchAsync(new TmuxLaunchRequest(
                     workspace.WorkspacePath,
                     config.CodexExecutableName,
                     config.CodexLaunchArguments.Concat(new[] { promptText }).ToArray(),
@@ -118,6 +123,21 @@ namespace HaloCreek.Services
             catch (InvalidOperationException ex)
             {
                 return new SessionLaunchResult(false, ex.Message, null);
+            }
+
+            if (_isDisposed)
+            {
+                _tmuxService.Exit(identifier);
+                return new SessionLaunchResult(false, "Application is closing.", null);
+            }
+
+            if (!string.Equals(
+                    WorkspaceRuntime.Current.WorkspacePath,
+                    workspace.WorkspacePath,
+                    StringComparison.Ordinal))
+            {
+                _tmuxService.Exit(identifier);
+                return new SessionLaunchResult(false, "Workspace changed before launch completed.", null);
             }
 
             var now = DateTimeOffset.Now;
@@ -130,13 +150,13 @@ namespace HaloCreek.Services
 
             _sessionsById.Add(identifier, session);
 
-            _tmuxService.StartWatching(identifier);
-            SessionsChanged?.Invoke(this, EventArgs.Empty);
+            // TODO 如果卡顿把这里的BringToFront也改成异步
+            BringToFront(identifier);
 
             return new SessionLaunchResult(true, "Codex session launch requested.", session);
         }
 
-        public SessionResumeResult Resume(HistorySessionInfo? session)
+        public async Task<SessionResumeResult> ResumeAsync(HistorySessionInfo? session)
         {
             RequireUiThread();
 
@@ -168,7 +188,7 @@ namespace HaloCreek.Services
             string identifier;
             try
             {
-                identifier = _tmuxService.Launch(new TmuxLaunchRequest(
+                identifier = await _tmuxService.LaunchAsync(new TmuxLaunchRequest(
                     workspace.WorkspacePath,
                     config.CodexExecutableName,
                     config.CodexLaunchArguments.Concat(new[] { "resume", session.Id }).ToArray(),
@@ -177,6 +197,21 @@ namespace HaloCreek.Services
             catch (InvalidOperationException ex)
             {
                 return new SessionResumeResult(false, ex.Message);
+            }
+
+            if (_isDisposed)
+            {
+                _tmuxService.Exit(identifier);
+                return new SessionResumeResult(false, "Application is closing.");
+            }
+
+            if (!string.Equals(
+                    WorkspaceRuntime.Current.WorkspacePath,
+                    workspace.WorkspacePath,
+                    StringComparison.Ordinal))
+            {
+                _tmuxService.Exit(identifier);
+                return new SessionResumeResult(false, "Workspace changed before resume completed.");
             }
 
             var now = DateTimeOffset.Now;
@@ -189,8 +224,7 @@ namespace HaloCreek.Services
 
             _sessionsById.Add(identifier, ongoingSession);
 
-            _tmuxService.StartWatching(identifier);
-            SessionsChanged?.Invoke(this, EventArgs.Empty);
+            BringToFront(identifier);
 
             return new SessionResumeResult(true, "Codex session resume requested.");
         }
@@ -242,8 +276,6 @@ namespace HaloCreek.Services
                 _tmuxService.StartWatching(previousFrontSessionId);
             }
 
-            // TODO: BringToFront currently does not wait for the per-session tmux operation
-            // queue. If launch is still in flight, attach/switch can still race creation.
             _tmuxService.StopWatching(sessionId);
             var startupCommand = _tmuxService.GetFrontClientStartupCommand(sessionId);
             _terminalService.EnsureFrontClient(startupCommand);

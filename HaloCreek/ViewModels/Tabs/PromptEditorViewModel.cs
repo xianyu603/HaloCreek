@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
@@ -27,7 +28,7 @@ namespace HaloCreek.ViewModels.Tabs
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _transientEventService = appCommonRuntime.TransientEventService;
 
-            LaunchCommand = new RelayCommand(Launch, CanLaunchPrompt);
+            LaunchCommand = new AsyncRelayCommand(LaunchAsync, CanLaunchPrompt);
             SendToFrontCommand = new RelayCommand(SendToFront, CanLaunchPrompt);
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, HasOngoingSession);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
@@ -73,7 +74,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         public bool IsOngoingSessionsEmpty => !HasOngoingSessions;
 
-        public IRelayCommand LaunchCommand { get; }
+        public IAsyncRelayCommand LaunchCommand { get; }
 
         public IRelayCommand SendToFrontCommand { get; }
 
@@ -81,19 +82,19 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
 
-        public SessionLaunchResult LaunchPrompt()
+        public Task<SessionLaunchResult> LaunchPromptAsync()
         {
             if (string.IsNullOrWhiteSpace(PromptText))
             {
-                return new SessionLaunchResult(false, "Prompt is empty.", null);
+                return Task.FromResult(new SessionLaunchResult(false, "Prompt is empty.", null));
             }
 
-            return _sessionLifecycleService.Launch(PromptText);
+            return _sessionLifecycleService.LaunchAsync(PromptText);
         }
 
-        private void Launch()
+        private async Task LaunchAsync()
         {
-            var result = LaunchPrompt();
+            var result = await LaunchPromptAsync();
             if (result.Started)
             {
                 Log.Info("PromptEditor", result.StatusMessage);

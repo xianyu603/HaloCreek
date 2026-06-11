@@ -65,7 +65,7 @@ namespace HaloCreek.ViewModels.Tabs
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
             SendPromptCommand = new RelayCommand(SendPrompt, CanSendPrompt);
-            LaunchPromptCommand = new RelayCommand(LaunchPrompt, CanLaunchPrompt);
+            LaunchPromptCommand = new AsyncRelayCommand(LaunchPromptAsync, CanLaunchPrompt);
             AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed);
             RevertToReviewedCommand = new RelayCommand<ReviewFilePath>(RevertToReviewed);
             MarkUnreviewedCommand = new RelayCommand<ReviewFilePath>(MarkUnreviewed);
@@ -99,7 +99,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand SendPromptCommand { get; }
 
-        public IRelayCommand LaunchPromptCommand { get; }
+        public IAsyncRelayCommand LaunchPromptCommand { get; }
 
         public IRelayCommand<ReviewFilePath> AddReviewedCommand { get; }
 
@@ -574,9 +574,9 @@ namespace HaloCreek.ViewModels.Tabs
             _sessionLifecycleService.SendMessageToFrontSession(ReviewPromptText);
         }
 
-        private void LaunchPrompt()
+        private async Task LaunchPromptAsync()
         {
-            var result = _sessionLifecycleService.Launch(ReviewPromptText);
+            var result = await _sessionLifecycleService.LaunchAsync(ReviewPromptText);
             if (result.Started)
             {
                 Log.Info("Review", result.StatusMessage);

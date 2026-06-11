@@ -76,7 +76,7 @@ namespace HaloCreek.Services
 
         public event EventHandler<TmuxSessionStateChangedEventArgs>? StateChanged;
 
-        public string Launch(TmuxLaunchRequest request)
+        public async Task<string> LaunchAsync(TmuxLaunchRequest request)
         {
             ArgumentNullException.ThrowIfNull(request);
             ArgumentException.ThrowIfNullOrWhiteSpace(request.WorkspacePath);
@@ -99,7 +99,7 @@ namespace HaloCreek.Services
                 .Concat(request.Arguments)
                 .ToArray();
 
-            QueueSessionOperation(identifier, () =>
+            await QueueSessionOperation(identifier, () =>
             {
                 RunTmuxCommand(arguments, "launch tmux session");
                 StartHeartbeatPipe(identifier);

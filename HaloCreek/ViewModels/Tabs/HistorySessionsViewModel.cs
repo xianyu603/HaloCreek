@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
 using HaloCreek.Models;
@@ -35,7 +36,7 @@ namespace HaloCreek.ViewModels.Tabs
             // 如果后续要拆成独立注册和启动，需要先明确“多处注册后再启动”
             // 或“先启动再允许多处注册”的调用约束，避免刷新结果分发语义含混。
             _sessionHistoryRefreshService.StartRefreshAndListen(HandleRefreshCompleted);
-            ResumeCommand = new RelayCommand<HistorySessionInfo>(Resume, HasSelectedSession);
+            ResumeCommand = new AsyncRelayCommand<HistorySessionInfo>(ResumeAsync, HasSelectedSession);
             ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
         }
 
@@ -73,7 +74,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         public string SelectedSessionSummaryText => SelectedSession?.SessionSummaryText ?? string.Empty;
 
-        public IRelayCommand<HistorySessionInfo> ResumeCommand { get; }
+        public IAsyncRelayCommand<HistorySessionInfo> ResumeCommand { get; }
 
         public IRelayCommand<HistorySessionInfo> ReeditInitialPromptCommand { get; }
 
@@ -194,14 +195,14 @@ namespace HaloCreek.ViewModels.Tabs
             }
         }
 
-        private void Resume(HistorySessionInfo? session)
+        private async Task ResumeAsync(HistorySessionInfo? session)
         {
             if (session is null)
             {
                 return;
             }
 
-            var result = _sessionLifecycleService.Resume(session);
+            var result = await _sessionLifecycleService.ResumeAsync(session);
             if (result.Started)
             {
                 Log.Info("HistorySessions", result.StatusMessage);
