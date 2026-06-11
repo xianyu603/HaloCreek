@@ -51,10 +51,6 @@ namespace HaloCreek.Services
                 return;
             }
 
-            // TODO: LaunchAsync/ResumeAsync may still be waiting for tmux launch.
-            // If the app exits while tmux is creating a session, that session can be
-            // created after this service has already collected _sessionsById and
-            // become an orphan. Handle pending launch/resume cleanup separately.
             _isDisposed = true;
             _tmuxService.StateChanged -= HandleTmuxStateChanged;
             WorkspaceRuntime.Changed -= HandleWorkspaceChanged;
