@@ -25,6 +25,18 @@ $Checks = @(
         ExpectedMessage = "wsl.exe can run bash in the default distribution."
     },
     [pscustomobject]@{
+        Name            = "WSL tmux"
+        Probe           = { Invoke-CheckCommand "wsl.exe" @("--exec", "bash", "-ic", "tmux -V") }
+        Assert          = { param($Actual) $Actual.ExitCode -eq 0 -and $Actual.Output -match "^tmux \d+\." }
+        ExpectedMessage = "tmux is installed and tmux -V succeeds in the default WSL distribution."
+    },
+    [pscustomobject]@{
+        Name            = "WSL Codex CLI"
+        Probe           = { Invoke-CheckCommand "wsl.exe" @("--exec", "bash", "-ic", "codex --version") }
+        Assert          = { param($Actual) $Actual.ExitCode -eq 0 -and $Actual.Output -match "^codex-cli \d+\." }
+        ExpectedMessage = "codex is installed and codex --version succeeds in the default WSL distribution."
+    },
+    [pscustomobject]@{
         Name            = "Windows Git on PATH"
         Probe           = { Invoke-CheckCommand "git.exe" @("--version") }
         Assert          = { param($Actual) $Actual.ExitCode -eq 0 -and $Actual.Output -match "^git version \d+\." }
