@@ -1,0 +1,9 @@
+git action从配置拿出来 这个承诺太重 未来很难兼容
+尝试适配source tree 可以搞个配置
+运行环境检查
+写运行环境安装指南
+过TODO中的bug
+更新readme
+撰写使用文档
+修改构建为self contained
+发布流程工作 加GitHub action 加tag
