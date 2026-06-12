@@ -33,7 +33,7 @@ namespace HaloCreek.ViewModels.Tabs
             _transientEventService = appCommonRuntime.TransientEventService;
             RefreshCommand = refreshCommand ?? throw new ArgumentNullException(nameof(refreshCommand));
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
-            ApplyWorkspaceConfig(WorkspaceRuntime.Current.EffectiveConfig);
+            LoadActionConfig();
         }
 
         public IReadOnlyList<GitChangeInfo> Changes
@@ -71,12 +71,6 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<GitChangeInfo> OpenSelectedChangeCommand { get; }
 
-        public void ApplyWorkspaceConfig(AppConfig config)
-        {
-            ArgumentNullException.ThrowIfNull(config);
-            LoadActionConfig(config);
-        }
-
         public async Task RefreshChangesAsync()
         {
             var result = await Task.Run(_gitService.GetChanges);
@@ -86,16 +80,16 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("Git", result.Message);
         }
 
-        private void LoadActionConfig(AppConfig config)
+        private void LoadActionConfig()
         {
-            _doubleClickActionId = config.GitFileBrowserDoubleClickActionId;
-            _doubleClickAction = config.GitFileBrowserActions.FirstOrDefault(
+            _doubleClickActionId = GitFileBrowserActionDefaults.DoubleClickActionId;
+            _doubleClickAction = GitFileBrowserActionDefaults.Actions.FirstOrDefault(
                 configuredAction => string.Equals(
                     configuredAction.Id,
                     _doubleClickActionId,
                     StringComparison.OrdinalIgnoreCase));
-            var selectedFilePathActions = BuildSelectedFilePathActions(config.GitFileBrowserActions);
-            var workspaceRootActions = BuildWorkspaceRootActions(config.GitFileBrowserActions);
+            var selectedFilePathActions = BuildSelectedFilePathActions(GitFileBrowserActionDefaults.Actions);
+            var workspaceRootActions = BuildWorkspaceRootActions(GitFileBrowserActionDefaults.Actions);
             _configuredActionCommands = selectedFilePathActions
                 .Concat(workspaceRootActions)
                 .Select(action => action.Command)

@@ -107,9 +107,7 @@ namespace HaloCreek.Services
                 Coalesce(fileConfig.CodexExecutableName, baseConfig.CodexExecutableName),
                 Coalesce(fileConfig.CodexLaunchArguments, baseConfig.CodexLaunchArguments),
                 CoalescePositive(fileConfig.MaxSessionHistoryFiles, baseConfig.MaxSessionHistoryFiles),
-                Coalesce(fileConfig.DiffToolPath, baseConfig.DiffToolPath),
-                Coalesce(fileConfig.GitFileBrowserDoubleClickActionId, baseConfig.GitFileBrowserDoubleClickActionId),
-                Coalesce(fileConfig.GitFileBrowserActions, baseConfig.GitFileBrowserActions));
+                Coalesce(fileConfig.DiffToolPath, baseConfig.DiffToolPath));
         }
 
         private static string Coalesce(string? value, string fallback)
@@ -122,15 +120,6 @@ namespace HaloCreek.Services
         private static IReadOnlyList<string> Coalesce(
             IReadOnlyList<string?>? values,
             IReadOnlyList<string> fallback)
-        {
-            return values is null
-                ? fallback
-                : values.Where(value => value is not null).Select(value => value!).ToArray();
-        }
-
-        private static IReadOnlyList<GitFileBrowserActionConfig> Coalesce(
-            IReadOnlyList<GitFileBrowserActionConfig?>? values,
-            IReadOnlyList<GitFileBrowserActionConfig> fallback)
         {
             return values is null
                 ? fallback
@@ -153,10 +142,6 @@ namespace HaloCreek.Services
             public int? MaxSessionHistoryFiles { get; init; }
 
             public string? DiffToolPath { get; init; }
-
-            public string? GitFileBrowserDoubleClickActionId { get; init; }
-
-            public List<GitFileBrowserActionConfig?>? GitFileBrowserActions { get; init; }
         }
     }
 }

@@ -347,7 +347,6 @@ namespace HaloCreek.ViewModels.Tabs
         private void OnWorkspaceChanged(WorkspaceContext workspace)
         {
             ArgumentNullException.ThrowIfNull(workspace);
-            ModifiedGit.ApplyWorkspaceConfig(workspace.EffectiveConfig);
             RequestRefreshReviewFiles();
         }
 
