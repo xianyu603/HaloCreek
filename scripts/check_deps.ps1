@@ -23,6 +23,18 @@ $Checks = @(
         Probe           = { Invoke-CheckCommand "wsl.exe" @("--exec", "bash", "-ic", "printf halocreek-wsl-ok") }
         Assert          = { param($Actual) $Actual.ExitCode -eq 0 -and $Actual.Output -eq "halocreek-wsl-ok" }
         ExpectedMessage = "wsl.exe can run bash in the default distribution."
+    },
+    [pscustomobject]@{
+        Name            = "Windows Git on PATH"
+        Probe           = { Invoke-CheckCommand "git.exe" @("--version") }
+        Assert          = { param($Actual) $Actual.ExitCode -eq 0 -and $Actual.Output -match "^git version \d+\." }
+        ExpectedMessage = "git.exe is on PATH and git.exe --version succeeds."
+    },
+    [pscustomobject]@{
+        Name            = "TortoiseGitProc on PATH"
+        Probe           = { Invoke-CheckCommand "where.exe" @("TortoiseGitProc.exe") }
+        Assert          = { param($Actual) $Actual.ExitCode -eq 0 -and $Actual.Output -match "TortoiseGitProc\.exe$" }
+        ExpectedMessage = "TortoiseGitProc.exe is on PATH."
     }
 )
 
