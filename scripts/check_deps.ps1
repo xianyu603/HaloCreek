@@ -18,13 +18,12 @@ function Invoke-CheckCommand {
 }
 
 $Checks = @(
-    # Example:
-    # [pscustomobject]@{
-    #     Name            = "dotnet SDK"
-    #     Probe           = { Invoke-CheckCommand "dotnet" @("--version") }
-    #     Assert          = { param($Actual) $Actual.ExitCode -eq 0 -and $Actual.Output -match "^10\." }
-    #     ExpectedMessage = "exit code 0, version starts with 10."
-    # }
+    [pscustomobject]@{
+        Name            = "WSL default distribution"
+        Probe           = { Invoke-CheckCommand "wsl.exe" @("--exec", "bash", "-ic", "printf halocreek-wsl-ok") }
+        Assert          = { param($Actual) $Actual.ExitCode -eq 0 -and $Actual.Output -eq "halocreek-wsl-ok" }
+        ExpectedMessage = "wsl.exe can run bash in the default distribution."
+    }
 )
 
 if ($Checks.Count -eq 0) {
@@ -38,7 +37,11 @@ foreach ($check in $Checks) {
     try {
         $actual = & $check.Probe
         $passed = [bool](& $check.Assert $actual)
-        $message = if ($passed) { "OK" } else { "Expected $($check.ExpectedMessage)" }
+        $message = if ($passed) {
+            "OK"
+        } else {
+            "Expected $($check.ExpectedMessage) Actual exit code $($actual.ExitCode), output: $($actual.Output)"
+        }
     }
     catch {
         $actual = $null
