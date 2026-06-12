@@ -1,5 +1,5 @@
-git action从配置拿出来 这个承诺太重 未来很难兼容
-尝试适配source tree 可以搞个配置
+git action从配置拿出来 这个承诺太重 未来很难兼容 done
+尝试适配source tree 可以搞个配置 先不做 做成运行时环境检查 source tree不支持diff
 运行环境检查
 写运行环境安装指南
 过TODO中的bug
