@@ -40,7 +40,7 @@ namespace HaloCreek.Models
                     "ExploreTo",
                     GitFileBrowserActionTarget.SelectedFilePath,
                     "explorer.exe",
-                    new[] { "/select,{SelectedPath}" }),
+                    new[] { "/select,", "{SelectedPath}" }),
                 new GitFileBrowserActionConfig(
                     "Edit",
                     "Edit",
