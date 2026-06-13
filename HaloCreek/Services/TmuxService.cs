@@ -466,27 +466,25 @@ namespace HaloCreek.Services
                 new[] { heartbeatPath },
                 out _);
 
-            // The helper consumes pane output without storing it. It refreshes the
-            // heartbeat at most once per second, while sparse output still refreshes
-            // on the next non-empty read even if the pane output has no newline.
+            // The helper consumes pane output without storing it. It treats Codex's
+            // repeated OSC title updates as the background activity signal, so tmux
+            // redraws and ordinary pane output do not move an idle session back to
+            // running after it is switched to the front client.
             var helperScript = string.Join(
                 " ",
                 "heartbeat=$1;",
                 "last_touch=0;",
-                "while :; do",
-                "chunk=;",
-                "IFS= read -r -n 4096 -t 1 chunk;", // 一次读4096 如果没那么多可读1s超时一次
-                "status=$?;",
-                "if [ -n \"$chunk\" ]; then",
+                "esc=$(printf '\\033');",
+                "previous=;",
+                "while IFS= read -r -n 1 char; do",
+                "if [ \"$previous\" = \"$esc\" ] && [ \"$char\" = \"]\" ]; then",
                 "now=${EPOCHSECONDS:-$(date +%s)};", // 输出以sec为单位的整数时间 以实现最多1s touch一次
                 "if [ \"$now\" != \"$last_touch\" ]; then",
                 ": > \"$heartbeat\";",
                 "last_touch=$now;",
                 "fi;",
                 "fi;",
-                "if [ \"$status\" -eq 1 ] && [ -z \"$chunk\" ]; then",
-                "break;",
-                "fi;",
+                "previous=$char;",
                 "done");
 
             var helperCommand = _platformInfrastructure.BuildWslShellCommand(
