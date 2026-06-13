@@ -8,3 +8,4 @@ review VM有点过载 目前已经承载了Reviewed Unreviewed的业务语义和
 文件归属有点乱 git VM现在已经不是tab而是组件了 另外似乎不应该将VM按UI组织
 常量考虑走一个文件 避免分叉
 * 前台session exit的过程中快速切另一个前台会寄掉
+wt的检查 win 10默认没有wt 需要同步修改user guide
