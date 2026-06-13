@@ -75,8 +75,12 @@ namespace HaloCreek.ViewModels.Tabs
         {
             var result = await Task.Run(_gitService.GetChanges);
 
-            SelectedChange = null;
-            Changes = result.Changes;
+            if (!Changes.SequenceEqual(result.Changes))
+            {
+                SelectedChange = null;
+                Changes = result.Changes;
+            }
+
             Log.Info("Git", result.Message);
         }
 

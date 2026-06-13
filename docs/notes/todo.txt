@@ -3,10 +3,9 @@ resume with prompt
 resume 切回来 或者每次新起session都先自动置于前台
 考虑下要不要提示词为空允许启动session
 当前不支持运行时 reload config 之后再说加不加的
-连续切session的时候会短暂报假的background running 顺便可以考虑将idle与否与是否前台分开
+* 连续切session的时候会短暂报假的background running 顺便可以考虑将idle与否与是否前台分开
 日志面板只在前台监听日志变化
 review VM有点过载 目前已经承载了Reviewed Unreviewed的业务语义和视图切换语义 加批注之后可能收不太住
 文件归属有点乱 git VM现在已经不是tab而是组件了 另外似乎不应该将VM按UI组织
 常量考虑走一个文件 避免分叉
-前台session exit的过程中快速切另一个前台会寄掉
-modified 面板的选中在刷新后不会保留
+* 前台session exit的过程中快速切另一个前台会寄掉
