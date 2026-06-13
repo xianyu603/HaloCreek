@@ -1,95 +1,37 @@
 # HaloCreek
 
-HaloCreek 是一个面向个人 Agent 编程工作流的 Codex shell wrapper。它不尝试做完整任务编排，而是把 workspace、prompt、Codex session、历史记录、Git 变更和人工审阅入口放到一个轻量桌面应用里，降低 Human in the loop 场景里的重复操作成本。
+HaloCreek 是一个面向个人 Agent 编程工作流的 Codex shell wrapper。它把 workspace、prompt、Codex session、历史记录、Git 变更和人工审阅入口放到一个轻量桌面应用里，用来降低 Human in the loop 场景里的重复操作成本，当前主要面向 Windows + WSL + Codex CLI 的本地开发环境。
 
-当前实现是 Avalonia/.NET 桌面应用，主要面向 Windows + WSL 环境：Codex session 通过 WSL 内的 `tmux` 后台运行，前台交互通过 Windows Terminal 拉起或复用同一个窗口。
+## 项目动机
 
-## 当前能力
+Codex CLI 已经适合在终端里执行具体编程任务，但真实的开发流程通常不只是一条 prompt 到一次输出。开发者需要反复切换 workspace、整理上下文、拉起或恢复 session、查看 Git 变更、把审阅意见继续发送给 Agent，并在终端、文件管理器、Git 工具和历史记录之间来回移动。
 
-- Workspace：选择当前工作目录，并缓存上次使用的 workspace。
-- Prompt Editor：编辑多行 prompt，支持拖入文件/目录追加路径，一键启动 Codex session。
-- Ongoing Sessions：在 Prompt Editor 中展示当前 HaloCreek 进程创建的 session，支持拉到前台和退出。
-- Review：监听剪贴板上下文，定位被复制内容对应的文件位置，并向前台 session 发送补充 prompt。
-- Git：读取当前 workspace 的 Git 变更，并提供内置动作，例如 diff、打开文件、定位文件、commit、show log。
-- History：读取本机 Codex JSONL session 历史，按当前 workspace 过滤，支持搜索、resume 和重新编辑初始 prompt。
-- AppLogs：查看应用内日志。
+这些动作本身不复杂，但在 Human in the loop 的使用方式里会频繁出现。HaloCreek 的目标是把这些低价值的重复操作收束到一个本地桌面入口中，让开发者仍然保留对 Codex CLI、Git、编辑器和终端的直接控制，同时减少围绕它们的机械操作。
 
-## 环境要求
+从定位上看，HaloCreek 更接近一个本地工作流壳层，而不是 IDE 插件、通用终端管理器或云端 Agent 平台。它优先服务个人开发者的可见、可控、可打断的 Agent 编程过程。
 
-- .NET 10 SDK
-- Windows Terminal：默认通过 `wt.exe` 打开前台 session。
-- WSL：用于执行 shell、`tmux` 和 Codex。
-- tmux：HaloCreek 使用 tmux session 管理后台 Codex。
-- Codex CLI：默认可执行文件名为 `codex`。
-- git：Git 页签通过 `git status --porcelain=v1 -z --untracked-files=all` 读取变更。
-- 可选：TortoiseGit。内置 Git 动作使用 `TortoiseGitProc.exe`、`explorer.exe`、`notepad.exe`。
+## 做什么
 
-## 构建与运行
+- 提供一个本地桌面入口，集中管理 workspace、prompt、session、history、Git 变更和审阅上下文。
+- 以 Codex CLI 为实际执行核心，围绕它补足个人工作流中缺失的操作面。
+- 支持开发者在 Agent 执行、人工审阅、补充追问和 Git 检查之间快速切换。
+- 优先优化 Windows + WSL 环境下的本地开发体验。
+- 保持轻量边界，尽量使用现有工具和本地文件系统能力。
 
-```bash
-dotnet restore HaloCreek/HaloCreek.csproj
-dotnet build HaloCreek/HaloCreek.csproj
-dotnet run --project HaloCreek/HaloCreek.csproj
-```
+## 不做什么
 
-发布时可以启用发布图标：
+- 不做完整的多 Agent 任务编排、队列调度或自动化流水线。
+- 不替代 IDE，也不试图接管代码编辑、语言服务或调试体验。
+- 不把 Codex 内部状态作为主控制面；HaloCreek 只在必要处读取外部可观察的信息。
+- 不做云端协作平台、账号系统、远程执行平台或团队级权限管理。
+- 不追求一开始覆盖所有操作系统、终端和 Git 客户端组合。
 
-```bash
-dotnet publish HaloCreek/HaloCreek.csproj -c Release /p:UsePublishIcon=true
-```
+## 文档
 
-## 配置
+- [User Guide](docs/UserGuide.md)
+- [Current Status](docs/CurrentStatus.md)
 
-HaloCreek 支持两层配置：
-
-- 全局配置：`%APPDATA%\HaloCreek\config.json`
-- Workspace 配置：`<workspace>/.HaloCreek/config.json`
-
-Workspace 配置会覆盖全局配置；没有配置文件时使用默认配置。配置读取失败当前会回退到默认值，适合 MVP 阶段快速使用，但不会主动修复损坏配置。
-
-示例：
-
-```json
-{
-  "CodexExecutableName": "codex",
-  "CodexLaunchArguments": [],
-  "MaxSessionHistoryFiles": 100
-}
-```
-
-## Codex 历史
-
-History 页签会尝试读取以下位置的 session 历史：
-
-- `$CODEX_HOME/sessions`
-- `~/.codex/sessions`
-
-在 Windows 环境中，HaloCreek 会同时尝试通过 WSL 的环境变量和可读路径候选定位历史文件。历史记录按当前 workspace 过滤，Windows 路径和 WSL `/mnt/<drive>/...` 路径会做等价比较。
-
-## 项目结构
-
-```text
-HaloCreek/
-  App.axaml(.cs)                  应用入口和对象组装
-  ViewModels/                     主窗口、页签和组件 ViewModel
-  Views/                          Avalonia XAML 视图
-  Services/                       workspace、session、tmux、git、配置、历史等服务
-  Infrastructure/                 平台相关能力：WSL、Windows Terminal、剪贴板、弹窗、路径
-  Models/                         配置、session、Git 变更等数据模型
-  Logging/                        应用内日志
-docs/
-  DesigningRules.md               设计规则
-  roadmap/                        MVP 计划、阶段文档和版本总结
-```
-
-## 已知限制
-
-- 当前没有自动化测试项目。
-- Ongoing Sessions 只管理当前 HaloCreek 进程创建的 tmux session，不扫描或接管已有 session。
-- tmux 状态通过 heartbeat 文件轮询判断，不解析 Codex 内部状态。
-- Git 外部动作只判断进程是否成功启动，不判断外部工具是否完成真实业务。
-- History 依赖 Codex JSONL 历史格式；格式变化时需要调整 reader。
-- History 搜索当前只过滤 Initial Prompt，不做全文检索。
+开发设计规则见 [Designing Rules](docs/DesigningRules.md)。
 
 ## License
 
