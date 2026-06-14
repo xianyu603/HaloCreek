@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  PROJECT_PATH: HaloCreek/HaloCreek.csproj
+  DOTNET_VERSION: 10.0.x
+  RUNTIME_ID: win-x64
+  PUBLISH_DIR: artifacts/publish/win-x64
+  RELEASE_DIR: artifacts/release
+
+jobs:
+  release-windows:
+    name: Release win-x64 package
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release metadata
+        id: release
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+
+          if ($tag -notmatch '^v\d+\.\d+(\.\d+)?$') {
+            throw "Release tag '$tag' is invalid. Use a tag like v0.1.0."
+          }
+
+          $version = $tag.Substring(1)
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish $env:PROJECT_PATH `
+            -c Release `
+            -r $env:RUNTIME_ID `
+            --self-contained true `
+            -o $env:PUBLISH_DIR `
+            /p:UsePublishIcon=true `
+            /p:DebugType=none `
+            /p:DebugSymbols=false
+
+          Get-ChildItem $env:PUBLISH_DIR -Recurse -Filter *.pdb | Remove-Item -Force
+
+      - name: Package
+        id: package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force $env:RELEASE_DIR | Out-Null
+
+          $zipName = "HaloCreek-$env:RELEASE_VERSION-$env:RUNTIME_ID.zip"
+          $zipPath = Join-Path $env:RELEASE_DIR $zipName
+          $checksumPath = "$zipPath.sha256"
+
+          Compress-Archive -Path "$env:PUBLISH_DIR\*" -DestinationPath $zipPath -Force
+
+          $hash = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
+          "$hash  $zipName" | Set-Content -Encoding ascii $checksumPath
+
+          "zip_name=$zipName" >> $env:GITHUB_OUTPUT
+          "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
+          "checksum_path=$checksumPath" >> $env:GITHUB_OUTPUT
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: HaloCreek-${{ steps.release.outputs.version }}-${{ env.RUNTIME_ID }}
+          path: |
+            ${{ steps.package.outputs.zip_path }}
+            ${{ steps.package.outputs.checksum_path }}
+          retention-days: 30
+
+      - name: Create or update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.release.outputs.tag }}"
+          $zipPath = "${{ steps.package.outputs.zip_path }}"
+          $checksumPath = "${{ steps.package.outputs.checksum_path }}"
+
+          $assets = @($zipPath, $checksumPath)
+
+          if (gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null) {
+            gh release upload $tag $assets --repo $env:GITHUB_REPOSITORY --clobber
+            exit 0
+          }
+
+          $args = @(
+            "release", "create", $tag
+            "--repo", $env:GITHUB_REPOSITORY
+            "--title", "HaloCreek $tag"
+            "--generate-notes"
+          )
+
+          $args += $assets
+          gh @args
