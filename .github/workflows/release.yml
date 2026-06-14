@@ -60,6 +60,9 @@ jobs:
             --self-contained true `
             -o $env:PUBLISH_DIR `
             /p:UsePublishIcon=true `
+            /p:Version=$env:RELEASE_VERSION `
+            /p:AssemblyVersion=$env:RELEASE_VERSION.0 `
+            /p:FileVersion=$env:RELEASE_VERSION.0 `
             /p:DebugType=none `
             /p:DebugSymbols=false
 
