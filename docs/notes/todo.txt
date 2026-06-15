@@ -10,8 +10,6 @@ review VM有点过载 目前已经承载了Reviewed Unreviewed的业务语义和
 * 前台session exit的过程中快速切另一个前台会寄掉
 wt的检查 win 10默认没有wt 需要同步修改user guide
 
-history tab 添加action: 双击历史自动resume resume会自动interrupt
 关闭terminal窗口后必须重启用用 解决一下
 应用内没法更新codex
-history 界面考虑加个双击action 触发resume
 vscode兼容

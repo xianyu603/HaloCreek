@@ -259,9 +259,23 @@ namespace HaloCreek.Services
             }
 
             _tmuxService.StopWatching(sessionId);
-            var startupCommand = _tmuxService.GetFrontClientStartupCommand(sessionId);
-            _terminalService.EnsureFrontClient(startupCommand);
-            _tmuxService.SwitchFrontClient(sessionId);
+
+            // 这里故意先由 SessionLifecycleService 编排 terminal 与 tmux：
+            // 当前只有 BringToFront 这一条调用路径需要同时处理 WT 窗口和 tmux 前台 client，
+            // 抽出独立“前台客户端”服务会增加一层暂时没有复用收益的间接调用。
+            // 如果后续出现多处复用、复杂失败恢复，或 terminal/tmux 开始互相持有对方状态，
+            // 再把这段收敛成独立的前台呈现服务。
+            if (_tmuxService.HasFrontClient())
+            {
+                _terminalService.ActivateFrontClient();
+                _tmuxService.SwitchFrontClient(sessionId);
+            }
+            else
+            {
+                var startupCommand = _tmuxService.GetFrontClientStartupCommand(sessionId);
+                _terminalService.LaunchFrontClient(startupCommand);
+                _tmuxService.MarkFrontClientAttachedToSession(sessionId);
+            }
 
             if (!_sessionsById.TryGetValue(sessionId, out var targetSession))
             {

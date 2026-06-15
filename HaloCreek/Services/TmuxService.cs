@@ -157,6 +157,17 @@ namespace HaloCreek.Services
             _frontClientSwitcher.SwitchIn(identifier);
         }
 
+        public bool HasFrontClient()
+        {
+            return _frontClientSwitcher.HasClient();
+        }
+
+        public void MarkFrontClientAttachedToSession(string identifier)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+            _frontClientSwitcher.MarkAttachedToSession(identifier);
+        }
+
         public void SendMessageToSession(
             string identifier,
             string message)
@@ -431,26 +442,74 @@ namespace HaloCreek.Services
                 }
             }
 
+            public void MarkAttachedToSession(string identifier)
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+                lock (_lock)
+                {
+                    _frontSessionId = identifier;
+                }
+            }
+
             private void SwitchClientCore(string identifier)
+            {
+                if (!TryGetFrontClientTty(out var tty))
+                {
+                    throw new InvalidOperationException("Front tmux client is not available.");
+                }
+
+                if (!_platformInfrastructure.TryRunWslCommand(
+                        "tmux",
+                        new[] { "switch-client", "-c", tty, "-t", identifier },
+                        out var output))
+                {
+                    var message = NormalizeProcessOutput(output);
+                    if (string.IsNullOrWhiteSpace(message))
+                    {
+                        message = "tmux switch-client failed.";
+                    }
+
+                    throw new InvalidOperationException(
+                        "Failed to switch front tmux client: " + message);
+                }
+            }
+
+            public bool HasClient()
+            {
+                lock (_lock)
+                {
+                    if (!TryGetFrontClientTty(out var tty))
+                    {
+                        return false;
+                    }
+
+                    if (!_platformInfrastructure.TryRunWslCommand(
+                            "tmux",
+                            new[] { "list-clients", "-F", "#{client_tty}" },
+                            out var output))
+                    {
+                        return false;
+                    }
+
+                    return SplitProcessOutputLines(output)
+                        .Any(clientTty => string.Equals(clientTty, tty, StringComparison.Ordinal));
+                }
+            }
+
+            private bool TryGetFrontClientTty(out string tty)
             {
                 if (!_platformInfrastructure.TryRunWslCommand(
                         "cat",
                         new[] { _frontClientTtyMarkerPath },
                         out var output))
                 {
-                    return;
+                    tty = string.Empty;
+                    return false;
                 }
 
-                var tty = SplitProcessOutputLines(output).FirstOrDefault();
-                if (string.IsNullOrWhiteSpace(tty))
-                {
-                    return;
-                }
-
-                _platformInfrastructure.TryRunWslCommand(
-                    "tmux",
-                    new[] { "switch-client", "-c", tty, "-t", identifier },
-                    out _);
+                tty = SplitProcessOutputLines(output).FirstOrDefault() ?? string.Empty;
+                return !string.IsNullOrWhiteSpace(tty);
             }
         }
 
