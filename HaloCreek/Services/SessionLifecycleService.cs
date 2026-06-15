@@ -315,13 +315,13 @@ namespace HaloCreek.Services
         {
             RequireUiThread();
 
-            if (!TryGetFrontSessionId(out _))
+            if (!TryGetFrontSessionId(out var frontSessionId))
             {
                 ReportFrontSessionFailure("Activate front session failed", "No front session is available.");
                 return;
             }
 
-            _terminalService.ActivateFrontClient();
+            BringToFront(frontSessionId);
         }
 
         public void Exit(string sessionId)
