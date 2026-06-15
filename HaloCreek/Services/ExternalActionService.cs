@@ -10,6 +10,13 @@ namespace HaloCreek.Services
 {
     public sealed class ExternalActionService
     {
+        private readonly IReadOnlyList<GitFileBrowserAction> _workspaceRootActions;
+
+        public ExternalActionService()
+        {
+            _workspaceRootActions = GitFileBrowserActions.ResolveWorkspaceRootActions();
+        }
+
         public IReadOnlyList<GitSelectedPathActionDescriptor> GetGitSelectedPathActions()
         {
             return GitFileBrowserActions.SelectedPathActions
@@ -19,7 +26,7 @@ namespace HaloCreek.Services
 
         public IReadOnlyList<GitWorkspaceRootActionDescriptor> GetGitWorkspaceRootActions()
         {
-            return GitFileBrowserActions.WorkspaceRootActions
+            return _workspaceRootActions
                 .Select(action => new GitWorkspaceRootActionDescriptor(action.Id, action.Title))
                 .ToArray();
         }
@@ -132,11 +139,11 @@ namespace HaloCreek.Services
                 ?? throw new InvalidOperationException($"Git selected path action not found: {actionId}");
         }
 
-        private static GitFileBrowserAction RequireGitWorkspaceRootAction(string actionId)
+        private GitFileBrowserAction RequireGitWorkspaceRootAction(string actionId)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
 
-            return GitFileBrowserActions.WorkspaceRootActions.FirstOrDefault(
+            return _workspaceRootActions.FirstOrDefault(
                     action => string.Equals(action.Id, actionId, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException($"Git workspace root action not found: {actionId}");
         }
@@ -208,6 +215,9 @@ namespace HaloCreek.Services
 
     internal static class GitFileBrowserActions
     {
+        private const string SourceTreeExecutableName = "SourceTree.exe";
+        private const string TortoiseGitProcExecutableName = "TortoiseGitProc.exe";
+
         public static GitFileBrowserAction SelectedPathDoubleClickAction { get; } = new(
             "Open",
             "Open",
@@ -253,19 +263,56 @@ namespace HaloCreek.Services
                     new[] { "/c", "del", "/f", "/q", "{SelectedPath}" }),
             };
 
-        public static IReadOnlyList<GitFileBrowserAction> WorkspaceRootActions { get; } =
-            new[]
+        public static IReadOnlyList<GitFileBrowserAction> ResolveWorkspaceRootActions()
+        {
+            if (PlatformInfrastructure.IsExecutableOnPath(TortoiseGitProcExecutableName))
+            {
+                Log.Info("Git", "Workspace root actions use TortoiseGit.");
+                return GetTortoiseGitWorkspaceRootActions();
+            }
+
+            if (PlatformInfrastructure.IsExecutableOnPath(SourceTreeExecutableName))
+            {
+                Log.Info("Git", "Workspace root actions use SourceTree.");
+                return GetSourceTreeWorkspaceRootActions();
+            }
+
+            Log.Info("Git", "Workspace root actions use empty external Git tool configuration.");
+            return Array.Empty<GitFileBrowserAction>();
+        }
+
+        private static IReadOnlyList<GitFileBrowserAction> GetTortoiseGitWorkspaceRootActions()
+        {
+            return new[]
             {
                 new GitFileBrowserAction(
                     "Commit",
                     "Commit",
-                    "TortoiseGitProc.exe",
+                    TortoiseGitProcExecutableName,
                     new[] { "/command:commit", "/path:{WorkspaceRoot}" }),
                 new GitFileBrowserAction(
                     "ShowLog",
                     "Show Log",
-                    "TortoiseGitProc.exe",
+                    TortoiseGitProcExecutableName,
                     new[] { "/command:log", "/path:{WorkspaceRoot}" }),
             };
+        }
+
+        private static IReadOnlyList<GitFileBrowserAction> GetSourceTreeWorkspaceRootActions()
+        {
+            return new[]
+            {
+                new GitFileBrowserAction(
+                    "Commit",
+                    "Commit",
+                    SourceTreeExecutableName,
+                    new[] { "-f", "{WorkspaceRoot}", "commit" }),
+                new GitFileBrowserAction(
+                    "ShowLog",
+                    "Show Log",
+                    SourceTreeExecutableName,
+                    new[] { "-f", "{WorkspaceRoot}", "log" }),
+            };
+        }
     }
 }

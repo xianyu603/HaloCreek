@@ -381,6 +381,16 @@ namespace HaloCreek.Infrastructure
             }
         }
 
+        public static bool IsExecutableOnPath(string executableName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
+
+            return RunProcessWithCapturedOutput(
+                    "where.exe",
+                    new[] { executableName })
+                .Succeeded;
+        }
+
         public static int StartProcess(
             string fileName,
             IEnumerable<string> arguments,
