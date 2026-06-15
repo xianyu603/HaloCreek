@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using HaloCreek.Infrastructure;
@@ -125,84 +123,6 @@ namespace HaloCreek.Services
             throw new InvalidOperationException($"Git HEAD file restore failed. {message}");
         }
 
-        public void RunConfiguredAction(
-            GitChangeInfo? selectedChange,
-            GitFileBrowserActionConfig action)
-        {
-            ArgumentNullException.ThrowIfNull(action);
-
-            var actionName = GetActionName(action);
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
-
-            if (string.IsNullOrWhiteSpace(action.Executable))
-            {
-                throw new InvalidOperationException($"Executable is empty for {actionName}.");
-            }
-
-            var arguments = action.Arguments ?? Array.Empty<string>();
-            if (arguments.Any(argument => argument is null))
-            {
-                throw new InvalidOperationException($"Argument is null for {actionName}.");
-            }
-
-            var validationError = ValidateConfiguredAction(action, selectedChange);
-            if (validationError is not null)
-            {
-                throw new InvalidOperationException(
-                    $"{actionName} configuration is invalid: {validationError}");
-            }
-
-            try
-            {
-                var executable = action.Executable.Trim();
-                var resolvedArguments = arguments
-                    .Select(argument => ReplaceActionTokens(
-                        argument,
-                        workspacePath,
-                        selectedChange))
-                    .ToArray();
-
-                Log.Info(
-                    "Git",
-                    $"Starting configured action. Action={QuoteForLog(actionName)} "
-                    + $"Executable={QuoteForLog(executable)} "
-                    + $"WorkingDirectory={QuoteForLog(workspacePath)} "
-                    + $"SelectedPath={QuoteForLog(ResolveSelectedPath(workspacePath, selectedChange))} "
-                    + $"Arguments={FormatActionArgumentsForLog(arguments, resolvedArguments)}");
-
-                using var process = new Process();
-                process.StartInfo = new ProcessStartInfo
-                {
-                    FileName = executable,
-                    WorkingDirectory = workspacePath,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                };
-
-                foreach (var argument in resolvedArguments)
-                {
-                    process.StartInfo.ArgumentList.Add(argument);
-                }
-
-                process.Start();
-                Log.Info(
-                    "Git",
-                    $"Started configured action. Action={QuoteForLog(actionName)} "
-                    + $"Executable={QuoteForLog(executable)} "
-                    + $"ProcessId={process.Id}");
-            }
-            catch (Exception ex) when (ex is Win32Exception
-                or InvalidOperationException
-                or IOException
-                or UnauthorizedAccessException
-                or ArgumentException
-                or NotSupportedException)
-            {
-                Log.Error("Git", ex, $"Failed to start configured action. Action={QuoteForLog(actionName)}");
-                throw new InvalidOperationException($"Failed to start {actionName}: {ex.Message}", ex);
-            }
-        }
-
         private static GitCommandResult RunGitStatus(string workspacePath)
         {
             return RunGit(
@@ -258,24 +178,6 @@ namespace HaloCreek.Services
                 || message.Contains("ambiguous argument 'HEAD:", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string? ValidateConfiguredAction(
-            GitFileBrowserActionConfig action,
-            GitChangeInfo? selectedChange)
-        {
-            return action.Target switch
-            {
-                GitFileBrowserActionTarget.SelectedFilePath when !action.UsesSelectedPathToken =>
-                    "SelectedFilePath actions must include the {SelectedPath} token.",
-                GitFileBrowserActionTarget.SelectedFilePath when selectedChange is null =>
-                    "SelectedFilePath actions require a selected Git change.",
-                GitFileBrowserActionTarget.SelectedFilePath => null,
-                GitFileBrowserActionTarget.WorkspaceRoot when action.UsesSelectedPathToken =>
-                    "WorkspaceRoot actions cannot include the {SelectedPath} token.",
-                GitFileBrowserActionTarget.WorkspaceRoot => null,
-                _ => "Target must be SelectedFilePath or WorkspaceRoot.",
-            };
-        }
-
         private static IReadOnlyList<GitChangeInfo> ParsePorcelainStatus(string output)
         {
             if (string.IsNullOrEmpty(output))
@@ -318,61 +220,6 @@ namespace HaloCreek.Services
         private static bool RequiresOriginalPath(char indexStatus, char workTreeStatus)
         {
             return indexStatus is 'R' or 'C' || workTreeStatus is 'R' or 'C';
-        }
-
-        private static string ReplaceActionTokens(
-            string argument,
-            string workspacePath,
-            GitChangeInfo? selectedChange)
-        {
-            return argument
-                .Replace(
-                    "{WorkspaceRoot}",
-                    PlatformInfrastructure.NormalizePathForCurrentPlatform(workspacePath),
-                    StringComparison.Ordinal)
-                .Replace(
-                    "{SelectedPath}",
-                    ResolveSelectedPath(workspacePath, selectedChange),
-                    StringComparison.Ordinal);
-        }
-
-        private static string ResolveSelectedPath(string workspacePath, GitChangeInfo? selectedChange)
-        {
-            return string.IsNullOrEmpty(selectedChange?.RelativePath)
-                ? string.Empty
-                : PlatformInfrastructure.CombinePathForCurrentPlatform(workspacePath, selectedChange.RelativePath);
-        }
-
-        private static string GetActionName(GitFileBrowserActionConfig action)
-        {
-            if (!string.IsNullOrWhiteSpace(action.Id))
-            {
-                return action.Id.Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(action.Label))
-            {
-                return action.Label.Trim();
-            }
-
-            return "configured action";
-        }
-
-        private static string FormatActionArgumentsForLog(
-            IReadOnlyList<string> originalArguments,
-            IReadOnlyList<string> resolvedArguments)
-        {
-            return string.Join(
-                ", ",
-                originalArguments.Select((argument, index) =>
-                    $"[{index}]Raw={QuoteForLog(argument)} Resolved={QuoteForLog(resolvedArguments[index])}"));
-        }
-
-        private static string QuoteForLog(string? value)
-        {
-            return value is null
-                ? "<null>"
-                : $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
         }
 
         private static bool IsStaged(char indexStatus)

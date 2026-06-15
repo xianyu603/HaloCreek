@@ -381,6 +381,37 @@ namespace HaloCreek.Infrastructure
             }
         }
 
+        public static int StartProcess(
+            string fileName,
+            IEnumerable<string> arguments,
+            string? workingDirectory = null,
+            bool createNoWindow = false)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            using var process = new Process();
+            process.StartInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                UseShellExecute = false,
+                CreateNoWindow = createNoWindow,
+            };
+
+            if (!string.IsNullOrWhiteSpace(workingDirectory))
+            {
+                process.StartInfo.WorkingDirectory = workingDirectory;
+            }
+
+            foreach (var argument in arguments)
+            {
+                process.StartInfo.ArgumentList.Add(argument);
+            }
+
+            process.Start();
+            return process.Id;
+        }
+
         private static bool IsWindowsRootedPath(string path)
         {
             return path.Length >= 3

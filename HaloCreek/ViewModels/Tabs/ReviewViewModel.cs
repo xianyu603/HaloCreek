@@ -22,7 +22,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private readonly ReviewSnapshotService _reviewSnapshotService;
         private readonly GitService _gitService;
-        private readonly DiffService _diffService;
+        private readonly ExternalActionService _externalActionService;
         private readonly ReviewClipboardContextService _reviewClipboardContextService;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly AppCommonRuntime _appCommonRuntime;
@@ -42,7 +42,7 @@ namespace HaloCreek.ViewModels.Tabs
         public ReviewViewModel(
             ReviewSnapshotService reviewSnapshotService,
             GitService gitService,
-            DiffService diffService,
+            ExternalActionService externalActionService,
             ReviewClipboardContextService reviewClipboardContextService,
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime)
@@ -50,7 +50,8 @@ namespace HaloCreek.ViewModels.Tabs
             _reviewSnapshotService = reviewSnapshotService
                 ?? throw new ArgumentNullException(nameof(reviewSnapshotService));
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
-            _diffService = diffService ?? throw new ArgumentNullException(nameof(diffService));
+            _externalActionService = externalActionService
+                ?? throw new ArgumentNullException(nameof(externalActionService));
             _reviewClipboardContextService = reviewClipboardContextService
                 ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
             _sessionLifecycleService = sessionLifecycleService
@@ -60,6 +61,7 @@ namespace HaloCreek.ViewModels.Tabs
             RefreshCommand = new AsyncRelayCommand(RefreshReviewFilesAsync);
             ModifiedGit = new GitViewModel(
                 _gitService,
+                _externalActionService,
                 _appCommonRuntime,
                 RefreshCommand);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
@@ -519,7 +521,7 @@ namespace HaloCreek.ViewModels.Tabs
                 var workingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
                     WorkspaceRuntime.Current.GitRootPath,
                     gitRelativePath);
-                _diffService.OpenDiff(
+                _externalActionService.OpenDiff(
                     reviewedPath,
                     workingTreePath,
                     $"Working Tree vs Reviewed: {file.RelativePath}");
@@ -544,7 +546,7 @@ namespace HaloCreek.ViewModels.Tabs
                 var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(file.RelativePath);
                 var headPath = _gitService.CreateTempHeadFile(gitRelativePath);
                 var reviewedPath = _reviewSnapshotService.CreateTempReviewedFile(gitRelativePath);
-                _diffService.OpenDiff(
+                _externalActionService.OpenDiff(
                     headPath,
                     reviewedPath,
                     $"Reviewed vs HEAD: {file.RelativePath}");

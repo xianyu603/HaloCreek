@@ -13,23 +13,26 @@ namespace HaloCreek.ViewModels.Tabs
     public sealed class GitViewModel : ViewModelBase
     {
         private readonly GitService _gitService;
+        private readonly ExternalActionService _externalActionService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
         private IReadOnlyList<RelayCommand> _configuredActionCommands = Array.Empty<RelayCommand>();
         private IReadOnlyList<IGitFileAction> _selectedFilePathActions = Array.Empty<IGitFileAction>();
         private IReadOnlyList<IGitFileAction> _workspaceRootActions = Array.Empty<IGitFileAction>();
         private GitChangeInfo? _selectedChange;
-        private GitFileBrowserActionConfig? _doubleClickAction;
-        private string _doubleClickActionId = string.Empty;
+        private GitSelectedPathActionDescriptor? _doubleClickAction;
 
         public GitViewModel(
             GitService gitService,
+            ExternalActionService externalActionService,
             AppCommonRuntime appCommonRuntime,
             ICommand refreshCommand)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
+            _externalActionService = externalActionService
+                ?? throw new ArgumentNullException(nameof(externalActionService));
             _transientEventService = appCommonRuntime.TransientEventService;
             RefreshCommand = refreshCommand ?? throw new ArgumentNullException(nameof(refreshCommand));
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
@@ -86,14 +89,11 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void LoadActionConfig()
         {
-            _doubleClickActionId = GitFileBrowserActionDefaults.DoubleClickActionId;
-            _doubleClickAction = GitFileBrowserActionDefaults.Actions.FirstOrDefault(
-                configuredAction => string.Equals(
-                    configuredAction.Id,
-                    _doubleClickActionId,
-                    StringComparison.OrdinalIgnoreCase));
-            var selectedFilePathActions = BuildSelectedFilePathActions(GitFileBrowserActionDefaults.Actions);
-            var workspaceRootActions = BuildWorkspaceRootActions(GitFileBrowserActionDefaults.Actions);
+            _doubleClickAction = _externalActionService.GetGitSelectedPathDoubleClickAction();
+            var selectedFilePathActions = BuildSelectedFilePathActions(
+                _externalActionService.GetGitSelectedPathActions());
+            var workspaceRootActions = BuildWorkspaceRootActions(
+                _externalActionService.GetGitWorkspaceRootActions());
             _configuredActionCommands = selectedFilePathActions
                 .Concat(workspaceRootActions)
                 .Select(action => action.Command)
@@ -111,27 +111,28 @@ namespace HaloCreek.ViewModels.Tabs
         }
 
         private IReadOnlyList<IGitFileAction> BuildSelectedFilePathActions(
-            IEnumerable<GitFileBrowserActionConfig> actions)
+            IEnumerable<GitSelectedPathActionDescriptor> actions)
         {
             return actions
-                .Where(action => action.Target == GitFileBrowserActionTarget.SelectedFilePath)
                 .Select(action => new GitFileAction(
-                    action.Label,
+                    action.Title,
                     new RelayCommand(
-                        () => RunConfiguredAction(action, SelectedChange),
-                        () => SelectedChange is not null)))
+                        () => RunGitSelectedPathAction(action, SelectedChange),
+                        () => _externalActionService.CanRunGitSelectedPathAction(
+                            action.Id,
+                            SelectedChange?.RelativePath))))
                 .ToArray();
         }
 
         private IReadOnlyList<IGitFileAction> BuildWorkspaceRootActions(
-            IEnumerable<GitFileBrowserActionConfig> actions)
+            IEnumerable<GitWorkspaceRootActionDescriptor> actions)
         {
             return actions
-                .Where(action => action.Target == GitFileBrowserActionTarget.WorkspaceRoot)
                 .Select(action => new GitFileAction(
-                    action.Label,
+                    action.Title,
                     new RelayCommand(
-                        () => RunConfiguredAction(action, null))))
+                        () => RunGitWorkspaceRootAction(action),
+                        () => _externalActionService.CanRunGitWorkspaceRootAction(action.Id))))
                 .ToArray();
         }
 
@@ -160,27 +161,43 @@ namespace HaloCreek.ViewModels.Tabs
                 _transientEventService.ReportUserActionFailure(
                     "Git",
                     "Open failed",
-                    $"Double click action not found: {_doubleClickActionId}");
+                    "Double click action not found.");
                 return;
             }
 
-            if (_doubleClickAction.Target != GitFileBrowserActionTarget.SelectedFilePath)
-            {
-                _transientEventService.ReportUserActionFailure(
-                    "Git",
-                    "Open failed",
-                    $"Double click action must target {GitFileBrowserActionTarget.SelectedFilePath}: {_doubleClickActionId}");
-                return;
-            }
-
-            RunConfiguredAction(_doubleClickAction, change);
+            RunGitSelectedPathAction(_doubleClickAction, change);
         }
 
-        private void RunConfiguredAction(GitFileBrowserActionConfig action, GitChangeInfo? selectedChange)
+        private void RunGitSelectedPathAction(
+            GitSelectedPathActionDescriptor action,
+            GitChangeInfo? selectedChange)
         {
             try
             {
-                _gitService.RunConfiguredAction(selectedChange, action);
+                if (selectedChange is null)
+                {
+                    throw new InvalidOperationException("SelectedFilePath actions require a selected Git change.");
+                }
+
+                _externalActionService.RunGitSelectedPathAction(action.Id, selectedChange.RelativePath);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException
+                or System.ComponentModel.Win32Exception
+                or ArgumentException
+                or NotSupportedException)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "Git",
+                    "Git action failed",
+                    ex.Message);
+            }
+        }
+
+        private void RunGitWorkspaceRootAction(GitWorkspaceRootActionDescriptor action)
+        {
+            try
+            {
+                _externalActionService.RunGitWorkspaceRootAction(action.Id);
             }
             catch (Exception ex) when (ex is InvalidOperationException
                 or System.ComponentModel.Win32Exception
