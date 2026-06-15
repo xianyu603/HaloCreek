@@ -10,16 +10,24 @@ namespace HaloCreek.Services
 {
     public sealed class ExternalActionService
     {
+        internal const string TortoiseGitProcExecutableName = "TortoiseGitProc.exe";
+        private const string VsCodeExecutableName = "code";
+        private const string GitExecutableName = "git";
+
+        private readonly DiffToolKind _diffToolKind;
+        private readonly IReadOnlyList<GitFileBrowserAction> _selectedPathActions;
         private readonly IReadOnlyList<GitFileBrowserAction> _workspaceRootActions;
 
         public ExternalActionService()
         {
+            _diffToolKind = ResolveDiffToolKind();
+            _selectedPathActions = ResolveSelectedPathActions();
             _workspaceRootActions = GitFileBrowserActions.ResolveWorkspaceRootActions();
         }
 
         public IReadOnlyList<GitSelectedPathActionDescriptor> GetGitSelectedPathActions()
         {
-            return GitFileBrowserActions.SelectedPathActions
+            return _selectedPathActions
                 .Select(action => new GitSelectedPathActionDescriptor(action.Id, action.Title))
                 .ToArray();
         }
@@ -53,17 +61,34 @@ namespace HaloCreek.Services
 
         public void OpenDiff(string leftPath, string rightPath, string title)
         {
+            if (_diffToolKind == DiffToolKind.None)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot start {title}: no supported external diff tool was found.");
+            }
+
             try
             {
+                var (executable, arguments) = _diffToolKind switch
+                {
+                    DiffToolKind.TortoiseGit => (
+                        TortoiseGitProcExecutableName,
+                        new[] { "/command:diff", $"/path:{rightPath}", $"/path2:{leftPath}" }),
+                    DiffToolKind.VsCode => (
+                        "cmd.exe",
+                        new[] { "/c", VsCodeExecutableName, "--diff", leftPath, rightPath }),
+                    _ => throw new InvalidOperationException($"Unsupported diff tool kind: {_diffToolKind}"),
+                };
+
                 StartExternalAction(
                     "Diff",
                     $"Starting external diff. Title={QuoteForLog(title)} "
                     + $"Left={QuoteForLog(leftPath)} Right={QuoteForLog(rightPath)}",
                     $"Started external diff. Title={QuoteForLog(title)}",
-                    "TortoiseGitProc.exe",
-                    new[] { "/command:diff", $"/path:{rightPath}", $"/path2:{leftPath}" },
+                    executable,
+                    arguments,
                     workingDirectory: null,
-                    createNoWindow: false);
+                    createNoWindow: true);
             }
             catch (Exception ex) when (IsExternalActionStartException(ex))
             {
@@ -130,11 +155,11 @@ namespace HaloCreek.Services
                 $"{startedMessagePrefix} ProcessId={processId}");
         }
 
-        private static GitFileBrowserAction RequireGitSelectedPathAction(string actionId)
+        private GitFileBrowserAction RequireGitSelectedPathAction(string actionId)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
 
-            return GitFileBrowserActions.SelectedPathActions.FirstOrDefault(
+            return _selectedPathActions.FirstOrDefault(
                     action => string.Equals(action.Id, actionId, StringComparison.OrdinalIgnoreCase))
                 ?? throw new InvalidOperationException($"Git selected path action not found: {actionId}");
         }
@@ -197,6 +222,92 @@ namespace HaloCreek.Services
                 or ArgumentException
                 or NotSupportedException;
         }
+
+        private static DiffToolKind ResolveDiffToolKind()
+        {
+            if (PlatformInfrastructure.IsExecutableOnPath(TortoiseGitProcExecutableName))
+            {
+                Log.Info("Diff", "Diff actions use TortoiseGit.");
+                return DiffToolKind.TortoiseGit;
+            }
+
+            if (PlatformInfrastructure.IsExecutableOnPath(VsCodeExecutableName))
+            {
+                Log.Info("Diff", "Diff actions use VS Code.");
+                return DiffToolKind.VsCode;
+            }
+
+            // TODO: Add a user-configurable diff tool path instead of hardcoding supported probes.
+            Log.Info("Diff", "No supported external diff tool found. Optional Git file diff action is disabled.");
+            return DiffToolKind.None;
+        }
+
+        private IReadOnlyList<GitFileBrowserAction> ResolveSelectedPathActions()
+        {
+            GitFileBrowserAction? openDiffAction = _diffToolKind switch
+            {
+                DiffToolKind.TortoiseGit => new GitFileBrowserAction(
+                    "OpenDiff",
+                    "OpenDiff",
+                    TortoiseGitProcExecutableName,
+                    new[] { "/command:diff", "/path:{SelectedPath}" }),
+                DiffToolKind.VsCode => new GitFileBrowserAction(
+                    "OpenDiff",
+                    "OpenDiff",
+                    GitExecutableName,
+                    new[] { "difftool", "--no-prompt", "--extcmd", "code --diff", "HEAD", "--", "{SelectedPath}" }),
+                DiffToolKind.None => null,
+                _ => throw new InvalidOperationException($"Unsupported diff tool kind: {_diffToolKind}"),
+            };
+
+            var actions = new List<GitFileBrowserAction>();
+            if (openDiffAction is not null)
+            {
+                actions.Add(openDiffAction);
+            }
+
+            actions.AddRange(new[]
+            {
+                GitFileBrowserActions.SelectedPathDoubleClickAction,
+                new GitFileBrowserAction(
+                    "ExploreTo",
+                    "ExploreTo",
+                    "explorer.exe",
+                    new[] { "/select,", "{SelectedPath}" }),
+                new GitFileBrowserAction(
+                    "Edit",
+                    "Edit",
+                    "notepad.exe",
+                    new[] { "{SelectedPath}" }),
+                new GitFileBrowserAction(
+                    "Revert",
+                    "Revert",
+                    GitExecutableName,
+                    new[]
+                    {
+                        "restore",
+                        "--source=HEAD",
+                        "--staged",
+                        "--worktree",
+                        "--",
+                        "{SelectedPath}",
+                    }),
+                new GitFileBrowserAction(
+                    "Delete",
+                    "Delete",
+                    "cmd.exe",
+                    new[] { "/c", "del", "/f", "/q", "{SelectedPath}" }),
+            });
+
+            return actions;
+        }
+
+        private enum DiffToolKind
+        {
+            TortoiseGit,
+            VsCode,
+            None,
+        }
     }
 
     public sealed record GitSelectedPathActionDescriptor(
@@ -216,7 +327,6 @@ namespace HaloCreek.Services
     internal static class GitFileBrowserActions
     {
         private const string SourceTreeExecutableName = "SourceTree.exe";
-        private const string TortoiseGitProcExecutableName = "TortoiseGitProc.exe";
 
         public static GitFileBrowserAction SelectedPathDoubleClickAction { get; } = new(
             "Open",
@@ -224,48 +334,9 @@ namespace HaloCreek.Services
             "explorer.exe",
             new[] { "{SelectedPath}" });
 
-        public static IReadOnlyList<GitFileBrowserAction> SelectedPathActions { get; } =
-            new[]
-            {
-                new GitFileBrowserAction(
-                    "OpenDiff",
-                    "OpenDiff",
-                    "TortoiseGitProc.exe",
-                    new[] { "/command:diff", "/path:{SelectedPath}" }),
-                SelectedPathDoubleClickAction,
-                new GitFileBrowserAction(
-                    "ExploreTo",
-                    "ExploreTo",
-                    "explorer.exe",
-                    new[] { "/select,", "{SelectedPath}" }),
-                new GitFileBrowserAction(
-                    "Edit",
-                    "Edit",
-                    "notepad.exe",
-                    new[] { "{SelectedPath}" }),
-                new GitFileBrowserAction(
-                    "Revert",
-                    "Revert",
-                    "git",
-                    new[]
-                    {
-                        "restore",
-                        "--source=HEAD",
-                        "--staged",
-                        "--worktree",
-                        "--",
-                        "{SelectedPath}",
-                    }),
-                new GitFileBrowserAction(
-                    "Delete",
-                    "Delete",
-                    "cmd.exe",
-                    new[] { "/c", "del", "/f", "/q", "{SelectedPath}" }),
-            };
-
         public static IReadOnlyList<GitFileBrowserAction> ResolveWorkspaceRootActions()
         {
-            if (PlatformInfrastructure.IsExecutableOnPath(TortoiseGitProcExecutableName))
+            if (PlatformInfrastructure.IsExecutableOnPath(ExternalActionService.TortoiseGitProcExecutableName))
             {
                 Log.Info("Git", "Workspace root actions use TortoiseGit.");
                 return GetTortoiseGitWorkspaceRootActions();
@@ -288,12 +359,12 @@ namespace HaloCreek.Services
                 new GitFileBrowserAction(
                     "Commit",
                     "Commit",
-                    TortoiseGitProcExecutableName,
+                    ExternalActionService.TortoiseGitProcExecutableName,
                     new[] { "/command:commit", "/path:{WorkspaceRoot}" }),
                 new GitFileBrowserAction(
                     "ShowLog",
                     "Show Log",
-                    TortoiseGitProcExecutableName,
+                    ExternalActionService.TortoiseGitProcExecutableName,
                     new[] { "/command:log", "/path:{WorkspaceRoot}" }),
             };
         }
