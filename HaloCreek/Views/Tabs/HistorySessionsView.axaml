@@ -91,7 +91,8 @@
                             <Grid Height="90"
                                   RowDefinitions="1,*"
                                   Background="Transparent"
-                                  ClipToBounds="True">
+                                  ClipToBounds="True"
+                                  DoubleTapped="HistorySession_OnDoubleTapped">
                                 <Border Grid.Row="0"
                                         Background="#E2E8F0"/>
                                 <Border Grid.Row="1"
