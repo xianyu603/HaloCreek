@@ -20,7 +20,7 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<IGitFileAction> _selectedFilePathActions = Array.Empty<IGitFileAction>();
         private IReadOnlyList<IGitFileAction> _workspaceRootActions = Array.Empty<IGitFileAction>();
         private GitChangeInfo? _selectedChange;
-        private GitSelectedPathActionDescriptor? _doubleClickAction;
+        private GitSelectedPathActionDescriptor _doubleClickAction = null!;
 
         public GitViewModel(
             GitService gitService,
@@ -118,9 +118,7 @@ namespace HaloCreek.ViewModels.Tabs
                     action.Title,
                     new RelayCommand(
                         () => RunGitSelectedPathAction(action, SelectedChange),
-                        () => _externalActionService.CanRunGitSelectedPathAction(
-                            action.Id,
-                            SelectedChange?.RelativePath))))
+                        () => !string.IsNullOrWhiteSpace(SelectedChange?.RelativePath))))
                 .ToArray();
         }
 
@@ -131,8 +129,7 @@ namespace HaloCreek.ViewModels.Tabs
                 .Select(action => new GitFileAction(
                     action.Title,
                     new RelayCommand(
-                        () => RunGitWorkspaceRootAction(action),
-                        () => _externalActionService.CanRunGitWorkspaceRootAction(action.Id))))
+                        () => RunGitWorkspaceRootAction(action))))
                 .ToArray();
         }
 
@@ -153,15 +150,6 @@ namespace HaloCreek.ViewModels.Tabs
         {
             if (change is null)
             {
-                return;
-            }
-
-            if (_doubleClickAction is null)
-            {
-                _transientEventService.ReportUserActionFailure(
-                    "Git",
-                    "Open failed",
-                    "Double click action not found.");
                 return;
             }
 

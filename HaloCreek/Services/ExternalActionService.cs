@@ -12,61 +12,35 @@ namespace HaloCreek.Services
     {
         public IReadOnlyList<GitSelectedPathActionDescriptor> GetGitSelectedPathActions()
         {
-            return GitFileBrowserActionDefaults.Actions
-                .Where(action => action.Target == GitFileBrowserActionTarget.SelectedFilePath)
+            return GitFileBrowserActions.SelectedPathActions
                 .Select(action => new GitSelectedPathActionDescriptor(action.Id, action.Title))
                 .ToArray();
         }
 
         public IReadOnlyList<GitWorkspaceRootActionDescriptor> GetGitWorkspaceRootActions()
         {
-            return GitFileBrowserActionDefaults.Actions
-                .Where(action => action.Target == GitFileBrowserActionTarget.WorkspaceRoot)
+            return GitFileBrowserActions.WorkspaceRootActions
                 .Select(action => new GitWorkspaceRootActionDescriptor(action.Id, action.Title))
                 .ToArray();
         }
 
-        public GitSelectedPathActionDescriptor? GetGitSelectedPathDoubleClickAction()
+        public GitSelectedPathActionDescriptor GetGitSelectedPathDoubleClickAction()
         {
-            var action = FindGitFileBrowserAction(GitFileBrowserActionDefaults.DoubleClickActionId);
-            return action?.Target == GitFileBrowserActionTarget.SelectedFilePath
-                ? new GitSelectedPathActionDescriptor(action.Id, action.Title)
-                : null;
-        }
-
-        public bool CanRunGitSelectedPathAction(string actionId, string? selectedRelativePath)
-        {
-            return !string.IsNullOrWhiteSpace(selectedRelativePath);
+            var action = GitFileBrowserActions.SelectedPathDoubleClickAction;
+            return new GitSelectedPathActionDescriptor(action.Id, action.Title);
         }
 
         public void RunGitSelectedPathAction(string actionId, string selectedRelativePath)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(selectedRelativePath);
 
-            var action = RequireGitFileBrowserAction(actionId);
-            if (action.Target != GitFileBrowserActionTarget.SelectedFilePath)
-            {
-                throw new InvalidOperationException(
-                    $"{GetActionName(action)} configuration is invalid: Target must be SelectedFilePath.");
-            }
-
+            var action = RequireGitSelectedPathAction(actionId);
             RunGitFileBrowserAction(action, selectedRelativePath);
-        }
-
-        public bool CanRunGitWorkspaceRootAction(string actionId)
-        {
-            return true;
         }
 
         public void RunGitWorkspaceRootAction(string actionId)
         {
-            var action = RequireGitFileBrowserAction(actionId);
-            if (action.Target != GitFileBrowserActionTarget.WorkspaceRoot)
-            {
-                throw new InvalidOperationException(
-                    $"{GetActionName(action)} configuration is invalid: Target must be WorkspaceRoot.");
-            }
-
+            var action = RequireGitWorkspaceRootAction(actionId);
             RunGitFileBrowserAction(action, null);
         }
 
@@ -92,35 +66,17 @@ namespace HaloCreek.Services
         }
 
         private static void RunGitFileBrowserAction(
-            GitFileBrowserActionExecutionConfig action,
+            GitFileBrowserAction action,
             string? selectedRelativePath)
         {
-            var actionName = GetActionName(action);
+            var actionName = action.Id;
             var workspacePath = WorkspaceRuntime.Current.GitRootPath;
-
-            if (string.IsNullOrWhiteSpace(action.Executable))
-            {
-                throw new InvalidOperationException($"Executable is empty for {actionName}.");
-            }
-
-            var arguments = action.Arguments ?? Array.Empty<string>();
-            if (arguments.Any(argument => argument is null))
-            {
-                throw new InvalidOperationException($"Argument is null for {actionName}.");
-            }
-
-            var validationError = ValidateGitFileBrowserAction(action, selectedRelativePath);
-            if (validationError is not null)
-            {
-                throw new InvalidOperationException(
-                    $"{actionName} configuration is invalid: {validationError}");
-            }
 
             try
             {
                 var executable = action.Executable.Trim();
                 var selectedPath = ResolveSelectedPath(workspacePath, selectedRelativePath);
-                var resolvedArguments = arguments
+                var resolvedArguments = action.Arguments
                     .Select(argument => ReplaceActionTokens(argument, workspacePath, selectedPath))
                     .ToArray();
 
@@ -130,7 +86,7 @@ namespace HaloCreek.Services
                     + $"Executable={QuoteForLog(executable)} "
                     + $"WorkingDirectory={QuoteForLog(workspacePath)} "
                     + $"SelectedPath={QuoteForLog(selectedPath)} "
-                    + $"Arguments={FormatActionArgumentsForLog(arguments, resolvedArguments)}",
+                    + $"Arguments={FormatActionArgumentsForLog(action.Arguments, resolvedArguments)}",
                     $"Started configured action. Action={QuoteForLog(actionName)} "
                     + $"Executable={QuoteForLog(executable)}",
                     executable,
@@ -167,36 +123,22 @@ namespace HaloCreek.Services
                 $"{startedMessagePrefix} ProcessId={processId}");
         }
 
-        private static GitFileBrowserActionExecutionConfig? FindGitFileBrowserAction(string actionId)
-        {
-            return GitFileBrowserActionDefaults.Actions.FirstOrDefault(
-                action => string.Equals(action.Id, actionId, StringComparison.OrdinalIgnoreCase));
-        }
-
-        private static GitFileBrowserActionExecutionConfig RequireGitFileBrowserAction(string actionId)
+        private static GitFileBrowserAction RequireGitSelectedPathAction(string actionId)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
 
-            return FindGitFileBrowserAction(actionId)
-                ?? throw new InvalidOperationException($"Git file browser action not found: {actionId}");
+            return GitFileBrowserActions.SelectedPathActions.FirstOrDefault(
+                    action => string.Equals(action.Id, actionId, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"Git selected path action not found: {actionId}");
         }
 
-        private static string? ValidateGitFileBrowserAction(
-            GitFileBrowserActionExecutionConfig action,
-            string? selectedRelativePath)
+        private static GitFileBrowserAction RequireGitWorkspaceRootAction(string actionId)
         {
-            return action.Target switch
-            {
-                GitFileBrowserActionTarget.SelectedFilePath when !action.UsesSelectedPathToken =>
-                    "SelectedFilePath actions must include the {SelectedPath} token.",
-                GitFileBrowserActionTarget.SelectedFilePath when string.IsNullOrWhiteSpace(selectedRelativePath) =>
-                    "SelectedFilePath actions require a selected Git change.",
-                GitFileBrowserActionTarget.SelectedFilePath => null,
-                GitFileBrowserActionTarget.WorkspaceRoot when action.UsesSelectedPathToken =>
-                    "WorkspaceRoot actions cannot include the {SelectedPath} token.",
-                GitFileBrowserActionTarget.WorkspaceRoot => null,
-                _ => "Target must be SelectedFilePath or WorkspaceRoot.",
-            };
+            ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
+
+            return GitFileBrowserActions.WorkspaceRootActions.FirstOrDefault(
+                    action => string.Equals(action.Id, actionId, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"Git workspace root action not found: {actionId}");
         }
 
         private static string ReplaceActionTokens(
@@ -220,21 +162,6 @@ namespace HaloCreek.Services
             return string.IsNullOrWhiteSpace(selectedRelativePath)
                 ? string.Empty
                 : PlatformInfrastructure.CombinePathForCurrentPlatform(workspacePath, selectedRelativePath);
-        }
-
-        private static string GetActionName(GitFileBrowserActionExecutionConfig action)
-        {
-            if (!string.IsNullOrWhiteSpace(action.Id))
-            {
-                return action.Id.Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(action.Title))
-            {
-                return action.Title.Trim();
-            }
-
-            return "configured action";
         }
 
         private static string FormatActionArgumentsForLog(
@@ -273,62 +200,42 @@ namespace HaloCreek.Services
         string Id,
         string Title);
 
-    internal sealed record GitFileBrowserActionExecutionConfig(
+    internal sealed record GitFileBrowserAction(
         string Id,
         string Title,
-        GitFileBrowserActionTarget Target,
         string Executable,
-        IReadOnlyList<string> Arguments)
+        IReadOnlyList<string> Arguments);
+
+    internal static class GitFileBrowserActions
     {
-        public bool UsesSelectedPathToken => (Arguments ?? Array.Empty<string>()).Any(UsesSelectedPathTokenInArgument);
+        public static GitFileBrowserAction SelectedPathDoubleClickAction { get; } = new(
+            "Open",
+            "Open",
+            "explorer.exe",
+            new[] { "{SelectedPath}" });
 
-        private static bool UsesSelectedPathTokenInArgument(string argument)
-        {
-            return argument?.Contains("{SelectedPath}", StringComparison.Ordinal) == true;
-        }
-    }
-
-    internal enum GitFileBrowserActionTarget
-    {
-        SelectedFilePath = 1,
-        WorkspaceRoot = 2
-    }
-
-    internal static class GitFileBrowserActionDefaults
-    {
-        public const string DoubleClickActionId = "Open";
-
-        public static IReadOnlyList<GitFileBrowserActionExecutionConfig> Actions { get; } =
+        public static IReadOnlyList<GitFileBrowserAction> SelectedPathActions { get; } =
             new[]
             {
-                new GitFileBrowserActionExecutionConfig(
+                new GitFileBrowserAction(
                     "OpenDiff",
                     "OpenDiff",
-                    GitFileBrowserActionTarget.SelectedFilePath,
                     "TortoiseGitProc.exe",
                     new[] { "/command:diff", "/path:{SelectedPath}" }),
-                new GitFileBrowserActionExecutionConfig(
-                    "Open",
-                    "Open",
-                    GitFileBrowserActionTarget.SelectedFilePath,
-                    "explorer.exe",
-                    new[] { "{SelectedPath}" }),
-                new GitFileBrowserActionExecutionConfig(
+                SelectedPathDoubleClickAction,
+                new GitFileBrowserAction(
                     "ExploreTo",
                     "ExploreTo",
-                    GitFileBrowserActionTarget.SelectedFilePath,
                     "explorer.exe",
                     new[] { "/select,", "{SelectedPath}" }),
-                new GitFileBrowserActionExecutionConfig(
+                new GitFileBrowserAction(
                     "Edit",
                     "Edit",
-                    GitFileBrowserActionTarget.SelectedFilePath,
                     "notepad.exe",
                     new[] { "{SelectedPath}" }),
-                new GitFileBrowserActionExecutionConfig(
+                new GitFileBrowserAction(
                     "Revert",
                     "Revert",
-                    GitFileBrowserActionTarget.SelectedFilePath,
                     "git",
                     new[]
                     {
@@ -339,22 +246,24 @@ namespace HaloCreek.Services
                         "--",
                         "{SelectedPath}",
                     }),
-                new GitFileBrowserActionExecutionConfig(
+                new GitFileBrowserAction(
                     "Delete",
                     "Delete",
-                    GitFileBrowserActionTarget.SelectedFilePath,
                     "cmd.exe",
                     new[] { "/c", "del", "/f", "/q", "{SelectedPath}" }),
-                new GitFileBrowserActionExecutionConfig(
+            };
+
+        public static IReadOnlyList<GitFileBrowserAction> WorkspaceRootActions { get; } =
+            new[]
+            {
+                new GitFileBrowserAction(
                     "Commit",
                     "Commit",
-                    GitFileBrowserActionTarget.WorkspaceRoot,
                     "TortoiseGitProc.exe",
                     new[] { "/command:commit", "/path:{WorkspaceRoot}" }),
-                new GitFileBrowserActionExecutionConfig(
+                new GitFileBrowserAction(
                     "ShowLog",
                     "Show Log",
-                    GitFileBrowserActionTarget.WorkspaceRoot,
                     "TortoiseGitProc.exe",
                     new[] { "/command:log", "/path:{WorkspaceRoot}" }),
             };
