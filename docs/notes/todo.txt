@@ -10,5 +10,5 @@ review VM有点过载 目前已经承载了Reviewed Unreviewed的业务语义和
 * 前台session exit的过程中快速切另一个前台会寄掉
 wt的检查 win 10默认没有wt 需要同步修改user guide
 
-应用内没法更新codex
+应用内没法更新codex 更新失败后 再次尝试拉起前台会闪退
 环境检查更新 现在能够适配code来diff和source tree来commit/log
