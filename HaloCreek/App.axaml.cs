@@ -137,6 +137,7 @@ namespace HaloCreek
 
             return new AppDisposeScope(
                 mainWindowViewModel,
+                promptEditor,
                 workspaceFooter,
                 review,
                 logs,
@@ -153,6 +154,7 @@ namespace HaloCreek
         private sealed class AppDisposeScope : IDisposable
         {
             private readonly LogPanelViewModel _logs;
+            private readonly PromptEditorViewModel _promptEditor;
             private readonly WorkspaceFooterViewModel _workspaceFooter;
             private readonly ReviewViewModel _review;
             private readonly SessionLifecycleService _sessionLifecycleService;
@@ -165,6 +167,7 @@ namespace HaloCreek
 
             public AppDisposeScope(
                 MainWindowViewModel mainWindowViewModel,
+                PromptEditorViewModel promptEditor,
                 WorkspaceFooterViewModel workspaceFooter,
                 ReviewViewModel review,
                 LogPanelViewModel logs,
@@ -176,6 +179,7 @@ namespace HaloCreek
                 GlobalHotkeyRegistrar globalHotkeyRegistrar)
             {
                 MainWindowViewModel = mainWindowViewModel;
+                _promptEditor = promptEditor ?? throw new ArgumentNullException(nameof(promptEditor));
                 _workspaceFooter = workspaceFooter ?? throw new ArgumentNullException(nameof(workspaceFooter));
                 _review = review ?? throw new ArgumentNullException(nameof(review));
                 _logs = logs;
@@ -202,6 +206,7 @@ namespace HaloCreek
                 _isDisposed = true;
                 _globalHotkeyRegistrar.Dispose();
                 _workspaceFooter.Dispose();
+                _promptEditor.Dispose();
                 _review.Dispose();
                 _reviewClipboardContextService.Dispose();
                 _platformClipboardInfrastructure.Dispose();

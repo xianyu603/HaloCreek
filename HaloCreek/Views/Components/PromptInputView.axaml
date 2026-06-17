@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="using:HaloCreek.Behaviors"
+             xmlns:vm="using:HaloCreek.ViewModels.Components"
+             x:DataType="vm:PromptInputViewModel"
+             x:Class="HaloCreek.Views.Components.PromptInputView">
+    <TextBox AcceptsReturn="True"
+             behaviors:TextBoxDropPathBehavior.AppendFirstPath="True"
+             Text="{Binding PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+             TextWrapping="Wrap"
+             PlaceholderText="{Binding PlaceholderText}"
+             BorderThickness="0"
+             Background="Transparent"
+             Padding="10"
+             VerticalContentAlignment="Top">
+        <TextBox.KeyBindings>
+            <KeyBinding Gesture="Alt+Enter"
+                        Command="{Binding SendToFrontCommand}"/>
+            <KeyBinding Gesture="Ctrl+Enter"
+                        Command="{Binding LaunchCommand}"/>
+        </TextBox.KeyBindings>
+    </TextBox>
+</UserControl>

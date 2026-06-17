@@ -1,22 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
+using HaloCreek.ViewModels.Components;
 
 namespace HaloCreek.ViewModels.Tabs
 {
-    public sealed class PromptEditorViewModel : ViewModelBase
+    public sealed class PromptEditorViewModel : ViewModelBase, IDisposable
     {
         private readonly SessionLifecycleService _sessionLifecycleService;
-        private readonly TransientEventService _transientEventService;
         private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
-        private string _promptText = string.Empty;
         private OngoingSessionInfo? _selectedOngoingSession;
+        private bool _isDisposed;
 
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
@@ -26,30 +25,18 @@ namespace HaloCreek.ViewModels.Tabs
 
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
-            _transientEventService = appCommonRuntime.TransientEventService;
+            PromptInput = new PromptInputViewModel(
+                _sessionLifecycleService,
+                appCommonRuntime);
 
-            LaunchCommand = new AsyncRelayCommand(LaunchAsync, CanLaunchPrompt);
-            SendToFrontCommand = new RelayCommand(SendToFront, CanLaunchPrompt);
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
-            // Prompt editor 与 SessionLifecycleService 同应用生命周期，当前不做显式退订。
             _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
             RefreshOngoingSessions();
         }
 
-        public string PromptText
-        {
-            get => _promptText;
-            set
-            {
-                if (SetProperty(ref _promptText, value ?? string.Empty))
-                {
-                    LaunchCommand.NotifyCanExecuteChanged();
-                    SendToFrontCommand.NotifyCanExecuteChanged();
-                }
-            }
-        }
+        public PromptInputViewModel PromptInput { get; }
 
         public IReadOnlyList<OngoingSessionInfo> OngoingSessions
         {
@@ -76,39 +63,9 @@ namespace HaloCreek.ViewModels.Tabs
 
         public bool IsOngoingSessionsEmpty => !HasOngoingSessions;
 
-        public IAsyncRelayCommand LaunchCommand { get; }
-
-        public IRelayCommand SendToFrontCommand { get; }
-
         public IRelayCommand<OngoingSessionInfo> BringToFrontCommand { get; }
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
-
-        private async Task LaunchAsync()
-        {
-            try
-            {
-                var session = await _sessionLifecycleService.LaunchAsync(PromptText);
-                Log.Info("PromptEditor", $"Codex session launch requested: {session.Id}");
-            }
-            catch (InvalidOperationException ex)
-            {
-                _transientEventService.ReportUserActionFailure(
-                    "PromptEditor",
-                    "Launch failed",
-                    ex.Message);
-            }
-        }
-
-        private void SendToFront()
-        {
-            _sessionLifecycleService.SendMessageToFrontSession(PromptText);
-        }
-
-        private bool CanLaunchPrompt()
-        {
-            return !string.IsNullOrWhiteSpace(PromptText);
-        }
 
         private void RefreshOngoingSessions()
         {
@@ -155,6 +112,18 @@ namespace HaloCreek.ViewModels.Tabs
         {
             // 走一下post防同步重入 现在已经不会从别的线程到这了
             Dispatcher.UIThread.Post(RefreshOngoingSessions);
+        }
+
+        public void Dispose()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            _sessionLifecycleService.SessionsChanged -= HandleSessionsChanged;
+            PromptInput.Dispose();
         }
     }
 }

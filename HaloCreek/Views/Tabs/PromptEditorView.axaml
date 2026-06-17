@@ -1,6 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:behaviors="using:HaloCreek.Behaviors"
+             xmlns:components="using:HaloCreek.Views.Components"
              xmlns:model="using:HaloCreek.Models"
              xmlns:vm="using:HaloCreek.ViewModels.Tabs"
              x:DataType="vm:PromptEditorViewModel"
@@ -8,20 +8,14 @@
     <Grid RowDefinitions="*,Auto"
           Margin="20"
           RowSpacing="16">
-        <TextBox Grid.Row="0"
-                 AcceptsReturn="True"
-                 behaviors:TextBoxDropPathBehavior.AppendFirstPath="True"
-                 Text="{Binding PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 TextWrapping="Wrap"
-                 PlaceholderText="Type a prompt or drop files here"
-                 VerticalContentAlignment="Top">
-            <TextBox.KeyBindings>
-                <KeyBinding Gesture="Alt+Enter"
-                            Command="{Binding SendToFrontCommand}"/>
-                <KeyBinding Gesture="Ctrl+Enter"
-                            Command="{Binding LaunchCommand}"/>
-            </TextBox.KeyBindings>
-        </TextBox>
+        <Border Grid.Row="0"
+                BorderBrush="#CBD5E1"
+                BorderThickness="1"
+                CornerRadius="6"
+                Background="#FFFFFF"
+                ClipToBounds="True">
+            <components:PromptInputView DataContext="{Binding PromptInput}"/>
+        </Border>
 
         <Grid Grid.Row="1"
               RowDefinitions="Auto,Auto"

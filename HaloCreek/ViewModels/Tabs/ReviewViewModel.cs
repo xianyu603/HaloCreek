@@ -9,6 +9,7 @@ using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
+using HaloCreek.ViewModels.Components;
 
 namespace HaloCreek.ViewModels.Tabs
 {
@@ -33,7 +34,6 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<ReviewFilePath> _reviewedFiles = Array.Empty<ReviewFilePath>();
         private ReviewFilePath? _selectedUnreviewedFile;
         private ReviewFilePath? _selectedReviewedFile;
-        private string _reviewPromptText = string.Empty;
         private string _clipLocateStatusText = "Unmatched";
         private IBrush _clipLocateButtonForeground = UnmatchedForeground;
         private bool _hasFrontSession;
@@ -66,8 +66,9 @@ namespace HaloCreek.ViewModels.Tabs
                 RefreshCommand);
             ShowClipLocateLineCommand = new AsyncRelayCommand(ShowClipLocateResultAsync);
             ActivateFrontClientCommand = new RelayCommand(ActivateFrontClient, CanActivateFrontClient);
-            SendPromptCommand = new RelayCommand(SendPrompt, CanSendPrompt);
-            LaunchPromptCommand = new AsyncRelayCommand(LaunchPromptAsync, CanLaunchPrompt);
+            PromptInput = new PromptInputViewModel(
+                _sessionLifecycleService,
+                _appCommonRuntime);
             AddReviewedCommand = new RelayCommand<ReviewFilePath>(AddReviewed);
             RevertToReviewedCommand = new RelayCommand<ReviewFilePath>(RevertToReviewed);
             MarkUnreviewedCommand = new RelayCommand<ReviewFilePath>(MarkUnreviewed);
@@ -99,10 +100,6 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand ActivateFrontClientCommand { get; }
 
-        public IRelayCommand SendPromptCommand { get; }
-
-        public IAsyncRelayCommand LaunchPromptCommand { get; }
-
         public IRelayCommand<ReviewFilePath> AddReviewedCommand { get; }
 
         public IRelayCommand<ReviewFilePath> RevertToReviewedCommand { get; }
@@ -122,6 +119,8 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand<ReviewFilePath> DiffReviewedAgainstHeadCommand { get; }
 
         public GitViewModel ModifiedGit { get; }
+
+        public PromptInputViewModel PromptInput { get; }
 
         public IReadOnlyList<ReviewFilePath> UnreviewedFiles
         {
@@ -160,19 +159,6 @@ namespace HaloCreek.ViewModels.Tabs
             set => SetProperty(ref _selectedReviewedFile, value);
         }
 
-        public string ReviewPromptText
-        {
-            get => _reviewPromptText;
-            set
-            {
-                if (SetProperty(ref _reviewPromptText, value ?? string.Empty))
-                {
-                    SendPromptCommand.NotifyCanExecuteChanged();
-                    LaunchPromptCommand.NotifyCanExecuteChanged();
-                }
-            }
-        }
-
         public bool HasFrontSession
         {
             get => _hasFrontSession;
@@ -182,7 +168,6 @@ namespace HaloCreek.ViewModels.Tabs
                 {
                     OnPropertyChanged(nameof(FrontSessionButtonForeground));
                     ActivateFrontClientCommand.NotifyCanExecuteChanged();
-                    SendPromptCommand.NotifyCanExecuteChanged();
                 }
             }
         }
@@ -216,6 +201,7 @@ namespace HaloCreek.ViewModels.Tabs
             WorkspaceRuntime.Changed -= OnWorkspaceChanged;
             _reviewClipboardContextService.ClipLocateChanged -= OnClipLocateChanged;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
+            PromptInput.Dispose();
         }
 
         public void OnSelected()
@@ -231,21 +217,6 @@ namespace HaloCreek.ViewModels.Tabs
         private bool CanActivateFrontClient()
         {
             return HasFrontSession;
-        }
-
-        private bool CanSendPrompt()
-        {
-            return HasFrontSession && HasReviewPromptText();
-        }
-
-        private bool CanLaunchPrompt()
-        {
-            return HasReviewPromptText();
-        }
-
-        private bool HasReviewPromptText()
-        {
-            return !string.IsNullOrWhiteSpace(ReviewPromptText);
         }
 
         private void RefreshFrontSessionState(object? sender = null, EventArgs? e = null)
@@ -568,27 +539,6 @@ namespace HaloCreek.ViewModels.Tabs
             await _appCommonRuntime.PlatformInfrastructure.ShowMessageDialogAsync(
                 "Review ClipLocate",
                 message);
-        }
-
-        private void SendPrompt()
-        {
-            _sessionLifecycleService.SendMessageToFrontSession(ReviewPromptText);
-        }
-
-        private async Task LaunchPromptAsync()
-        {
-            try
-            {
-                var session = await _sessionLifecycleService.LaunchAsync(ReviewPromptText);
-                Log.Info("Review", $"Codex session launch requested: {session.Id}");
-            }
-            catch (InvalidOperationException ex)
-            {
-                _transientEventService.ReportUserActionFailure(
-                    "Review",
-                    "Launch failed",
-                    ex.Message);
-            }
         }
 
         private sealed record ReviewFilesRefreshResult(
