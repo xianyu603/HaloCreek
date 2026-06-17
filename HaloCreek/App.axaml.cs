@@ -125,7 +125,14 @@ namespace HaloCreek
                 historySessions,
                 logs,
                 workspaceFooter);
+            var globalHotkeyActionService = new GlobalHotkeyActionService(
+                mainWindow,
+                sessionLifecycleService);
             var globalHotkeyRegistrar = new GlobalHotkeyRegistrar();
+            globalHotkeyRegistrar.MainWindowHotkeyPressed += (_, _) =>
+                globalHotkeyActionService.ActivateMainWindow();
+            globalHotkeyRegistrar.FrontTerminalHotkeyPressed += (_, _) =>
+                globalHotkeyActionService.ActivateFrontTerminal();
             globalHotkeyRegistrar.RegisterDefaultHotkeys();
 
             return new AppDisposeScope(

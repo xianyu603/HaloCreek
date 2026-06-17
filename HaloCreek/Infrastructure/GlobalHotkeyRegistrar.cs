@@ -23,6 +23,7 @@ namespace HaloCreek.Infrastructure
         private bool _frontTerminalHotkeyRegistered;
 
         public event EventHandler? MainWindowHotkeyPressed;
+        public event EventHandler? FrontTerminalHotkeyPressed;
 
         public void RegisterDefaultHotkeys()
         {
@@ -121,6 +122,7 @@ namespace HaloCreek.Infrastructure
             if (message == WmHotkey && wParam.ToInt32() == FrontTerminalHotkeyId)
             {
                 Log.Info("GlobalHotkey", $"Front terminal hotkey pressed. Hotkey={FrontTerminalHotkeyText}");
+                FrontTerminalHotkeyPressed?.Invoke(this, EventArgs.Empty);
                 return IntPtr.Zero;
             }
 
