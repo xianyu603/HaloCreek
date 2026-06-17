@@ -5,19 +5,6 @@
              x:DataType="vm:ReviewViewModel"
              x:Class="HaloCreek.Views.Tabs.ReviewView">
     <UserControl.Styles>
-        <Style Selector="Button.reviewActionButton">
-            <Setter Property="MinWidth" Value="116"/>
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="BorderBrush" Value="#CBD5E1"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Margin" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="10,0"/>
-        </Style>
-
         <Style Selector="Border.reviewStatusPill">
             <Setter Property="MinWidth" Value="116"/>
             <Setter Property="Height" Value="36"/>
@@ -284,7 +271,7 @@
         </Grid>
 
         <Grid Grid.Column="1"
-              RowDefinitions="Auto,12,*,12,Auto">
+              RowDefinitions="Auto,12,*">
             <Border Grid.Row="0"
                     BorderBrush="#CBD5E1"
                     BorderThickness="1"
@@ -332,25 +319,6 @@
                                     Command="{Binding LaunchPromptCommand}"/>
                     </TextBox.KeyBindings>
                 </TextBox>
-            </Border>
-
-            <Border Grid.Row="4"
-                    BorderBrush="#CBD5E1"
-                    BorderThickness="1"
-                    CornerRadius="3"
-                    Background="#FFFFFF"
-                    Padding="10">
-                <Grid ColumnDefinitions="*,*"
-                      ColumnSpacing="8">
-                    <Button Grid.Column="0"
-                            Classes="reviewActionButton"
-                            Content="SendToFront"
-                            Command="{Binding SendPromptCommand}"/>
-                    <Button Grid.Column="1"
-                            Classes="reviewActionButton"
-                            Content="Launch New"
-                            Command="{Binding LaunchPromptCommand}"/>
-                </Grid>
             </Border>
         </Grid>
     </Grid>

@@ -257,7 +257,7 @@ codex --model gpt-5-codex resume <sessionId>
 
 - History 列表展示。
 - History 搜索。
-- History `Resume` 和 `Reedit` 的可见候选范围。
+- History `Resume` 的可见候选范围。
 
 如果 Codex 历史很多，可以调小这个值以减少读取时间；如果需要回看更早的 session，可以调大这个值。
 

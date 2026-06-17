@@ -152,7 +152,6 @@ HaloCreek 会优先查找以下位置：
 
 - 搜索框：按 Initial Prompt 做大小写不敏感过滤。
 - `Resume`：启动 `codex <配置参数> resume <sessionId>`，并把恢复后的进程纳入 ongoing session 管理。
-- `Reedit`：把选中 session 的 Initial Prompt 填回 Prompt Editor，并切换到 Prompt Editor Tab。
 
 History 每 10 秒自动刷新一次，最多读取的历史文件数量由 `MaxSessionHistoryFiles` 控制。见 [Startup Guide 的 History 配置](StartupGuide.md#34-history-配置)。
 

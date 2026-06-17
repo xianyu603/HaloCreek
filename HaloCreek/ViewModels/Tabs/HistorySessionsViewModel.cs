@@ -19,7 +19,6 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
         private HistorySessionInfo? _selectedSession;
-        private Action<HistorySessionInfo>? _reeditInitialPromptDispatcher;
 
         public HistorySessionsViewModel(
             SessionHistoryRefreshService sessionHistoryRefreshService,
@@ -37,7 +36,6 @@ namespace HaloCreek.ViewModels.Tabs
             // 或“先启动再允许多处注册”的调用约束，避免刷新结果分发语义含混。
             _sessionHistoryRefreshService.StartRefreshAndListen(HandleRefreshCompleted);
             ResumeCommand = new AsyncRelayCommand<HistorySessionInfo>(ResumeAsync, HasSelectedSession);
-            ReeditInitialPromptCommand = new RelayCommand<HistorySessionInfo>(ReeditInitialPrompt, HasSelectedSession);
         }
 
         public string SearchText
@@ -66,7 +64,6 @@ namespace HaloCreek.ViewModels.Tabs
                 if (SetProperty(ref _selectedSession, value))
                 {
                     ResumeCommand.NotifyCanExecuteChanged();
-                    ReeditInitialPromptCommand.NotifyCanExecuteChanged();
                     OnPropertyChanged(nameof(SelectedSessionSummaryText));
                 }
             }
@@ -75,14 +72,6 @@ namespace HaloCreek.ViewModels.Tabs
         public string SelectedSessionSummaryText => SelectedSession?.SessionSummaryText ?? string.Empty;
 
         public IAsyncRelayCommand<HistorySessionInfo> ResumeCommand { get; }
-
-        public IRelayCommand<HistorySessionInfo> ReeditInitialPromptCommand { get; }
-
-        public void SetReeditInitialPromptDispatcher(Action<HistorySessionInfo> reeditInitialPromptDispatcher)
-        {
-            _reeditInitialPromptDispatcher = reeditInitialPromptDispatcher
-                ?? throw new ArgumentNullException(nameof(reeditInitialPromptDispatcher));
-        }
 
         private void ApplySearch()
         {
@@ -219,30 +208,6 @@ namespace HaloCreek.ViewModels.Tabs
         private static bool HasSelectedSession(HistorySessionInfo? session)
         {
             return session is not null;
-        }
-
-        private void ReeditInitialPrompt(HistorySessionInfo? session)
-        {
-            if (session is null)
-            {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(session.InitialPrompt))
-            {
-                _transientEventService.ReportUserActionFailure(
-                    "HistorySessions",
-                    "Reedit failed",
-                    "Initial prompt is empty.");
-                return;
-            }
-
-            if (_reeditInitialPromptDispatcher is null)
-            {
-                throw new InvalidOperationException("Prompt editor dispatcher is not connected.");
-            }
-
-            _reeditInitialPromptDispatcher.Invoke(session);
         }
     }
 }

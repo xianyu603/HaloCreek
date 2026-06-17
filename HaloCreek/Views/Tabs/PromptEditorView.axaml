@@ -5,7 +5,7 @@
              xmlns:vm="using:HaloCreek.ViewModels.Tabs"
              x:DataType="vm:PromptEditorViewModel"
              x:Class="HaloCreek.Views.Tabs.PromptEditorView">
-    <Grid RowDefinitions="*,Auto,Auto"
+    <Grid RowDefinitions="*,Auto"
           Margin="20"
           RowSpacing="16">
         <TextBox Grid.Row="0"
@@ -114,14 +114,5 @@
             </Border>
         </Grid>
 
-        <StackPanel Grid.Row="2"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    Spacing="8">
-            <Button Content="SendToFront"
-                    Command="{Binding SendToFrontCommand}"/>
-            <Button Content="Launch"
-                    Command="{Binding LaunchCommand}"/>
-        </StackPanel>
     </Grid>
 </UserControl>

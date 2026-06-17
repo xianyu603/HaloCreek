@@ -1,8 +1,4 @@
-// agent 开发平台
-
-using System;
 using System.Collections.Generic;
-using HaloCreek.Models;
 using HaloCreek.ViewModels.Components;
 using HaloCreek.ViewModels.Tabs;
 
@@ -10,8 +6,6 @@ namespace HaloCreek.ViewModels
 {
     public partial class MainWindowViewModel : ViewModelBase
     {
-        private const int PromptEditorTabIndex = 0;
-
         private readonly IReadOnlyList<ViewModelBase> _tabViewModels;
         private int _selectedTabIndex;
 
@@ -28,8 +22,6 @@ namespace HaloCreek.ViewModels
             Logs = logs;
             WorkspaceFooter = workspaceFooter;
             _tabViewModels = new ViewModelBase[] { PromptEditor, Review, HistorySessions, Logs };
-
-            HistorySessions.SetReeditInitialPromptDispatcher(ReeditInitialPrompt);
         }
 
         public PromptEditorViewModel PromptEditor { get; }
@@ -55,19 +47,6 @@ namespace HaloCreek.ViewModels
                     selectedTab.OnSelected();
                 }
             }
-        }
-
-        private void ReeditInitialPrompt(HistorySessionInfo session)
-        {
-            ArgumentNullException.ThrowIfNull(session);
-
-            if (string.IsNullOrWhiteSpace(session.InitialPrompt))
-            {
-                throw new InvalidOperationException("Initial prompt is empty.");
-            }
-
-            PromptEditor.PromptText = session.InitialPrompt;
-            SelectedTabIndex = PromptEditorTabIndex;
         }
     }
 }
