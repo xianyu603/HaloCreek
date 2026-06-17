@@ -125,6 +125,8 @@ namespace HaloCreek
                 historySessions,
                 logs,
                 workspaceFooter);
+            var globalHotkeyRegistrar = new GlobalHotkeyRegistrar();
+            globalHotkeyRegistrar.RegisterDefaultHotkeys();
 
             return new AppDisposeScope(
                 mainWindowViewModel,
@@ -135,7 +137,8 @@ namespace HaloCreek
                 sessionHistoryRefreshService,
                 tmuxService,
                 reviewClipboardContextService,
-                platformClipboardInfrastructure);
+                platformClipboardInfrastructure,
+                globalHotkeyRegistrar);
         }
 
         // 统一收口应用级对象的退出释放。当前这里同时承载少量对象组装职责，
@@ -150,6 +153,7 @@ namespace HaloCreek
             private readonly TmuxService _tmuxService;
             private readonly ReviewClipboardContextService _reviewClipboardContextService;
             private readonly PlatformClipboardInfrastructure _platformClipboardInfrastructure;
+            private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
             private bool _isDisposed;
 
             public AppDisposeScope(
@@ -161,7 +165,8 @@ namespace HaloCreek
                 SessionHistoryRefreshService sessionHistoryRefreshService,
                 TmuxService tmuxService,
                 ReviewClipboardContextService reviewClipboardContextService,
-                PlatformClipboardInfrastructure platformClipboardInfrastructure)
+                PlatformClipboardInfrastructure platformClipboardInfrastructure,
+                GlobalHotkeyRegistrar globalHotkeyRegistrar)
             {
                 MainWindowViewModel = mainWindowViewModel;
                 _workspaceFooter = workspaceFooter ?? throw new ArgumentNullException(nameof(workspaceFooter));
@@ -174,6 +179,8 @@ namespace HaloCreek
                     ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
                 _platformClipboardInfrastructure = platformClipboardInfrastructure
                     ?? throw new ArgumentNullException(nameof(platformClipboardInfrastructure));
+                _globalHotkeyRegistrar = globalHotkeyRegistrar
+                    ?? throw new ArgumentNullException(nameof(globalHotkeyRegistrar));
             }
 
             public MainWindowViewModel MainWindowViewModel { get; }
@@ -186,6 +193,7 @@ namespace HaloCreek
                 }
 
                 _isDisposed = true;
+                _globalHotkeyRegistrar.Dispose();
                 _workspaceFooter.Dispose();
                 _review.Dispose();
                 _reviewClipboardContextService.Dispose();
