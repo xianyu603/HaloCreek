@@ -7,15 +7,20 @@ namespace HaloCreek.Infrastructure
 {
     public sealed class GlobalHotkeyRegistrar : IDisposable
     {
+        // TODO 再多一个hotkey这里就需要抽一些数据结构了 现在这样好抽象
         private const int MainWindowHotkeyId = 1;
+        private const int FrontTerminalHotkeyId = 2;
         private const uint WmHotkey = 0x0312;
         private const uint ModAlt = 0x0001;
         private const uint ModControl = 0x0002;
         private const uint VirtualKeyH = 0x48;
+        private const uint VirtualKeyT = 0x54;
         private const string MainWindowHotkeyText = "Ctrl+Alt+H";
+        private const string FrontTerminalHotkeyText = "Ctrl+Alt+T";
 
         private NativeMessageWindow? _messageWindow;
         private bool _mainWindowHotkeyRegistered;
+        private bool _frontTerminalHotkeyRegistered;
 
         public event EventHandler? MainWindowHotkeyPressed;
 
@@ -43,20 +48,51 @@ namespace HaloCreek.Infrastructure
             {
                 _mainWindowHotkeyRegistered = true;
                 Log.Info("GlobalHotkey", $"Registered main window hotkey. Hotkey={MainWindowHotkeyText}");
-                return;
+            }
+            else
+            {
+                var exception = new Win32Exception(Marshal.GetLastWin32Error());
+                Log.Error(
+                    "GlobalHotkey",
+                    exception,
+                    $"Failed to register main window hotkey. Hotkey={MainWindowHotkeyText}");
             }
 
-            var exception = new Win32Exception(Marshal.GetLastWin32Error());
-            Log.Error(
-                "GlobalHotkey",
-                exception,
-                $"Failed to register main window hotkey. Hotkey={MainWindowHotkeyText}");
-            _messageWindow.Dispose();
-            _messageWindow = null;
+            if (RegisterHotKey(_messageWindow.Handle, FrontTerminalHotkeyId, ModControl | ModAlt, VirtualKeyT))
+            {
+                _frontTerminalHotkeyRegistered = true;
+                Log.Info("GlobalHotkey", $"Registered front terminal hotkey. Hotkey={FrontTerminalHotkeyText}");
+            }
+            else
+            {
+                var exception = new Win32Exception(Marshal.GetLastWin32Error());
+                Log.Error(
+                    "GlobalHotkey",
+                    exception,
+                    $"Failed to register front terminal hotkey. Hotkey={FrontTerminalHotkeyText}");
+            }
+
+            if (!_mainWindowHotkeyRegistered && !_frontTerminalHotkeyRegistered)
+            {
+                _messageWindow.Dispose();
+                _messageWindow = null;
+            }
         }
 
         public void Dispose()
         {
+            if (_frontTerminalHotkeyRegistered && _messageWindow is not null)
+            {
+                if (!UnregisterHotKey(_messageWindow.Handle, FrontTerminalHotkeyId))
+                {
+                    Log.Warning(
+                        "GlobalHotkey",
+                        $"Failed to unregister front terminal hotkey. Hotkey={FrontTerminalHotkeyText}");
+                }
+
+                _frontTerminalHotkeyRegistered = false;
+            }
+
             if (_mainWindowHotkeyRegistered && _messageWindow is not null)
             {
                 if (!UnregisterHotKey(_messageWindow.Handle, MainWindowHotkeyId))
@@ -79,6 +115,12 @@ namespace HaloCreek.Infrastructure
             {
                 Log.Info("GlobalHotkey", $"Main window hotkey pressed. Hotkey={MainWindowHotkeyText}");
                 MainWindowHotkeyPressed?.Invoke(this, EventArgs.Empty);
+                return IntPtr.Zero;
+            }
+
+            if (message == WmHotkey && wParam.ToInt32() == FrontTerminalHotkeyId)
+            {
+                Log.Info("GlobalHotkey", $"Front terminal hotkey pressed. Hotkey={FrontTerminalHotkeyText}");
                 return IntPtr.Zero;
             }
 
