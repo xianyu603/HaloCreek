@@ -317,6 +317,7 @@ namespace HaloCreek.Services
 
             if (!TryGetFrontSessionId(out var frontSessionId))
             {
+                // TODO 此处异常处理应当由业务决定
                 ReportFrontSessionFailure("Activate front session failed", "No front session is available.");
                 return;
             }
