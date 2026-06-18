@@ -9,6 +9,7 @@
                  AcceptsReturn="True"
                  behaviors:TextBoxDropPathBehavior.AppendFirstPath="True"
                  Text="{Binding PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 CaretIndex="{Binding PromptCaretIndex, Mode=TwoWay}"
                  TextWrapping="Wrap"
                  PlaceholderText="{Binding PlaceholderText}"
                  BorderThickness="0"

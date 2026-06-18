@@ -41,6 +41,7 @@ namespace HaloCreek.ViewModels.Components
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
         private string _promptText = string.Empty;
+        private int _promptCaretIndex;
         private CompletionTriggerAnalysis _completionTrigger = CompletionTriggerAnalysis.Hidden("Initial");
         private PromptCompletionItem? _selectedCompletionItem;
         private bool _hasFrontSession;
@@ -72,6 +73,19 @@ namespace HaloCreek.ViewModels.Components
                 {
                     LaunchCommand.NotifyCanExecuteChanged();
                     SendToFrontCommand.NotifyCanExecuteChanged();
+                    RefreshCompletionTrigger();
+                }
+            }
+        }
+
+        public int PromptCaretIndex
+        {
+            get => _promptCaretIndex;
+            set
+            {
+                if (SetProperty(ref _promptCaretIndex, value))
+                {
+                    RefreshCompletionTrigger();
                 }
             }
         }
@@ -110,7 +124,12 @@ namespace HaloCreek.ViewModels.Components
 
         public IRelayCommand SendToFrontCommand { get; }
 
-        public void UpdateCompletionTrigger(string? text, int caretIndex)
+        private void RefreshCompletionTrigger()
+        {
+            UpdateCompletionTrigger(PromptText, PromptCaretIndex);
+        }
+
+        private void UpdateCompletionTrigger(string? text, int caretIndex)
         {
             text ??= string.Empty;
             caretIndex = Math.Clamp(caretIndex, 0, text.Length);
@@ -169,9 +188,48 @@ namespace HaloCreek.ViewModels.Components
                 case Key.Escape:
                     SelectedCompletionItem = null;
                     return true;
+                case Key.Enter:
+                    AcceptSelectedCompletion();
+                    return true;
                 default:
                     return false;
             }
+        }
+
+        private void AcceptSelectedCompletion()
+        {
+            if (!IsCompletionOpen)
+            {
+                throw new InvalidOperationException("Cannot accept a completion item when the completion menu is closed.");
+            }
+
+            var selectedItem = SelectedCompletionItem
+                ?? throw new InvalidOperationException("Cannot accept a completion item before one is selected.");
+
+            if (CompletionTokenStart < 0)
+            {
+                throw new InvalidOperationException("Cannot accept a completion item without an active completion token.");
+            }
+
+            var text = PromptText;
+            var replaceStart = Math.Clamp(CompletionTokenStart, 0, text.Length);
+            var replaceEnd = replaceStart;
+            while (replaceEnd < text.Length && !char.IsWhiteSpace(text[replaceEnd]))
+            {
+                replaceEnd++;
+            }
+
+            var insertText = selectedItem.InsertText;
+            var replacement = insertText + " ";
+            var updatedText = text[..replaceStart] + replacement + text[replaceEnd..];
+            var updatedCaretIndex = replaceStart + replacement.Length;
+
+            Log.Info(
+                LogCategory,
+                $"Completion item accepted. Title='{selectedItem.Title}', ReplaceStart={replaceStart}, ReplaceEnd={replaceEnd}");
+
+            PromptText = updatedText;
+            PromptCaretIndex = updatedCaretIndex;
         }
 
         public void Dispose()
