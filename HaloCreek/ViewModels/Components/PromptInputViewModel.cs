@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Avalonia.Input;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
@@ -11,6 +13,27 @@ namespace HaloCreek.ViewModels.Components
     {
         private const string LogCategory = "PromptInput";
         private const char CompletionTriggerCharacter = '$';
+        private static readonly PromptCompletionItem[] DefaultCompletionItems =
+        [
+            new PromptCompletionItem
+            {
+                Title = "$skill:code-review",
+                Description = "Code review checklist",
+                InsertText = "$skill:code-review",
+            },
+            new PromptCompletionItem
+            {
+                Title = "$skill:implementation",
+                Description = "Implementation workflow",
+                InsertText = "$skill:implementation",
+            },
+            new PromptCompletionItem
+            {
+                Title = "$file",
+                Description = "Reference a workspace file",
+                InsertText = "$file",
+            },
+        ];
 
         public const string DefaultPlaceholderText =
             "Type a prompt or drop files here. Ctrl+Enter launches, Alt+Enter sends to front.";
@@ -19,6 +42,7 @@ namespace HaloCreek.ViewModels.Components
         private readonly TransientEventService _transientEventService;
         private string _promptText = string.Empty;
         private CompletionTriggerAnalysis _completionTrigger = CompletionTriggerAnalysis.Hidden("Initial");
+        private PromptCompletionItem? _selectedCompletionItem;
         private bool _hasFrontSession;
         private bool _isDisposed;
 
@@ -74,6 +98,14 @@ namespace HaloCreek.ViewModels.Components
             get => _completionTrigger.FilterText;
         }
 
+        public IReadOnlyList<PromptCompletionItem> CompletionItems => DefaultCompletionItems;
+
+        public PromptCompletionItem? SelectedCompletionItem
+        {
+            get => _selectedCompletionItem;
+            set => SetProperty(ref _selectedCompletionItem, value);
+        }
+
         public IAsyncRelayCommand LaunchCommand { get; }
 
         public IRelayCommand SendToFrontCommand { get; }
@@ -101,9 +133,44 @@ namespace HaloCreek.ViewModels.Components
 
             if (!wasOpen)
             {
+                SelectedCompletionItem = null;
                 Log.Info(
                     LogCategory,
                     $"Completion menu shown. TokenStart={CompletionTokenStart}, CaretIndex={caretIndex}, FilterText='{CompletionFilterText}'");
+            }
+        }
+
+        public bool HandleCompletionNavigation(Key key)
+        {
+            if (!IsCompletionOpen)
+            {
+                return false;
+            }
+
+            if (SelectedCompletionItem is null)
+            {
+                if (key != Key.Down)
+                {
+                    return false;
+                }
+
+                MoveCompletionSelection(1);
+                return true;
+            }
+
+            switch (key)
+            {
+                case Key.Down:
+                    MoveCompletionSelection(1);
+                    return true;
+                case Key.Up:
+                    MoveCompletionSelection(-1);
+                    return true;
+                case Key.Escape:
+                    SelectedCompletionItem = null;
+                    return true;
+                default:
+                    return false;
             }
         }
 
@@ -167,7 +234,39 @@ namespace HaloCreek.ViewModels.Components
             }
 
             SetCompletionTrigger(CompletionTriggerAnalysis.Hidden(reason));
+            SelectedCompletionItem = null;
             Log.Info(LogCategory, $"Completion menu hidden. Reason={reason}");
+        }
+
+        private void MoveCompletionSelection(int step)
+        {
+            if (CompletionItems.Count == 0)
+            {
+                SelectedCompletionItem = null;
+                return;
+            }
+
+            var currentIndex = SelectedCompletionItem is null
+                ? -1
+                : IndexOfCompletionItem(SelectedCompletionItem);
+            var nextIndex = currentIndex < 0
+                ? (step > 0 ? 0 : CompletionItems.Count - 1)
+                : Math.Clamp(currentIndex + step, 0, CompletionItems.Count - 1);
+
+            SelectedCompletionItem = CompletionItems[nextIndex];
+        }
+
+        private int IndexOfCompletionItem(PromptCompletionItem item)
+        {
+            for (var index = 0; index < CompletionItems.Count; index++)
+            {
+                if (ReferenceEquals(CompletionItems[index], item))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
         }
 
         private void SetCompletionTrigger(CompletionTriggerAnalysis analysis)
@@ -270,5 +369,16 @@ namespace HaloCreek.ViewModels.Components
                 return new CompletionTriggerAnalysis(true, string.Empty, tokenStart, tokenEnd, filterText);
             }
         }
+    }
+
+    public sealed class PromptCompletionItem
+    {
+        public required string Title { get; init; }
+
+        public string? Description { get; init; }
+
+        public required string InsertText { get; init; }
+
+        public IReadOnlyList<PromptCompletionItem> Children { get; init; } = Array.Empty<PromptCompletionItem>();
     }
 }

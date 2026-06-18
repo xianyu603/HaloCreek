@@ -1,6 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using HaloCreek.ViewModels.Components;
 
 namespace HaloCreek.Views.Components
@@ -11,6 +12,7 @@ namespace HaloCreek.Views.Components
         {
             InitializeComponent();
             PromptTextBox.TextChanged += PromptTextBox_OnTextChanged;
+            PromptTextBox.KeyDown += PromptTextBox_OnKeyDown;
             PromptTextBox.PropertyChanged += PromptTextBox_OnPropertyChanged;
             DataContextChanged += PromptInputView_OnDataContextChanged;
         }
@@ -18,6 +20,20 @@ namespace HaloCreek.Views.Components
         private void PromptTextBox_OnTextChanged(object? sender, TextChangedEventArgs e)
         {
             UpdateCompletionTrigger();
+        }
+
+        private void PromptTextBox_OnKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyModifiers != KeyModifiers.None
+                || DataContext is not PromptInputViewModel viewModel)
+            {
+                return;
+            }
+
+            if (viewModel.HandleCompletionNavigation(e.Key))
+            {
+                e.Handled = true;
+            }
         }
 
         private void PromptTextBox_OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
