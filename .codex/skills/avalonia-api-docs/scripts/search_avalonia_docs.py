@@ -77,11 +77,16 @@ def avalonia_xml_files(assets: dict, tfm: str) -> list[Path]:
             package_dir = root / package_path
             for base in ("ref", "lib"):
                 directory = package_dir / base / tfm
-                for xml_file in sorted(directory.glob("*.xml")):
+                xml_files = sorted(directory.glob("*.xml"))
+                if not xml_files:
+                    continue
+
+                for xml_file in xml_files:
                     resolved = xml_file.resolve()
                     if resolved not in seen:
                         files.append(xml_file)
                         seen.add(resolved)
+                break
 
     return files
 
