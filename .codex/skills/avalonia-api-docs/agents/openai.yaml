@@ -1,0 +1,4 @@
+interface:
+  display_name: "Avalonia API Docs"
+  short_description: "Find version-matched Avalonia API docs"
+  default_prompt: "Use $avalonia-api-docs to verify an Avalonia API before changing HaloCreek code."
