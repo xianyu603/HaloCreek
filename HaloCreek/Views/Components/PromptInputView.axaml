@@ -5,6 +5,24 @@
              x:DataType="vm:PromptInputViewModel"
              x:Class="HaloCreek.Views.Components.PromptInputView">
     <Grid>
+        <Grid.Styles>
+            <Style Selector="ListBoxItem">
+                <Setter Property="MinHeight" Value="48"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Margin" Value="0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            </Style>
+            <Style Selector="ListBoxItem:selected">
+                <Setter Property="Background" Value="#E0F2FE"/>
+            </Style>
+            <Style Selector="Border.completionAccent">
+                <Setter Property="Background" Value="Transparent"/>
+            </Style>
+            <Style Selector="ListBoxItem:selected Border.completionAccent">
+                <Setter Property="Background" Value="#0284C7"/>
+            </Style>
+        </Grid.Styles>
+
         <TextBox x:Name="PromptTextBox"
                  AcceptsReturn="True"
                  behaviors:TextBoxDropPathBehavior.AppendFirstPath="True"
@@ -24,67 +42,70 @@
             </TextBox.KeyBindings>
         </TextBox>
 
-        <Border IsVisible="{Binding IsCompletionOpen, FallbackValue=False}"
-                IsHitTestVisible="False"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Top"
-                Margin="10,38,0,0"
-                MinWidth="280"
-                Background="#FFFFFF"
-                BorderBrush="#CBD5E1"
-                BorderThickness="1"
-                CornerRadius="4"
-                Padding="4">
-            <ListBox ItemsSource="{Binding CompletionItems}"
-                     SelectedItem="{Binding SelectedCompletionItem, Mode=TwoWay}"
-                     SelectionMode="Single"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     Padding="0"
-                     MaxHeight="176">
-                <ListBox.Styles>
-                    <Style Selector="ListBoxItem">
-                        <Setter Property="MinHeight" Value="48"/>
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="Margin" Value="0"/>
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                    </Style>
-                    <Style Selector="ListBoxItem:selected">
-                        <Setter Property="Background" Value="#E0F2FE"/>
-                    </Style>
-                    <Style Selector="Border.completionAccent">
-                        <Setter Property="Background" Value="Transparent"/>
-                    </Style>
-                    <Style Selector="ListBoxItem:selected Border.completionAccent">
-                        <Setter Property="Background" Value="#0284C7"/>
-                    </Style>
-                </ListBox.Styles>
-                <ListBox.ItemTemplate>
-                    <DataTemplate DataType="vm:PromptCompletionItem">
-                        <Grid Height="48"
-                              ColumnDefinitions="3,*"
-                              ColumnSpacing="10">
-                            <Border Classes="completionAccent"
-                                    Width="3"
-                                    CornerRadius="2"
-                                    Margin="0,6,0,6"/>
-                            <StackPanel Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Spacing="1">
-                                <TextBlock Text="{Binding Title}"
-                                           Foreground="#0F172A"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding Description}"
-                                           Foreground="#64748B"
-                                           FontSize="12"
-                                           TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-                        </Grid>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </Border>
+        <ItemsControl IsVisible="{Binding IsCompletionOpen, FallbackValue=False}"
+                      IsHitTestVisible="False"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Top"
+                      Margin="10,38,0,0"
+                      ItemsSource="{Binding CompletionMenuLevels}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:PromptCompletionMenuLevel">
+                    <Border Background="#FFFFFF"
+                            BorderBrush="#CBD5E1"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="4"
+                            Margin="0,0,4,0">
+                        <ListBox Width="280"
+                                 ItemsSource="{Binding Items}"
+                                 SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                                 SelectionMode="Single"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 MaxHeight="176">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="vm:PromptCompletionItem">
+                                    <Grid Height="48"
+                                          ColumnDefinitions="3,*,Auto"
+                                          ColumnSpacing="10">
+                                        <Border Classes="completionAccent"
+                                                Width="3"
+                                                CornerRadius="2"
+                                                Margin="0,6,0,6"/>
+                                        <StackPanel Grid.Column="1"
+                                                    VerticalAlignment="Center"
+                                                    Spacing="1">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Foreground="#0F172A"
+                                                       FontSize="13"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Description}"
+                                                       Foreground="#64748B"
+                                                       FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2"
+                                                   IsVisible="{Binding HasChildren}"
+                                                   Text=">"
+                                                   Foreground="#64748B"
+                                                   FontSize="14"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </Grid>
 </UserControl>

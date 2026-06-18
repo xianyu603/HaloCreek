@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -17,21 +18,63 @@ namespace HaloCreek.ViewModels.Components
         [
             new PromptCompletionItem
             {
-                Title = "$skill:code-review",
-                Description = "Code review checklist",
-                InsertText = "$skill:code-review",
-            },
-            new PromptCompletionItem
-            {
-                Title = "$skill:implementation",
-                Description = "Implementation workflow",
-                InsertText = "$skill:implementation",
+                Title = "$skill",
+                Description = "Skill shortcuts",
+                Children =
+                [
+                    new PromptCompletionItem
+                    {
+                        Title = "$skill:code-review",
+                        Description = "Code review checklist",
+                        InsertText = "$skill:code-review",
+                    },
+                    new PromptCompletionItem
+                    {
+                        Title = "$skill:implementation",
+                        Description = "Implementation workflow",
+                        Children =
+                        [
+                            new PromptCompletionItem
+                            {
+                                Title = "$skill:implementation:feature",
+                                Description = "Feature implementation workflow",
+                                InsertText = "$skill:implementation:feature",
+                            },
+                            new PromptCompletionItem
+                            {
+                                Title = "$skill:implementation:fix",
+                                Description = "Bug fix workflow",
+                                InsertText = "$skill:implementation:fix",
+                            },
+                        ],
+                    },
+                ],
             },
             new PromptCompletionItem
             {
                 Title = "$file",
                 Description = "Reference a workspace file",
                 InsertText = "$file",
+            },
+            new PromptCompletionItem
+            {
+                Title = "$prompt",
+                Description = "Prompt templates",
+                Children =
+                [
+                    new PromptCompletionItem
+                    {
+                        Title = "$prompt:summary",
+                        Description = "Summarize current context",
+                        InsertText = "$prompt:summary",
+                    },
+                    new PromptCompletionItem
+                    {
+                        Title = "$prompt:tests",
+                        Description = "Ask for focused verification",
+                        InsertText = "$prompt:tests",
+                    },
+                ],
             },
         ];
 
@@ -43,7 +86,11 @@ namespace HaloCreek.ViewModels.Components
         private string _promptText = string.Empty;
         private int _promptCaretIndex;
         private CompletionTriggerAnalysis _completionTrigger = CompletionTriggerAnalysis.Hidden("Initial");
-        private PromptCompletionItem? _selectedCompletionItem;
+        private readonly ObservableCollection<PromptCompletionMenuLevel> _completionMenuLevels =
+        [
+            new PromptCompletionMenuLevel(DefaultCompletionItems),
+        ];
+        private int _activeCompletionLevelIndex;
         private bool _hasFrontSession;
         private bool _isDisposed;
 
@@ -112,12 +159,9 @@ namespace HaloCreek.ViewModels.Components
             get => _completionTrigger.FilterText;
         }
 
-        public IReadOnlyList<PromptCompletionItem> CompletionItems => DefaultCompletionItems;
-
-        public PromptCompletionItem? SelectedCompletionItem
+        public ObservableCollection<PromptCompletionMenuLevel> CompletionMenuLevels
         {
-            get => _selectedCompletionItem;
-            set => SetProperty(ref _selectedCompletionItem, value);
+            get => _completionMenuLevels;
         }
 
         public IAsyncRelayCommand LaunchCommand { get; }
@@ -152,7 +196,7 @@ namespace HaloCreek.ViewModels.Components
 
             if (!wasOpen)
             {
-                SelectedCompletionItem = null;
+                ResetCompletionSelection();
                 Log.Info(
                     LogCategory,
                     $"Completion menu shown. TokenStart={CompletionTokenStart}, CaretIndex={caretIndex}, FilterText='{CompletionFilterText}'");
@@ -166,7 +210,8 @@ namespace HaloCreek.ViewModels.Components
                 return false;
             }
 
-            if (SelectedCompletionItem is null)
+            var activeLevel = ActiveCompletionLevel;
+            if (activeLevel.SelectedItem is null)
             {
                 if (key != Key.Down)
                 {
@@ -185,11 +230,23 @@ namespace HaloCreek.ViewModels.Components
                 case Key.Up:
                     MoveCompletionSelection(-1);
                     return true;
+                case Key.Right:
+                    return OpenNextCompletionLevel();
+                case Key.Left:
+                    return CloseActiveCompletionLevel();
                 case Key.Escape:
-                    SelectedCompletionItem = null;
+                    ResetCompletionSelection();
                     return true;
                 case Key.Enter:
-                    AcceptSelectedCompletion();
+                    if (activeLevel.SelectedItem.InsertText is null && activeLevel.SelectedItem.Children.Count > 0)
+                    {
+                        OpenNextCompletionLevel();
+                    }
+                    else
+                    {
+                        AcceptSelectedCompletion();
+                    }
+
                     return true;
                 default:
                     return false;
@@ -203,8 +260,11 @@ namespace HaloCreek.ViewModels.Components
                 throw new InvalidOperationException("Cannot accept a completion item when the completion menu is closed.");
             }
 
-            var selectedItem = SelectedCompletionItem
+            var selectedItem = ActiveCompletionLevel.SelectedItem
                 ?? throw new InvalidOperationException("Cannot accept a completion item before one is selected.");
+
+            var insertText = selectedItem.InsertText
+                ?? throw new InvalidOperationException("Cannot accept a completion item without insertion text.");
 
             if (CompletionTokenStart < 0)
             {
@@ -219,7 +279,6 @@ namespace HaloCreek.ViewModels.Components
                 replaceEnd++;
             }
 
-            var insertText = selectedItem.InsertText;
             var replacement = insertText + " ";
             var updatedText = text[..replaceStart] + replacement + text[replaceEnd..];
             var updatedCaretIndex = replaceStart + replacement.Length;
@@ -292,39 +351,100 @@ namespace HaloCreek.ViewModels.Components
             }
 
             SetCompletionTrigger(CompletionTriggerAnalysis.Hidden(reason));
-            SelectedCompletionItem = null;
+            ResetCompletionSelection();
             Log.Info(LogCategory, $"Completion menu hidden. Reason={reason}");
         }
 
         private void MoveCompletionSelection(int step)
         {
-            if (CompletionItems.Count == 0)
+            var activeLevel = ActiveCompletionLevel;
+            if (activeLevel.Items.Count == 0)
             {
-                SelectedCompletionItem = null;
-                return;
+                throw new InvalidOperationException("Active completion menu level cannot be empty.");
             }
 
-            var currentIndex = SelectedCompletionItem is null
+            var currentIndex = activeLevel.SelectedItem is null
                 ? -1
-                : IndexOfCompletionItem(SelectedCompletionItem);
+                : IndexOfCompletionItem(activeLevel.Items, activeLevel.SelectedItem);
             var nextIndex = currentIndex < 0
-                ? (step > 0 ? 0 : CompletionItems.Count - 1)
-                : Math.Clamp(currentIndex + step, 0, CompletionItems.Count - 1);
+                ? (step > 0 ? 0 : activeLevel.Items.Count - 1)
+                : Math.Clamp(currentIndex + step, 0, activeLevel.Items.Count - 1);
 
-            SelectedCompletionItem = CompletionItems[nextIndex];
+            activeLevel.SelectedItem = activeLevel.Items[nextIndex];
+            TrimCompletionLevelsAfter(_activeCompletionLevelIndex);
         }
 
-        private int IndexOfCompletionItem(PromptCompletionItem item)
+        private bool OpenNextCompletionLevel()
         {
-            for (var index = 0; index < CompletionItems.Count; index++)
+            var selectedItem = ActiveCompletionLevel.SelectedItem;
+            if (selectedItem is null || selectedItem.Children.Count == 0)
             {
-                if (ReferenceEquals(CompletionItems[index], item))
+                return false;
+            }
+
+            TrimCompletionLevelsAfter(_activeCompletionLevelIndex);
+            var nextLevel = new PromptCompletionMenuLevel(selectedItem.Children)
+            {
+                SelectedItem = selectedItem.Children[0],
+            };
+            _completionMenuLevels.Add(nextLevel);
+            _activeCompletionLevelIndex = _completionMenuLevels.Count - 1;
+            Log.Info(
+                LogCategory,
+                $"Completion menu level opened. Level={_activeCompletionLevelIndex}, ParentTitle='{selectedItem.Title}', ItemCount={selectedItem.Children.Count}");
+            return true;
+        }
+
+        private bool CloseActiveCompletionLevel()
+        {
+            if (_activeCompletionLevelIndex == 0)
+            {
+                return false;
+            }
+
+            _activeCompletionLevelIndex--;
+            TrimCompletionLevelsAfter(_activeCompletionLevelIndex);
+            Log.Info(LogCategory, $"Completion menu level closed. Level={_activeCompletionLevelIndex}");
+            return true;
+        }
+
+        private void ResetCompletionSelection()
+        {
+            _activeCompletionLevelIndex = 0;
+            _completionMenuLevels[0].SelectedItem = null;
+            TrimCompletionLevelsAfter(0);
+        }
+
+        private PromptCompletionMenuLevel ActiveCompletionLevel
+        {
+            get => _completionMenuLevels[_activeCompletionLevelIndex];
+        }
+
+        private static int IndexOfCompletionItem(IReadOnlyList<PromptCompletionItem> items, PromptCompletionItem item)
+        {
+            for (var index = 0; index < items.Count; index++)
+            {
+                if (ReferenceEquals(items[index], item))
                 {
                     return index;
                 }
             }
 
             return -1;
+        }
+
+        private void TrimCompletionLevelsAfter(int levelIndex)
+        {
+            var keepCount = levelIndex + 1;
+            if (_completionMenuLevels.Count <= keepCount)
+            {
+                return;
+            }
+
+            while (_completionMenuLevels.Count > keepCount)
+            {
+                _completionMenuLevels.RemoveAt(_completionMenuLevels.Count - 1);
+            }
         }
 
         private void SetCompletionTrigger(CompletionTriggerAnalysis analysis)
@@ -435,8 +555,28 @@ namespace HaloCreek.ViewModels.Components
 
         public string? Description { get; init; }
 
-        public required string InsertText { get; init; }
+        public string? InsertText { get; init; }
 
         public IReadOnlyList<PromptCompletionItem> Children { get; init; } = Array.Empty<PromptCompletionItem>();
+
+        public bool HasChildren => Children.Count > 0;
+    }
+
+    public sealed class PromptCompletionMenuLevel : ViewModelBase
+    {
+        private PromptCompletionItem? _selectedItem;
+
+        public PromptCompletionMenuLevel(IReadOnlyList<PromptCompletionItem> items)
+        {
+            Items = items;
+        }
+
+        public IReadOnlyList<PromptCompletionItem> Items { get; }
+
+        public PromptCompletionItem? SelectedItem
+        {
+            get => _selectedItem;
+            set => SetProperty(ref _selectedItem, value);
+        }
     }
 }
