@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="using:HaloCreek.Behaviors"
-             xmlns:primitives="using:Avalonia.Controls.Primitives"
              xmlns:vm="using:HaloCreek.ViewModels.Components"
              x:DataType="vm:PromptInputViewModel"
              x:Class="HaloCreek.Views.Components.PromptInputView">
@@ -43,79 +42,70 @@
             </TextBox.KeyBindings>
         </TextBox>
 
-        <primitives:Popup x:Name="CompletionPopup"
-                          IsOpen="{Binding IsCompletionOpen, FallbackValue=False}"
-                          PlacementTarget="{Binding #PromptTextBox}"
-                          Placement="AnchorAndGravity"
-                          PlacementAnchor="BottomLeft"
-                          PlacementGravity="BottomRight"
-                          HorizontalOffset="0"
-                          VerticalOffset="4"
-                          Topmost="True"
-                          ShouldUseOverlayLayer="False"
-                          TakesFocusFromNativeControl="False">
-            <ItemsControl x:Name="CompletionMenu"
-                          IsHitTestVisible="False"
-                          ItemsSource="{Binding CompletionMenuLevels}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="vm:PromptCompletionMenuLevel">
-                        <Border Background="#FFFFFF"
-                                BorderBrush="#CBD5E1"
-                                BorderThickness="1"
-                                CornerRadius="4"
-                                Padding="4"
-                                Margin="0,0,4,0">
-                            <ListBox Width="280"
-                                     ItemsSource="{Binding Items}"
-                                     SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
-                                     SelectionMode="Single"
-                                     Background="Transparent"
-                                     BorderThickness="0"
-                                     Padding="0"
-                                     MaxHeight="176">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate DataType="vm:PromptCompletionItem">
-                                        <Grid Height="48"
-                                              ColumnDefinitions="3,*,Auto"
-                                              ColumnSpacing="10">
-                                            <Border Classes="completionAccent"
-                                                    Width="3"
-                                                    CornerRadius="2"
-                                                    Margin="0,6,0,6"/>
-                                            <StackPanel Grid.Column="1"
-                                                        VerticalAlignment="Center"
-                                                        Spacing="1">
-                                                <TextBlock Text="{Binding Title}"
-                                                           Foreground="#0F172A"
-                                                           FontSize="13"
-                                                           FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Text="{Binding Description}"
-                                                           Foreground="#64748B"
-                                                           FontSize="12"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2"
-                                                       IsVisible="{Binding HasChildren}"
-                                                       Text=">"
-                                                       Foreground="#64748B"
-                                                       FontSize="14"
+        <ItemsControl IsVisible="{Binding IsCompletionOpen, FallbackValue=False}"
+                      IsHitTestVisible="False"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Top"
+                      Margin="10,38,0,0"
+                      ItemsSource="{Binding CompletionMenuLevels}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:PromptCompletionMenuLevel">
+                    <Border Background="#FFFFFF"
+                            BorderBrush="#CBD5E1"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="4"
+                            Margin="0,0,4,0">
+                        <ListBox Width="280"
+                                 ItemsSource="{Binding Items}"
+                                 SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                                 SelectionMode="Single"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="0"
+                                 MaxHeight="176">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate DataType="vm:PromptCompletionItem">
+                                    <Grid Height="48"
+                                          ColumnDefinitions="3,*,Auto"
+                                          ColumnSpacing="10">
+                                        <Border Classes="completionAccent"
+                                                Width="3"
+                                                CornerRadius="2"
+                                                Margin="0,6,0,6"/>
+                                        <StackPanel Grid.Column="1"
+                                                    VerticalAlignment="Center"
+                                                    Spacing="1">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Foreground="#0F172A"
+                                                       FontSize="13"
                                                        FontWeight="SemiBold"
-                                                       VerticalAlignment="Center"
-                                                       Margin="0,0,8,0"/>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </primitives:Popup>
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Description}"
+                                                       Foreground="#64748B"
+                                                       FontSize="12"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2"
+                                                   IsVisible="{Binding HasChildren}"
+                                                   Text=">"
+                                                   Foreground="#64748B"
+                                                   FontSize="14"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </Grid>
 </UserControl>
