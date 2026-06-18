@@ -10,6 +10,7 @@ namespace HaloCreek.ViewModels.Components
     public sealed class PromptInputViewModel : ViewModelBase, IDisposable
     {
         private const string LogCategory = "PromptInput";
+        private const char CompletionTriggerCharacter = '$';
 
         public const string DefaultPlaceholderText =
             "Type a prompt or drop files here. Ctrl+Enter launches, Alt+Enter sends to front.";
@@ -17,6 +18,7 @@ namespace HaloCreek.ViewModels.Components
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
         private string _promptText = string.Empty;
+        private CompletionTriggerAnalysis _completionTrigger = CompletionTriggerAnalysis.Hidden("Initial");
         private bool _hasFrontSession;
         private bool _isDisposed;
 
@@ -52,9 +54,58 @@ namespace HaloCreek.ViewModels.Components
 
         public string PlaceholderText => DefaultPlaceholderText;
 
+        public bool IsCompletionOpen
+        {
+            get => _completionTrigger.IsValid;
+        }
+
+        public int CompletionTokenStart
+        {
+            get => _completionTrigger.TokenStart;
+        }
+
+        public int CompletionTokenEnd
+        {
+            get => _completionTrigger.TokenEnd;
+        }
+
+        public string CompletionFilterText
+        {
+            get => _completionTrigger.FilterText;
+        }
+
         public IAsyncRelayCommand LaunchCommand { get; }
 
         public IRelayCommand SendToFrontCommand { get; }
+
+        public void UpdateCompletionTrigger(string? text, int caretIndex)
+        {
+            text ??= string.Empty;
+            caretIndex = Math.Clamp(caretIndex, 0, text.Length);
+
+            var analysis = AnalyzeCompletionTrigger(text, caretIndex);
+            if (!analysis.IsValid)
+            {
+                HideCompletion(analysis.HideReason);
+                return;
+            }
+
+            // 展开的时候点到另一个触发
+            if (IsCompletionOpen && CompletionTokenStart != analysis.TokenStart)
+            {
+                HideCompletion("CaretOutsideToken");
+            }
+
+            var wasOpen = IsCompletionOpen;
+            SetCompletionTrigger(analysis);
+
+            if (!wasOpen)
+            {
+                Log.Info(
+                    LogCategory,
+                    $"Completion menu shown. TokenStart={CompletionTokenStart}, CaretIndex={caretIndex}, FilterText='{CompletionFilterText}'");
+            }
+        }
 
         public void Dispose()
         {
@@ -65,6 +116,89 @@ namespace HaloCreek.ViewModels.Components
 
             _isDisposed = true;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
+        }
+
+        private static CompletionTriggerAnalysis AnalyzeCompletionTrigger(string text, int caretIndex)
+        {
+            if (caretIndex == 0)
+            {
+                return CompletionTriggerAnalysis.Hidden("NoTrigger");
+            }
+
+            var triggerIndex = text.LastIndexOf(CompletionTriggerCharacter, caretIndex - 1, caretIndex);
+            if (triggerIndex < 0)
+            {
+                return CompletionTriggerAnalysis.Hidden("NoTrigger");
+            }
+
+            if (triggerIndex > 0 && !char.IsWhiteSpace(text[triggerIndex - 1]))
+            {
+                return CompletionTriggerAnalysis.Hidden("CharBeforeTrigger");
+            }
+
+            for (var index = triggerIndex + 1; index < caretIndex; index++)
+            {
+                if (char.IsWhiteSpace(text[index]))
+                {
+                    return CompletionTriggerAnalysis.Hidden("WhitespaceAfterTrigger");
+                }
+            }
+
+            var tokenEnd = triggerIndex + 1;
+            while (tokenEnd < text.Length && !char.IsWhiteSpace(text[tokenEnd]))
+            {
+                tokenEnd++;
+            }
+
+            if (caretIndex > tokenEnd)
+            {
+                return CompletionTriggerAnalysis.Hidden("CaretOutsideToken");
+            }
+
+            var filterText = text[(triggerIndex + 1)..tokenEnd];
+            return CompletionTriggerAnalysis.Visible(triggerIndex, tokenEnd, filterText);
+        }
+
+        private void HideCompletion(string reason)
+        {
+            if (!IsCompletionOpen)
+            {
+                return;
+            }
+
+            SetCompletionTrigger(CompletionTriggerAnalysis.Hidden(reason));
+            Log.Info(LogCategory, $"Completion menu hidden. Reason={reason}");
+        }
+
+        private void SetCompletionTrigger(CompletionTriggerAnalysis analysis)
+        {
+            if (_completionTrigger == analysis)
+            {
+                return;
+            }
+
+            var previous = _completionTrigger;
+            _completionTrigger = analysis;
+
+            if (previous.IsValid != analysis.IsValid)
+            {
+                OnPropertyChanged(nameof(IsCompletionOpen));
+            }
+
+            if (previous.TokenStart != analysis.TokenStart)
+            {
+                OnPropertyChanged(nameof(CompletionTokenStart));
+            }
+
+            if (previous.TokenEnd != analysis.TokenEnd)
+            {
+                OnPropertyChanged(nameof(CompletionTokenEnd));
+            }
+
+            if (previous.FilterText != analysis.FilterText)
+            {
+                OnPropertyChanged(nameof(CompletionFilterText));
+            }
         }
 
         private async Task LaunchAsync()
@@ -116,6 +250,24 @@ namespace HaloCreek.ViewModels.Components
             {
                 _hasFrontSession = hasFrontSession;
                 SendToFrontCommand.NotifyCanExecuteChanged();
+            }
+        }
+
+        private readonly record struct CompletionTriggerAnalysis(
+            bool IsValid,
+            string HideReason,
+            int TokenStart,
+            int TokenEnd,
+            string FilterText)
+        {
+            public static CompletionTriggerAnalysis Hidden(string reason)
+            {
+                return new CompletionTriggerAnalysis(false, reason, -1, -1, string.Empty);
+            }
+
+            public static CompletionTriggerAnalysis Visible(int tokenStart, int tokenEnd, string filterText)
+            {
+                return new CompletionTriggerAnalysis(true, string.Empty, tokenStart, tokenEnd, filterText);
             }
         }
     }

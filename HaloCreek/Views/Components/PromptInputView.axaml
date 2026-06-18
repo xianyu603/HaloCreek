@@ -4,20 +4,48 @@
              xmlns:vm="using:HaloCreek.ViewModels.Components"
              x:DataType="vm:PromptInputViewModel"
              x:Class="HaloCreek.Views.Components.PromptInputView">
-    <TextBox AcceptsReturn="True"
-             behaviors:TextBoxDropPathBehavior.AppendFirstPath="True"
-             Text="{Binding PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-             TextWrapping="Wrap"
-             PlaceholderText="{Binding PlaceholderText}"
-             BorderThickness="0"
-             Background="Transparent"
-             Padding="10"
-             VerticalContentAlignment="Top">
-        <TextBox.KeyBindings>
-            <KeyBinding Gesture="Alt+Enter"
-                        Command="{Binding SendToFrontCommand}"/>
-            <KeyBinding Gesture="Ctrl+Enter"
-                        Command="{Binding LaunchCommand}"/>
-        </TextBox.KeyBindings>
-    </TextBox>
+    <Grid>
+        <TextBox x:Name="PromptTextBox"
+                 AcceptsReturn="True"
+                 behaviors:TextBoxDropPathBehavior.AppendFirstPath="True"
+                 Text="{Binding PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 TextWrapping="Wrap"
+                 PlaceholderText="{Binding PlaceholderText}"
+                 BorderThickness="0"
+                 Background="Transparent"
+                 Padding="10"
+                 VerticalContentAlignment="Top">
+            <TextBox.KeyBindings>
+                <KeyBinding Gesture="Alt+Enter"
+                            Command="{Binding SendToFrontCommand}"/>
+                <KeyBinding Gesture="Ctrl+Enter"
+                            Command="{Binding LaunchCommand}"/>
+            </TextBox.KeyBindings>
+        </TextBox>
+
+        <Border IsVisible="{Binding IsCompletionOpen, FallbackValue=False}"
+                IsHitTestVisible="False"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="10,38,0,0"
+                MinWidth="220"
+                Background="#FFFFFF"
+                BorderBrush="#CBD5E1"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="10,8">
+            <Grid RowDefinitions="Auto,Auto"
+                  RowSpacing="2">
+                <TextBlock Text="$"
+                           Foreground="#0F172A"
+                           FontSize="13"
+                           FontWeight="SemiBold"/>
+                <TextBlock Grid.Row="1"
+                           Text="{Binding CompletionFilterText}"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"/>
+            </Grid>
+        </Border>
+    </Grid>
 </UserControl>
