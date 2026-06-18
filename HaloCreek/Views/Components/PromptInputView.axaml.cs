@@ -17,6 +17,7 @@ namespace HaloCreek.Views.Components
         public PromptInputView()
         {
             InitializeComponent();
+            CompletionPopup.PlacementTarget = PromptTextBox;
             DataContextChanged += PromptInputView_OnDataContextChanged;
             PromptTextBox.AddHandler(
                 InputElement.KeyDownEvent,
@@ -47,6 +48,7 @@ namespace HaloCreek.Views.Components
             }
 
             _subscribedViewModel = DataContext as PromptInputViewModel;
+            CompletionPopup.DataContext = _subscribedViewModel;
             if (_subscribedViewModel is not null)
             {
                 _subscribedViewModel.PropertyChanged += ViewModel_OnPropertyChanged;
@@ -55,26 +57,20 @@ namespace HaloCreek.Views.Components
 
         private void ViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(PromptInputViewModel.IsCompletionOpen)
-                || sender is not PromptInputViewModel { IsCompletionOpen: true })
+            if (sender is not PromptInputViewModel { IsCompletionOpen: true })
             {
                 return;
             }
 
-            CompletionMenu.Margin = GetCompletionMenuMargin();
+            if (e.PropertyName == nameof(PromptInputViewModel.IsCompletionOpen)
+                || e.PropertyName == nameof(PromptInputViewModel.PromptText)
+                || e.PropertyName == nameof(PromptInputViewModel.PromptCaretIndex))
+            {
+                CompletionPopup.PlacementRect = GetCompletionPlacementRect();
+            }
         }
 
-        private Thickness GetCompletionMenuMargin()
-        {
-            const double verticalGap = 4;
-
-            var caretBounds = GetCaretBoundsInView();
-            var left = Math.Max(0, caretBounds.X);
-            var top = Math.Max(0, caretBounds.Y + Math.Max(0, caretBounds.Height) + verticalGap);
-            return new Thickness(left, top, 0, 0);
-        }
-
-        private Rect GetCaretBoundsInView()
+        private Rect GetCompletionPlacementRect()
         {
             var presenter = PromptTextBox.FindDescendantOfType<TextPresenter>();
             if (presenter is null)
@@ -85,7 +81,7 @@ namespace HaloCreek.Views.Components
             var textLength = PromptTextBox.Text?.Length ?? 0;
             var caretIndex = Math.Clamp(PromptTextBox.CaretIndex, 0, textLength);
             var caretBounds = presenter.TextLayout.HitTestTextPosition(caretIndex);
-            var caretTopLeft = presenter.TranslatePoint(new Point(caretBounds.X, caretBounds.Y), this);
+            var caretTopLeft = presenter.TranslatePoint(new Point(caretBounds.X, caretBounds.Y), PromptTextBox);
 
             return caretTopLeft is { } point
                 ? new Rect(point, caretBounds.Size)
