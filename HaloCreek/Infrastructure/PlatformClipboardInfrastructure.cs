@@ -21,6 +21,7 @@ namespace HaloCreek.Infrastructure
         public ClipboardTextSnapshot Snapshot { get; }
     }
 
+    // 当前没有业务入口使用剪贴板监听；基础设施先保留，后续确认有真实入口再重新接入。
     public sealed class PlatformClipboardInfrastructure : IDisposable
     {
         private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);

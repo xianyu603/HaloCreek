@@ -57,18 +57,6 @@ namespace HaloCreek
         private static async Task<AppDisposeScope> CreateAppDisposeScopeAsync(MainWindow mainWindow)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
-            PlatformClipboardInfrastructure platformClipboardInfrastructure;
-            try
-            {
-                platformClipboardInfrastructure = new PlatformClipboardInfrastructure(mainWindow);
-                Log.Info("Clipboard", "Clipboard infrastructure created.");
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Clipboard", ex, "Clipboard infrastructure creation failed.");
-                throw;
-            }
-
             var applicationStatusService = new ApplicationStatusService();
             var transientEventService = new TransientEventService(platformInfrastructure);
             var appCommonRuntime = new AppCommonRuntime(
@@ -94,9 +82,6 @@ namespace HaloCreek
             var gitService = new GitService();
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
-            var reviewClipboardContextService = new ReviewClipboardContextService(
-                platformClipboardInfrastructure,
-                gitService);
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
@@ -109,8 +94,6 @@ namespace HaloCreek
                 reviewSnapshotService,
                 gitService,
                 externalActionService,
-                reviewClipboardContextService,
-                sessionLifecycleService,
                 appCommonRuntime);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistoryRefreshService,
@@ -144,8 +127,6 @@ namespace HaloCreek
                 sessionLifecycleService,
                 sessionHistoryRefreshService,
                 tmuxService,
-                reviewClipboardContextService,
-                platformClipboardInfrastructure,
                 globalHotkeyRegistrar);
         }
 
@@ -160,8 +141,6 @@ namespace HaloCreek
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
             private readonly TmuxService _tmuxService;
-            private readonly ReviewClipboardContextService _reviewClipboardContextService;
-            private readonly PlatformClipboardInfrastructure _platformClipboardInfrastructure;
             private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
             private bool _isDisposed;
 
@@ -174,8 +153,6 @@ namespace HaloCreek
                 SessionLifecycleService sessionLifecycleService,
                 SessionHistoryRefreshService sessionHistoryRefreshService,
                 TmuxService tmuxService,
-                ReviewClipboardContextService reviewClipboardContextService,
-                PlatformClipboardInfrastructure platformClipboardInfrastructure,
                 GlobalHotkeyRegistrar globalHotkeyRegistrar)
             {
                 MainWindowViewModel = mainWindowViewModel;
@@ -186,10 +163,6 @@ namespace HaloCreek
                 _sessionLifecycleService = sessionLifecycleService;
                 _sessionHistoryRefreshService = sessionHistoryRefreshService;
                 _tmuxService = tmuxService;
-                _reviewClipboardContextService = reviewClipboardContextService
-                    ?? throw new ArgumentNullException(nameof(reviewClipboardContextService));
-                _platformClipboardInfrastructure = platformClipboardInfrastructure
-                    ?? throw new ArgumentNullException(nameof(platformClipboardInfrastructure));
                 _globalHotkeyRegistrar = globalHotkeyRegistrar
                     ?? throw new ArgumentNullException(nameof(globalHotkeyRegistrar));
             }
@@ -208,8 +181,6 @@ namespace HaloCreek
                 _workspaceFooter.Dispose();
                 _promptEditor.Dispose();
                 _review.Dispose();
-                _reviewClipboardContextService.Dispose();
-                _platformClipboardInfrastructure.Dispose();
                 _logs.Dispose();
                 _sessionHistoryRefreshService.Dispose();
                 _sessionLifecycleService.Dispose();

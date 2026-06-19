@@ -7,6 +7,7 @@ using HaloCreek.Models;
 
 namespace HaloCreek.Services
 {
+    // 当前没有业务入口消费剪贴板匹配结果；匹配能力先保留，后续确认有真实入口再重新接入。
     public sealed class ReviewClipboardContextService : IDisposable
     {
         private const string LogCategory = "ReviewClipLocate";
