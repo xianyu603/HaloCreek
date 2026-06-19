@@ -6,89 +6,28 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
+using HaloCreek.Models;
 using HaloCreek.Services;
+using HaloCreek.Services.Completions;
 
 namespace HaloCreek.ViewModels.Components
 {
     public sealed class PromptInputViewModel : ViewModelBase, IDisposable
     {
         private const string LogCategory = "PromptInput";
-        private const char CompletionTriggerCharacter = '$';
-        private static readonly PromptCompletionItem[] DefaultCompletionItems =
-        [
-            new PromptCompletionItem
-            {
-                Title = "$skill",
-                Description = "Skill shortcuts",
-                Children =
-                [
-                    new PromptCompletionItem
-                    {
-                        Title = "$skill:code-review",
-                        Description = "Code review checklist",
-                        InsertText = "$skill:code-review",
-                    },
-                    new PromptCompletionItem
-                    {
-                        Title = "$skill:implementation",
-                        Description = "Implementation workflow",
-                        Children =
-                        [
-                            new PromptCompletionItem
-                            {
-                                Title = "$skill:implementation:feature",
-                                Description = "Feature implementation workflow",
-                                InsertText = "$skill:implementation:feature",
-                            },
-                            new PromptCompletionItem
-                            {
-                                Title = "$skill:implementation:fix",
-                                Description = "Bug fix workflow",
-                                InsertText = "$skill:implementation:fix",
-                            },
-                        ],
-                    },
-                ],
-            },
-            new PromptCompletionItem
-            {
-                Title = "$file",
-                Description = "Reference a workspace file",
-                InsertText = "$file",
-            },
-            new PromptCompletionItem
-            {
-                Title = "$prompt",
-                Description = "Prompt templates",
-                Children =
-                [
-                    new PromptCompletionItem
-                    {
-                        Title = "$prompt:summary",
-                        Description = "Summarize current context",
-                        InsertText = "$prompt:summary",
-                    },
-                    new PromptCompletionItem
-                    {
-                        Title = "$prompt:tests",
-                        Description = "Ask for focused verification",
-                        InsertText = "$prompt:tests",
-                    },
-                ],
-            },
-        ];
 
         public const string DefaultPlaceholderText =
             "Type a prompt or drop files here. Ctrl+Enter launches, Alt+Enter sends to front.";
 
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
+        private readonly CompletionCoordinator _completionCoordinator;
         private string _promptText = string.Empty;
         private int _promptCaretIndex;
-        private CompletionTriggerAnalysis _completionTrigger = CompletionTriggerAnalysis.Hidden("Initial");
+        private CompletionTriggerState _completionTrigger = CompletionTriggerState.Hidden("Initial");
         private readonly ObservableCollection<PromptCompletionMenuLevel> _completionMenuLevels =
         [
-            new PromptCompletionMenuLevel(DefaultCompletionItems),
+            new PromptCompletionMenuLevel(Array.Empty<PromptCompletionItem>()),
         ];
         private int _activeCompletionLevelIndex;
         private bool _hasFrontSession;
@@ -96,13 +35,16 @@ namespace HaloCreek.ViewModels.Components
 
         public PromptInputViewModel(
             SessionLifecycleService sessionLifecycleService,
-            AppCommonRuntime appCommonRuntime)
+            AppCommonRuntime appCommonRuntime,
+            CompletionCoordinator completionCoordinator)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _transientEventService = appCommonRuntime.TransientEventService;
+            _completionCoordinator = completionCoordinator
+                ?? throw new ArgumentNullException(nameof(completionCoordinator));
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
             SendToFrontCommand = new RelayCommand(SendToFront, CanSendToFront);
@@ -178,25 +120,33 @@ namespace HaloCreek.ViewModels.Components
             text ??= string.Empty;
             caretIndex = Math.Clamp(caretIndex, 0, text.Length);
 
-            var analysis = AnalyzeCompletionTrigger(text, caretIndex);
-            if (!analysis.IsValid)
+            var triggerState = AnalyzeCompletionTrigger(
+                text,
+                caretIndex,
+                _completionCoordinator.TriggerCharacters);
+            if (!triggerState.IsValid)
             {
-                HideCompletion(analysis.HideReason);
+                HideCompletion(triggerState.HideReason);
                 return;
             }
 
-            // 展开的时候点到另一个触发
-            if (IsCompletionOpen && CompletionTokenStart != analysis.TokenStart)
-            {
-                HideCompletion("CaretOutsideToken");
-            }
-
             var wasOpen = IsCompletionOpen;
-            SetCompletionTrigger(analysis);
+            var activeQuery = _completionTrigger.Query;
+            var queryChanged = activeQuery is null
+                || CompletionTokenStart != triggerState.TokenStart
+                || _completionTrigger.TriggerCharacter != triggerState.TriggerCharacter
+                || !string.Equals(_completionTrigger.FilterText, triggerState.FilterText, StringComparison.Ordinal);
 
-            if (!wasOpen)
+            if (queryChanged)
             {
                 ResetCompletionSelection();
+                activeQuery = StartCompletionQuery(triggerState);
+            }
+
+            SetCompletionTrigger(triggerState.WithQuery(activeQuery));
+
+            if (!wasOpen && IsCompletionOpen)
+            {
                 Log.Info(
                     LogCategory,
                     $"Completion menu shown. TokenStart={CompletionTokenStart}, CaretIndex={caretIndex}, FilterText='{CompletionFilterText}'");
@@ -217,8 +167,11 @@ namespace HaloCreek.ViewModels.Components
                 {
                     return false;
                 }
-
-                MoveCompletionSelection(1);
+                if (activeLevel.Items.Count != 0)
+                {
+                    MoveCompletionSelection(1);
+                }
+                // 否则说明没有任何匹配结果 忽略按键即可
                 return true;
             }
 
@@ -236,6 +189,9 @@ namespace HaloCreek.ViewModels.Components
                     return CloseActiveCompletionLevel();
                 case Key.Escape:
                     ResetCompletionSelection();
+                    var query = _completionTrigger.Query
+                        ?? throw new InvalidOperationException("Completion query is required while the completion menu is open.");
+                    ApplyCompletionSnapshot(query);
                     return true;
                 case Key.Enter:
                     if (activeLevel.SelectedItem.InsertText is null && activeLevel.SelectedItem.Children.Count > 0)
@@ -300,31 +256,54 @@ namespace HaloCreek.ViewModels.Components
 
             _isDisposed = true;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
+            StopActiveCompletionQuery();
         }
 
-        private static CompletionTriggerAnalysis AnalyzeCompletionTrigger(string text, int caretIndex)
+        private static CompletionTriggerState AnalyzeCompletionTrigger(
+            string text,
+            int caretIndex,
+            IReadOnlyCollection<char> triggerCharacters)
         {
-            if (caretIndex == 0)
+            if (caretIndex == 0 || triggerCharacters.Count == 0)
             {
-                return CompletionTriggerAnalysis.Hidden("NoTrigger");
+                return CompletionTriggerState.Hidden("NoTrigger");
             }
 
-            var triggerIndex = text.LastIndexOf(CompletionTriggerCharacter, caretIndex - 1, caretIndex);
+            var triggerIndex = -1;
+            for (var index = caretIndex - 1; index >= 0; index--)
+            {
+                foreach (var triggerCharacter in triggerCharacters)
+                {
+                    if (text[index] != triggerCharacter)
+                    {
+                        continue;
+                    }
+
+                    triggerIndex = index;
+                    break;
+                }
+
+                if (triggerIndex >= 0)
+                {
+                    break;
+                }
+            }
+
             if (triggerIndex < 0)
             {
-                return CompletionTriggerAnalysis.Hidden("NoTrigger");
+                return CompletionTriggerState.Hidden("NoTrigger");
             }
 
             if (triggerIndex > 0 && !char.IsWhiteSpace(text[triggerIndex - 1]))
             {
-                return CompletionTriggerAnalysis.Hidden("CharBeforeTrigger");
+                return CompletionTriggerState.Hidden("CharBeforeTrigger");
             }
 
             for (var index = triggerIndex + 1; index < caretIndex; index++)
             {
                 if (char.IsWhiteSpace(text[index]))
                 {
-                    return CompletionTriggerAnalysis.Hidden("WhitespaceAfterTrigger");
+                    return CompletionTriggerState.Hidden("WhitespaceAfterTrigger");
                 }
             }
 
@@ -336,11 +315,15 @@ namespace HaloCreek.ViewModels.Components
 
             if (caretIndex > tokenEnd)
             {
-                return CompletionTriggerAnalysis.Hidden("CaretOutsideToken");
+                return CompletionTriggerState.Hidden("CaretOutsideToken");
             }
 
             var filterText = text[(triggerIndex + 1)..tokenEnd];
-            return CompletionTriggerAnalysis.Visible(triggerIndex, tokenEnd, filterText);
+            return CompletionTriggerState.Visible(
+                text[triggerIndex],
+                triggerIndex,
+                tokenEnd,
+                filterText);
         }
 
         private void HideCompletion(string reason)
@@ -350,9 +333,61 @@ namespace HaloCreek.ViewModels.Components
                 return;
             }
 
-            SetCompletionTrigger(CompletionTriggerAnalysis.Hidden(reason));
+            StopActiveCompletionQuery();
+            SetCompletionTrigger(CompletionTriggerState.Hidden(reason));
             ResetCompletionSelection();
             Log.Info(LogCategory, $"Completion menu hidden. Reason={reason}");
+        }
+
+        private CompletionQuery StartCompletionQuery(CompletionTriggerState triggerState)
+        {
+            StopActiveCompletionQuery();
+
+            var query = _completionCoordinator.StartQuery(
+                triggerState.TriggerCharacter,
+                triggerState.FilterText);
+            query.Changed += (_, _) => HandleCompletionQueryChanged(query);
+            ApplyCompletionSnapshot(query);
+            return query;
+        }
+
+        private void StopActiveCompletionQuery()
+        {
+            _completionTrigger.Query?.Dispose();
+        }
+
+        private void HandleCompletionQueryChanged(CompletionQuery query)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => HandleCompletionQueryChanged(query));
+                return;
+            }
+
+            if (_isDisposed || !ReferenceEquals(query, _completionTrigger.Query))
+            {
+                return;
+            }
+
+            if (IsCompletionNavigating)
+            {
+                return;
+            }
+
+            ApplyCompletionSnapshot(query);
+        }
+
+        private void ApplyCompletionSnapshot(CompletionQuery query)
+        {
+            _activeCompletionLevelIndex = 0;
+            _completionMenuLevels[0] = new PromptCompletionMenuLevel(query.Current.Items);
+            TrimCompletionLevelsAfter(0);
+        }
+
+        private bool IsCompletionNavigating
+        {
+            get => _activeCompletionLevelIndex > 0
+                || _completionMenuLevels[0].SelectedItem is not null;
         }
 
         private void MoveCompletionSelection(int step)
@@ -447,7 +482,7 @@ namespace HaloCreek.ViewModels.Components
             }
         }
 
-        private void SetCompletionTrigger(CompletionTriggerAnalysis analysis)
+        private void SetCompletionTrigger(CompletionTriggerState analysis)
         {
             if (_completionTrigger == analysis)
             {
@@ -530,36 +565,44 @@ namespace HaloCreek.ViewModels.Components
             }
         }
 
-        private readonly record struct CompletionTriggerAnalysis(
+        private readonly record struct CompletionTriggerState(
             bool IsValid,
             string HideReason,
+            CompletionQuery? Query,
+            char TriggerCharacter,
             int TokenStart,
             int TokenEnd,
             string FilterText)
         {
-            public static CompletionTriggerAnalysis Hidden(string reason)
+            public static CompletionTriggerState Hidden(string reason)
             {
-                return new CompletionTriggerAnalysis(false, reason, -1, -1, string.Empty);
+                return new CompletionTriggerState(false, reason, null, '\0', -1, -1, string.Empty);
             }
 
-            public static CompletionTriggerAnalysis Visible(int tokenStart, int tokenEnd, string filterText)
+            public static CompletionTriggerState Visible(
+                char triggerCharacter,
+                int tokenStart,
+                int tokenEnd,
+                string filterText)
             {
-                return new CompletionTriggerAnalysis(true, string.Empty, tokenStart, tokenEnd, filterText);
+                return new CompletionTriggerState(
+                    true,
+                    string.Empty,
+                    null,
+                    triggerCharacter,
+                    tokenStart,
+                    tokenEnd,
+                    filterText);
+            }
+
+            public CompletionTriggerState WithQuery(CompletionQuery? query)
+            {
+                return this with
+                {
+                    Query = query,
+                };
             }
         }
-    }
-
-    public sealed class PromptCompletionItem
-    {
-        public required string Title { get; init; }
-
-        public string? Description { get; init; }
-
-        public string? InsertText { get; init; }
-
-        public IReadOnlyList<PromptCompletionItem> Children { get; init; } = Array.Empty<PromptCompletionItem>();
-
-        public bool HasChildren => Children.Count > 0;
     }
 
     public sealed class PromptCompletionMenuLevel : ViewModelBase

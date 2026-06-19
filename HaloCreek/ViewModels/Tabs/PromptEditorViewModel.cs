@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
+using HaloCreek.Services.Completions;
 using HaloCreek.ViewModels.Components;
 
 namespace HaloCreek.ViewModels.Tabs
@@ -19,15 +20,18 @@ namespace HaloCreek.ViewModels.Tabs
 
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
-            AppCommonRuntime appCommonRuntime)
+            AppCommonRuntime appCommonRuntime,
+            CompletionCoordinator completionCoordinator)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
+            ArgumentNullException.ThrowIfNull(completionCoordinator);
 
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             PromptInput = new PromptInputViewModel(
                 _sessionLifecycleService,
-                appCommonRuntime);
+                appCommonRuntime,
+                completionCoordinator);
 
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);

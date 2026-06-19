@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="using:HaloCreek.Behaviors"
+             xmlns:models="using:HaloCreek.Models"
              xmlns:vm="using:HaloCreek.ViewModels.Components"
              x:DataType="vm:PromptInputViewModel"
              x:Class="HaloCreek.Views.Components.PromptInputView">
@@ -71,7 +72,7 @@
                                  Padding="0"
                                  MaxHeight="176">
                             <ListBox.ItemTemplate>
-                                <DataTemplate DataType="vm:PromptCompletionItem">
+                                <DataTemplate DataType="models:PromptCompletionItem">
                                     <Grid Height="48"
                                           ColumnDefinitions="3,*,Auto"
                                           ColumnSpacing="10">

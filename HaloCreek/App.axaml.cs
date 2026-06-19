@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Services;
+using HaloCreek.Services.Completions;
 using HaloCreek.Services.SessionHistory;
 using HaloCreek.ViewModels;
 using HaloCreek.ViewModels.Components;
@@ -82,6 +83,7 @@ namespace HaloCreek
             var gitService = new GitService();
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
+            var completionCoordinator = new CompletionCoordinator();
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
@@ -89,7 +91,8 @@ namespace HaloCreek
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
-                appCommonRuntime);
+                appCommonRuntime,
+                completionCoordinator);
             var review = new ReviewViewModel(
                 reviewSnapshotService,
                 gitService,
