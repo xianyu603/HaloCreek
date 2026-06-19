@@ -42,11 +42,12 @@
             </TextBox.KeyBindings>
         </TextBox>
 
-        <ItemsControl IsVisible="{Binding IsCompletionOpen, FallbackValue=False}"
+        <ItemsControl x:Name="CompletionMenu"
+                      IsVisible="{Binding IsCompletionOpen, FallbackValue=False}"
                       IsHitTestVisible="False"
                       HorizontalAlignment="Left"
                       VerticalAlignment="Top"
-                      Margin="10,38,0,0"
+                      Margin="10,0,0,0"
                       ItemsSource="{Binding CompletionMenuLevels}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
