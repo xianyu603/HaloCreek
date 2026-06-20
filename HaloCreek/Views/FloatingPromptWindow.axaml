@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:components="using:HaloCreek.Views.Components"
+        xmlns:vm="using:HaloCreek.ViewModels"
+        x:Class="HaloCreek.Views.FloatingPromptWindow"
+        x:DataType="vm:FloatingPromptViewModel"
+        Title="HaloCreek Prompt"
+        Width="720"
+        Height="360"
+        MinWidth="520"
+        MinHeight="270"
+        WindowStartupLocation="CenterScreen"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True">
+
+    <Border Margin="12"
+            BorderBrush="#CBD5E1"
+            BorderThickness="1"
+            CornerRadius="6"
+            Background="#FFFFFF"
+            ClipToBounds="True">
+        <components:PromptInputView x:Name="PromptInput"
+                                    DataContext="{Binding PromptInput}"/>
+    </Border>
+</Window>

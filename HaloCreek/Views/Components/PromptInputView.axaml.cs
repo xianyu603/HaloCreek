@@ -42,6 +42,11 @@ namespace HaloCreek.Views.Components
             }
         }
 
+        public void FocusPromptTextBox()
+        {
+            PromptTextBox.Focus();
+        }
+
         private void CompletionMenu_OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
         {
             if (e.Property == IsVisibleProperty && CompletionMenu.IsVisible)

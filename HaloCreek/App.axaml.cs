@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -28,6 +29,7 @@ namespace HaloCreek
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
+                desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
                 var mainWindow = new MainWindow();
                 desktop.MainWindow = mainWindow;
                 Dispatcher.UIThread.Post(async () => await InitializeMainWindowAsync(desktop, mainWindow));
@@ -89,6 +91,10 @@ namespace HaloCreek
                 {
                     [DummyCompletionSource.TriggerCharacter] = new DummyCompletionSource(),
                 });
+            var floatingPromptService = new FloatingPromptService(
+                sessionLifecycleService,
+                appCommonRuntime,
+                completionCoordinator);
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
@@ -117,11 +123,11 @@ namespace HaloCreek
                 logs,
                 workspaceFooter);
             var globalHotkeyActionService = new GlobalHotkeyActionService(
-                mainWindow,
+                floatingPromptService,
                 sessionLifecycleService);
             var globalHotkeyRegistrar = new GlobalHotkeyRegistrar();
             globalHotkeyRegistrar.MainWindowHotkeyPressed += (_, _) =>
-                globalHotkeyActionService.ActivateMainWindow();
+                globalHotkeyActionService.ActivateFloatingPrompt();
             globalHotkeyRegistrar.FrontTerminalHotkeyPressed += (_, _) =>
                 globalHotkeyActionService.ActivateFrontTerminal();
             globalHotkeyRegistrar.RegisterDefaultHotkeys();
@@ -135,6 +141,7 @@ namespace HaloCreek
                 sessionLifecycleService,
                 sessionHistoryRefreshService,
                 tmuxService,
+                floatingPromptService,
                 globalHotkeyRegistrar);
         }
 
@@ -149,6 +156,7 @@ namespace HaloCreek
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
             private readonly TmuxService _tmuxService;
+            private readonly FloatingPromptService _floatingPromptService;
             private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
             private bool _isDisposed;
 
@@ -161,6 +169,7 @@ namespace HaloCreek
                 SessionLifecycleService sessionLifecycleService,
                 SessionHistoryRefreshService sessionHistoryRefreshService,
                 TmuxService tmuxService,
+                FloatingPromptService floatingPromptService,
                 GlobalHotkeyRegistrar globalHotkeyRegistrar)
             {
                 MainWindowViewModel = mainWindowViewModel;
@@ -171,6 +180,8 @@ namespace HaloCreek
                 _sessionLifecycleService = sessionLifecycleService;
                 _sessionHistoryRefreshService = sessionHistoryRefreshService;
                 _tmuxService = tmuxService;
+                _floatingPromptService = floatingPromptService
+                    ?? throw new ArgumentNullException(nameof(floatingPromptService));
                 _globalHotkeyRegistrar = globalHotkeyRegistrar
                     ?? throw new ArgumentNullException(nameof(globalHotkeyRegistrar));
             }
@@ -186,6 +197,7 @@ namespace HaloCreek
 
                 _isDisposed = true;
                 _globalHotkeyRegistrar.Dispose();
+                _floatingPromptService.Dispose();
                 _workspaceFooter.Dispose();
                 _promptEditor.Dispose();
                 _review.Dispose();

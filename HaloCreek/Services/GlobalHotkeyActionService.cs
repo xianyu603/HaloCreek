@@ -1,5 +1,4 @@
 using System;
-using Avalonia.Controls;
 using Avalonia.Threading;
 using HaloCreek.Logging;
 
@@ -7,35 +6,30 @@ namespace HaloCreek.Services
 {
     public sealed class GlobalHotkeyActionService
     {
-        private readonly Window _mainWindow;
+        private readonly FloatingPromptService _floatingPromptService;
         private readonly SessionLifecycleService _sessionLifecycleService;
 
         public GlobalHotkeyActionService(
-            Window mainWindow,
+            FloatingPromptService floatingPromptService,
             SessionLifecycleService sessionLifecycleService)
         {
-            _mainWindow = mainWindow ?? throw new ArgumentNullException(nameof(mainWindow));
+            _floatingPromptService = floatingPromptService
+                ?? throw new ArgumentNullException(nameof(floatingPromptService));
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
         }
 
-        public void ActivateMainWindow()
+        public void ActivateFloatingPrompt()
         {
             Dispatcher.UIThread.Post(() =>
             {
                 try
                 {
-                    if (_mainWindow.WindowState == WindowState.Minimized)
-                    {
-                        _mainWindow.WindowState = WindowState.Normal;
-                    }
-
-                    _mainWindow.Show();
-                    _mainWindow.Activate();
+                    _floatingPromptService.ShowOrActivate();
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("GlobalHotkey", ex, "Failed to activate main window from global hotkey.");
+                    Log.Error("GlobalHotkey", ex, "Failed to activate floating prompt from global hotkey.");
                 }
             });
         }
