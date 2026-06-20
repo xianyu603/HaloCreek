@@ -89,7 +89,7 @@ namespace HaloCreek
             var completionCoordinator = new CompletionCoordinator(
                 new Dictionary<char, ICompletionSource>
                 {
-                    [DummyCompletionSource.TriggerCharacter] = new DummyCompletionSource(),
+                    [ShortcutPhraseCompletionSource.TriggerCharacter] = new ShortcutPhraseCompletionSource(),
                 });
             var floatingPromptService = new FloatingPromptService(
                 sessionLifecycleService,
