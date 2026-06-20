@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -83,7 +84,11 @@ namespace HaloCreek
             var gitService = new GitService();
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
-            var completionCoordinator = new CompletionCoordinator();
+            var completionCoordinator = new CompletionCoordinator(
+                new Dictionary<char, ICompletionSource>
+                {
+                    [DummyCompletionSource.TriggerCharacter] = new DummyCompletionSource(),
+                });
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
