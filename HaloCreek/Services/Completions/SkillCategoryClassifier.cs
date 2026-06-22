@@ -21,6 +21,23 @@ namespace HaloCreek.Services.Completions
             OtherCategoryName,
         ];
 
+        private static readonly IReadOnlyDictionary<string, string> CategoryDescriptions =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [InformationCategoryName] = "Docs, APIs, references, and read-only context.",
+                [CodingCategoryName] = "Implementation, editing, refactoring, and code review.",
+                [ActionCategoryName] = "Build, test, launch, publish, or generate assets.",
+                [ManagementCategoryName] = "Create, install, configure, and manage skills/plugins.",
+                [OtherCategoryName] = "Items that do not fit a stable category yet.",
+            };
+
+        public static string GetDescription(string categoryName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(categoryName);
+
+            return CategoryDescriptions[categoryName];
+        }
+
         public static string Classify(SkillCatalogItem item)
         {
             ArgumentNullException.ThrowIfNull(item);

@@ -1,9 +1,15 @@
+using System.Collections.Generic;
+
 namespace HaloCreek.Services.Completions
 {
     internal sealed record SkillCatalogItem(
         string Name,
-        string? Description,
-        SkillSourceKind Source);
+        string? Description);
+
+    internal sealed record SkillCatalogSource(
+        SkillSourceKind Source,
+        string DirectoryPath,
+        IReadOnlyList<SkillCatalogItem> Skills);
 
     internal enum SkillSourceKind
     {

@@ -38,19 +38,19 @@ namespace HaloCreek.Services.Completions
                 : homeDirectoryPath;
         }
 
-        public IReadOnlyList<SkillCatalogItem> ReadCatalog()
+        public IReadOnlyList<SkillCatalogSource> ReadCatalog()
         {
-            var items = new List<SkillCatalogItem>();
+            var sources = new List<SkillCatalogSource>();
             foreach (var directory in GetSourceDirectories())
             {
-                items.AddRange(ReadSourceDirectory(directory));
+                sources.Add(ReadSourceDirectory(directory));
             }
 
-            LogCatalogSummary(items);
-            return items;
+            LogCatalogSummary(sources);
+            return sources;
         }
 
-        private IReadOnlyList<SkillCatalogItem> ReadSourceDirectory(SkillSourceDirectory sourceDirectory)
+        private SkillCatalogSource ReadSourceDirectory(SkillSourceDirectory sourceDirectory)
         {
             var directoryPath = sourceDirectory.DirectoryPath;
             if (!Directory.Exists(directoryPath))
@@ -58,17 +58,25 @@ namespace HaloCreek.Services.Completions
                 Log.Warning(
                     LogCategory,
                     $"Skill source directory does not exist. Source={sourceDirectory.Source}, Path={directoryPath}");
-                return Array.Empty<SkillCatalogItem>();
+                return new SkillCatalogSource(
+                    sourceDirectory.Source,
+                    sourceDirectory.DirectoryPath,
+                    Array.Empty<SkillCatalogItem>());
             }
 
             try
             {
-                return Directory.EnumerateDirectories(directoryPath)
+                var skills = Directory.EnumerateDirectories(directoryPath)
                     .Where(ShouldReadSkillDirectory)
                     .Select(skillDirectory => ReadSkillDirectory(sourceDirectory, skillDirectory))
                     .Where(item => item is not null)
                     .Select(item => item!)
                     .ToArray();
+
+                return new SkillCatalogSource(
+                    sourceDirectory.Source,
+                    sourceDirectory.DirectoryPath,
+                    skills);
             }
             catch (Exception ex) when (ex is IOException
                 or UnauthorizedAccessException
@@ -77,7 +85,10 @@ namespace HaloCreek.Services.Completions
                 Log.Warning(
                     LogCategory,
                     $"Skill source directory could not be read. Source={sourceDirectory.Source}, Path={directoryPath}, Error={ex.Message}");
-                return Array.Empty<SkillCatalogItem>();
+                return new SkillCatalogSource(
+                    sourceDirectory.Source,
+                    sourceDirectory.DirectoryPath,
+                    Array.Empty<SkillCatalogItem>());
             }
         }
 
@@ -108,8 +119,7 @@ namespace HaloCreek.Services.Completions
 
                 return new SkillCatalogItem(
                     name,
-                    string.IsNullOrWhiteSpace(metadata.Description) ? null : metadata.Description.Trim(),
-                    sourceDirectory.Source);
+                    string.IsNullOrWhiteSpace(metadata.Description) ? null : metadata.Description.Trim());
             }
             catch (Exception ex) when (ex is IOException
                 or UnauthorizedAccessException
@@ -229,21 +239,22 @@ namespace HaloCreek.Services.Completions
             return directories;
         }
 
-        private static void LogCatalogSummary(IReadOnlyList<SkillCatalogItem> items)
+        private static void LogCatalogSummary(IReadOnlyList<SkillCatalogSource> sources)
         {
-            foreach (var source in Enum.GetValues<SkillSourceKind>())
+            foreach (var source in sources)
             {
-                var sourceItems = items
-                    .Where(item => item.Source == source)
+                var sourceItems = source.Skills
                     .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
                     .ToArray();
 
-                Log.Debug(LogCategory, $"Source={source}, Count={sourceItems.Length}");
+                Log.Debug(
+                    LogCategory,
+                    $"Source={source.Source}, Path={source.DirectoryPath}, Count={sourceItems.Length}");
                 foreach (var item in sourceItems)
                 {
                     Log.Debug(
                         LogCategory,
-                        $"Source={item.Source}, Name={item.Name}");
+                        $"Source={source.Source}, Name={item.Name}");
                 }
             }
         }
