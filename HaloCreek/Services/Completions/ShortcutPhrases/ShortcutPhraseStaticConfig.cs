@@ -31,6 +31,11 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
                         [],
                         "写方案并落盘",
                         "参考之前的信息，落盘一个方案到docs/"),
+                    new(
+                        "方案审阅",
+                        [],
+                        "审阅工作区方案",
+                        "审阅工作区方案，重点看有没有明显的矛盾或风险。"),
                 ]),
             new(
                 "范围",
