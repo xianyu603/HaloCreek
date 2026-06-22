@@ -89,11 +89,11 @@ namespace HaloCreek
             var skillCatalogReader = new SkillCatalogReader(
                 WorkspaceRuntime.Current.WorkspacePath,
                 appCommonRuntime.PlatformInfrastructure);
-            skillCatalogReader.ReadCatalog();
             var completionCoordinator = new CompletionCoordinator(
                 new Dictionary<char, ICompletionSource>
                 {
                     [ShortcutPhraseCompletionSource.TriggerCharacter] = new ShortcutPhraseCompletionSource(),
+                    [SkillCompletionSource.TriggerCharacter] = new SkillCompletionSource(skillCatalogReader),
                 });
             var floatingPromptService = new FloatingPromptService(
                 sessionLifecycleService,
