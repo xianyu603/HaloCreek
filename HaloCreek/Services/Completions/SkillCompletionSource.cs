@@ -11,8 +11,6 @@ namespace HaloCreek.Services.Completions
     {
         public const char TriggerCharacter = '$';
 
-        private const string FixedCategoryName = "其他";
-
         private static readonly SkillSourceKind[] SourceOrder =
         [
             SkillSourceKind.Project,
@@ -24,11 +22,8 @@ namespace HaloCreek.Services.Completions
         private static readonly IReadOnlyDictionary<string, SkillSourceKind> SourceExactTokens =
             BuildSourceExactTokenIndex();
 
-        private static readonly string[] FixedCategoryExactTokens =
-        [
-            FixedCategoryName,
-            "other",
-        ];
+        private static readonly IReadOnlyDictionary<string, string> CategoryExactTokens =
+            BuildCategoryExactTokenIndex();
 
         private readonly IReadOnlyList<SkillCatalogItem> _items;
 
@@ -66,23 +61,17 @@ namespace HaloCreek.Services.Completions
                 .Select(group => new PromptCompletionItem
                 {
                     Title = group.Source.ToString(),
-                    Children =
-                    [
-                        new PromptCompletionItem
-                        {
-                            Title = FixedCategoryName,
-                            Children = group.Skills.Select(BuildSkillItem).ToArray(),
-                        },
-                    ],
+                    Children = BuildCategoryItems(group.Skills),
                 })
                 .ToArray();
         }
 
         private IReadOnlyList<PromptCompletionItem> BuildQueriedItems(string query)
         {
-            if (FixedCategoryExactTokens.Contains(query, StringComparer.OrdinalIgnoreCase))
+            if (CategoryExactTokens.TryGetValue(query, out var category))
             {
                 return GetSortedSkills(_items)
+                    .Where(item => SkillCategoryClassifier.Classify(item) == category)
                     .Select(BuildSkillItem)
                     .ToArray();
             }
@@ -95,14 +84,7 @@ namespace HaloCreek.Services.Completions
                     return Array.Empty<PromptCompletionItem>();
                 }
 
-                return
-                [
-                    new PromptCompletionItem
-                    {
-                        Title = FixedCategoryName,
-                        Children = skills.Select(BuildSkillItem).ToArray(),
-                    },
-                ];
+                return BuildCategoryItems(skills);
             }
 
             var exactSkillMatches = GetSortedSkills(_items)
@@ -121,6 +103,26 @@ namespace HaloCreek.Services.Completions
         private IEnumerable<SkillCatalogItem> GetSourceSkills(SkillSourceKind source)
         {
             return GetSortedSkills(_items.Where(item => item.Source == source));
+        }
+
+        private static IReadOnlyList<PromptCompletionItem> BuildCategoryItems(
+            IEnumerable<SkillCatalogItem> skills)
+        {
+            var skillArray = skills.ToArray();
+            return SkillCategoryClassifier.CategoryOrder
+                .Select(category => new
+                {
+                    Category = category,
+                    Skills = GetSortedSkills(skillArray.Where(item =>
+                        SkillCategoryClassifier.Classify(item) == category)).ToArray(),
+                })
+                .Where(group => group.Skills.Length > 0)
+                .Select(group => new PromptCompletionItem
+                {
+                    Title = group.Category,
+                    Children = group.Skills.Select(BuildSkillItem).ToArray(),
+                })
+                .ToArray();
         }
 
         private static PromptCompletionItem BuildSkillItem(SkillCatalogItem skill)
@@ -164,7 +166,7 @@ namespace HaloCreek.Services.Completions
             }
 
             if (containsQuery(item.Source.ToString())
-                || containsQuery(FixedCategoryName))
+                || containsQuery(SkillCategoryClassifier.Classify(item)))
             {
                 return 2;
             }
@@ -203,6 +205,26 @@ namespace HaloCreek.Services.Completions
             addSourceTokens(SkillSourceKind.User, ["user", "personal"]);
             addSourceTokens(SkillSourceKind.Other, ["other"]);
             return sourceByToken;
+        }
+
+        private static IReadOnlyDictionary<string, string> BuildCategoryExactTokenIndex()
+        {
+            var categoryByToken = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Action<string, string[]> addCategoryTokens = (category, aliases) =>
+            {
+                categoryByToken[category] = category;
+                foreach (var alias in aliases)
+                {
+                    categoryByToken[alias] = category;
+                }
+            };
+
+            addCategoryTokens(SkillCategoryClassifier.InformationCategoryName, ["info", "docs"]);
+            addCategoryTokens(SkillCategoryClassifier.CodingCategoryName, ["code", "review"]);
+            addCategoryTokens(SkillCategoryClassifier.ActionCategoryName, ["run", "build"]);
+            addCategoryTokens(SkillCategoryClassifier.ManagementCategoryName, ["manage", "config"]);
+            addCategoryTokens(SkillCategoryClassifier.OtherCategoryName, ["other"]);
+            return categoryByToken;
         }
     }
 }
