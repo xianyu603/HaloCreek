@@ -37,6 +37,28 @@ namespace HaloCreek.Services
             return new GitChangesResult(changes, loadedMessage, workspacePath);
         }
 
+        public IReadOnlyList<string> GetRecentCommittedFilePaths(int commitCount)
+        {
+            if (commitCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(commitCount), "Commit count must be positive.");
+            }
+
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            var commandResult = RunGit(
+                workspacePath,
+                new[] { "log", "-n", commitCount.ToString(), "--name-only", "--pretty=format:" });
+            if (!commandResult.Succeeded)
+            {
+                var message = commandResult.ErrorMessage.Trim();
+                throw new InvalidOperationException($"Git recent committed file query failed. {message}");
+            }
+
+            return commandResult.Output
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                .ToArray();
+        }
+
         public string? GetHeadBlobId(string? relativePath)
         {
             var workspacePath = WorkspaceRuntime.Current.GitRootPath;

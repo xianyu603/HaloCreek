@@ -297,6 +297,17 @@ namespace HaloCreek.Infrastructure
                 NormalizePathForCurrentPlatform(relativePath));
         }
 
+        public static bool IsExistingFileUnderDirectory(string? rootPath, string? relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(rootPath) || string.IsNullOrWhiteSpace(relativePath))
+            {
+                return false;
+            }
+
+            var absolutePath = CombinePathForCurrentPlatform(rootPath, relativePath);
+            return File.Exists(absolutePath) && !Directory.Exists(absolutePath);
+        }
+
         public static string WriteTempFile(string desiredFileName, string content)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(desiredFileName);

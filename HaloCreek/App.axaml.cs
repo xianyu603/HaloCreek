@@ -10,6 +10,7 @@ using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Services;
 using HaloCreek.Services.Completions;
+using HaloCreek.Services.Completions.Files;
 using HaloCreek.Services.Completions.ShortcutPhrases;
 using HaloCreek.Services.Completions.Skills;
 using HaloCreek.Services.SessionHistory;
@@ -96,6 +97,8 @@ namespace HaloCreek
                 {
                     [ShortcutPhraseCompletionSource.TriggerCharacter] = new ShortcutPhraseCompletionSource(),
                     [SkillCompletionSource.TriggerCharacter] = new SkillCompletionSource(skillCatalogReader),
+                    [FileCompletionSource.TriggerCharacter] = new FileCompletionSource(
+                        new FileCompletionCandidateReader(gitService)),
                 });
             var floatingPromptService = new FloatingPromptService(
                 sessionLifecycleService,
