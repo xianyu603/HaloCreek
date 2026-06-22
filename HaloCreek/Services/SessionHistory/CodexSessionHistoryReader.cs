@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using HaloCreek.Infrastructure;
+using HaloCreek.Logging;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services.SessionHistory
@@ -13,6 +14,7 @@ namespace HaloCreek.Services.SessionHistory
         private const string JsonlSearchPattern = "*.jsonl";
         private const string SessionsDirectoryName = "sessions";
         private const string CodexDirectoryName = ".codex";
+        private const string LogCategory = "SessionHistory";
         private static readonly EnumerationOptions SessionFileEnumerationOptions = new()
         {
             IgnoreInaccessible = true,
@@ -75,107 +77,24 @@ namespace HaloCreek.Services.SessionHistory
 
         private string? FindSessionHistoryRootPath()
         {
-            foreach (var candidatePath in GetSessionHistoryRootPathCandidates())
+            if (!_platformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath))
             {
-                if (Directory.Exists(candidatePath))
-                {
-                    return candidatePath;
-                }
+                return null;
             }
 
-            return null;
-        }
-
-        private IEnumerable<string> GetSessionHistoryRootPathCandidates()
-        {
-            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var candidatePath in GetCodexHomeSessionPathCandidates())
+            var sessionHistoryRootPath = Path.Combine(
+                homeDirectoryPath,
+                CodexDirectoryName,
+                SessionsDirectoryName);
+            if (!Directory.Exists(sessionHistoryRootPath))
             {
-                if (seenPaths.Add(candidatePath))
-                {
-                    yield return candidatePath;
-                }
+                Log.Warning(
+                    LogCategory,
+                    $"Codex session history directory does not exist. Path={sessionHistoryRootPath}");
+                return null;
             }
 
-            foreach (var homePath in GetHomePathCandidates())
-            {
-                var sessionHistoryPath = AppendPathSegments(
-                    homePath,
-                    CodexDirectoryName,
-                    SessionsDirectoryName);
-                foreach (var candidatePath in ExpandReadablePathCandidates(sessionHistoryPath))
-                {
-                    if (seenPaths.Add(candidatePath))
-                    {
-                        yield return candidatePath;
-                    }
-                }
-            }
-        }
-
-        private IEnumerable<string> GetCodexHomeSessionPathCandidates()
-        {
-            var codexHome = Environment.GetEnvironmentVariable("CODEX_HOME");
-            if (!string.IsNullOrWhiteSpace(codexHome))
-            {
-                foreach (var candidatePath in ExpandReadablePathCandidates(
-                    AppendPathSegments(codexHome, SessionsDirectoryName)))
-                {
-                    yield return candidatePath;
-                }
-            }
-
-            if (_platformInfrastructure.TryGetWslEnvironmentVariable("CODEX_HOME", out var wslCodexHome))
-            {
-                foreach (var candidatePath in ExpandReadablePathCandidates(
-                    AppendPathSegments(wslCodexHome, SessionsDirectoryName)))
-                {
-                    yield return candidatePath;
-                }
-            }
-        }
-
-        private IEnumerable<string> GetHomePathCandidates()
-        {
-            var homeEnvironmentPath = Environment.GetEnvironmentVariable("HOME");
-            if (!string.IsNullOrWhiteSpace(homeEnvironmentPath))
-            {
-                yield return homeEnvironmentPath;
-            }
-
-            if (_platformInfrastructure.TryGetWslEnvironmentVariable("HOME", out var wslHomePath))
-            {
-                yield return wslHomePath;
-            }
-
-            var userProfilePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (!string.IsNullOrWhiteSpace(userProfilePath))
-            {
-                yield return userProfilePath;
-            }
-        }
-
-        private IEnumerable<string> ExpandReadablePathCandidates(string path)
-        {
-            yield return path;
-
-            foreach (var candidatePath in _platformInfrastructure.GetReadableWslPathCandidates(path))
-            {
-                yield return candidatePath;
-            }
-        }
-
-        private static string AppendPathSegments(string path, params string[] segments)
-        {
-            var separator = path.Contains('/')
-                && !path.Contains('\\')
-                    ? '/'
-                    : Path.DirectorySeparatorChar;
-
-            return path.TrimEnd('/', '\\')
-                + separator
-                + string.Join(separator.ToString(), segments);
+            return sessionHistoryRootPath;
         }
 
         private static IReadOnlyList<SessionFileMetadata> EnumerateLatestSessionFiles(

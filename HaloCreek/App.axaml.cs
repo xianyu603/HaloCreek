@@ -86,6 +86,10 @@ namespace HaloCreek
             var gitService = new GitService();
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
+            var skillCatalogReader = new SkillCatalogReader(
+                WorkspaceRuntime.Current.WorkspacePath,
+                appCommonRuntime.PlatformInfrastructure);
+            skillCatalogReader.ReadCatalog();
             var completionCoordinator = new CompletionCoordinator(
                 new Dictionary<char, ICompletionSource>
                 {

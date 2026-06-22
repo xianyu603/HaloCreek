@@ -12,6 +12,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.Input;
+using HaloCreek.Logging;
 using HaloCreek.Services;
 
 namespace HaloCreek.Infrastructure
@@ -25,6 +26,7 @@ namespace HaloCreek.Infrastructure
 
     public sealed class PlatformInfrastructure
     {
+        private const string LogCategory = "Platform";
         private const int WslCommandTimeoutMilliseconds = 10000;
 
         private readonly Window _owner;
@@ -456,29 +458,64 @@ namespace HaloCreek.Infrastructure
             return !string.IsNullOrWhiteSpace(value);
         }
 
-        public IReadOnlyList<string> GetReadableWslPathCandidates(string wslPath)
+        public bool TryGetReadableWslHomeDirectoryPath(out string homeDirectoryPath)
         {
+            homeDirectoryPath = string.Empty;
+
+            if (!TryGetWslEnvironmentVariable("HOME", out var wslHomeDirectoryPath))
+            {
+                Log.Warning(LogCategory, "WSL HOME could not be resolved.");
+                return false;
+            }
+
+            if (!TryConvertWslPathToReadablePath(wslHomeDirectoryPath, out var readableHomeDirectoryPath))
+            {
+                Log.Warning(
+                    LogCategory,
+                    $"WSL HOME could not be converted to a readable path. WslHome={wslHomeDirectoryPath}");
+                return false;
+            }
+
+            if (!Directory.Exists(readableHomeDirectoryPath))
+            {
+                Log.Warning(
+                    LogCategory,
+                    $"Converted WSL HOME directory does not exist. WslHome={wslHomeDirectoryPath}, ReadablePath={readableHomeDirectoryPath}");
+                return false;
+            }
+
+            homeDirectoryPath = readableHomeDirectoryPath;
+            return true;
+        }
+
+        public bool TryConvertWslPathToReadablePath(string wslPath, out string readablePath)
+        {
+            readablePath = string.Empty;
+
             if (string.IsNullOrWhiteSpace(wslPath))
             {
-                return Array.Empty<string>();
+                return false;
             }
 
             var normalizedWslPath = wslPath.Trim().Replace('\\', '/');
             if (!normalizedWslPath.StartsWith("/", StringComparison.Ordinal)
                 || !OperatingSystem.IsWindows())
             {
-                return new[] { normalizedWslPath };
+                readablePath = normalizedWslPath;
+                return true;
             }
 
-            var windowsPathSuffix = normalizedWslPath.Replace('/', '\\');
-            var candidates = new List<string>();
-            foreach (var distributionName in GetWslDistributionNames())
+            var distributionName = GetWslDistributionNames().FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(distributionName))
             {
-                candidates.Add(@"\\wsl.localhost\" + distributionName + windowsPathSuffix);
-                candidates.Add(@"\\wsl$\" + distributionName + windowsPathSuffix);
+                Log.Warning(
+                    LogCategory,
+                    $"WSL path could not be converted because no WSL distribution was resolved. WslPath={wslPath}");
+                return false;
             }
 
-            return candidates;
+            readablePath = @"\\wsl.localhost\" + distributionName + normalizedWslPath.Replace('/', '\\');
+            return true;
         }
 
         public bool TryGetWslFileLastWriteTimeUtc(
@@ -492,31 +529,31 @@ namespace HaloCreek.Infrastructure
                 return false;
             }
 
-            foreach (var candidatePath in GetReadableWslPathCandidates(wslPath))
+            if (!TryConvertWslPathToReadablePath(wslPath, out var readablePath))
             {
-                try
-                {
-                    if (!File.Exists(candidatePath))
-                    {
-                        continue;
-                    }
-
-                    lastWriteTimeUtc = new DateTimeOffset(
-                        File.GetLastWriteTimeUtc(candidatePath),
-                        TimeSpan.Zero);
-                    return true;
-                }
-                catch (Exception ex) when (ex is IOException
-                    or NotSupportedException
-                    or UnauthorizedAccessException
-                    or ArgumentException
-                    or PathTooLongException)
-                {
-                    continue;
-                }
+                return false;
             }
 
-            return false;
+            try
+            {
+                if (!File.Exists(readablePath))
+                {
+                    return false;
+                }
+
+                lastWriteTimeUtc = new DateTimeOffset(
+                    File.GetLastWriteTimeUtc(readablePath),
+                    TimeSpan.Zero);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException
+                or NotSupportedException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or PathTooLongException)
+            {
+                return false;
+            }
         }
 
         public Process? LaunchWslTerminalCommand(

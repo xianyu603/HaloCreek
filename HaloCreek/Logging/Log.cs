@@ -21,6 +21,13 @@ namespace HaloCreek.Logging
         private static readonly object WriterLock = new();
         private static StreamWriter? _writer;
 
+        public static LogLevel MinimumLevel { get; set; } =
+#if DEBUG
+            LogLevel.Debug;
+#else
+            LogLevel.Info;
+#endif
+
         public static void InitializeFileOutput()
         {
             var logDirectoryPath = GetDefaultLogDirectoryPath();
@@ -74,6 +81,11 @@ namespace HaloCreek.Logging
 
         public static void Write(LogLevel level, string category, string message)
         {
+            if (level < MinimumLevel)
+            {
+                return;
+            }
+
             ArgumentException.ThrowIfNullOrWhiteSpace(category);
             ArgumentNullException.ThrowIfNull(message);
 
