@@ -5,7 +5,7 @@ using System.Linq;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 
-namespace HaloCreek.Services.Completions
+namespace HaloCreek.Services.Completions.Skills
 {
     internal sealed class SkillCatalogReader
     {

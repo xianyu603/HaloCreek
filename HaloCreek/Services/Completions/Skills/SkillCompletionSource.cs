@@ -4,8 +4,9 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using HaloCreek.Models;
+using HaloCreek.Services.Completions;
 
-namespace HaloCreek.Services.Completions
+namespace HaloCreek.Services.Completions.Skills
 {
     internal sealed class SkillCompletionSource : ICompletionSource
     {

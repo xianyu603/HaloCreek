@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace HaloCreek.Services.Completions
+namespace HaloCreek.Services.Completions.Skills
 {
     internal static class SkillCategoryClassifier
     {

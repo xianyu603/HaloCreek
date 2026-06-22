@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace HaloCreek.Services.Completions
+namespace HaloCreek.Services.Completions.ShortcutPhrases
 {
     internal static class ShortcutPhraseStaticConfig
     {

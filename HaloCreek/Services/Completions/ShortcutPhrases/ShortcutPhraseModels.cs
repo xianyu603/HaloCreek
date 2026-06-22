@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace HaloCreek.Services.Completions
+namespace HaloCreek.Services.Completions.ShortcutPhrases
 {
     internal sealed record ShortcutPhraseCategory(
         string Name,

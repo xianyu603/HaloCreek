@@ -5,8 +5,9 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using HaloCreek.Logging;
 using HaloCreek.Models;
+using HaloCreek.Services.Completions;
 
-namespace HaloCreek.Services.Completions
+namespace HaloCreek.Services.Completions.ShortcutPhrases
 {
     public sealed class ShortcutPhraseCompletionSource : ICompletionSource
     {

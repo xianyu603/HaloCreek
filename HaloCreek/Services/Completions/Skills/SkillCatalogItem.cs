@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace HaloCreek.Services.Completions
+namespace HaloCreek.Services.Completions.Skills
 {
     internal sealed record SkillCatalogItem(
         string Name,

@@ -10,6 +10,8 @@ using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Services;
 using HaloCreek.Services.Completions;
+using HaloCreek.Services.Completions.ShortcutPhrases;
+using HaloCreek.Services.Completions.Skills;
 using HaloCreek.Services.SessionHistory;
 using HaloCreek.ViewModels;
 using HaloCreek.ViewModels.Components;
