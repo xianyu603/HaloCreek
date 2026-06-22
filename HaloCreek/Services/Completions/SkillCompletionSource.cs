@@ -13,13 +13,21 @@ namespace HaloCreek.Services.Completions
 
         private const string FixedCategoryName = "其他";
 
-        // 这个实际上起到两个作用 1. 全体来源集合 2. 来源顺序 有点混淆之后再多考虑拆分
         private static readonly SkillSourceKind[] SourceOrder =
         [
             SkillSourceKind.Project,
             SkillSourceKind.System,
             SkillSourceKind.User,
             SkillSourceKind.Other,
+        ];
+
+        private static readonly IReadOnlyDictionary<string, SkillSourceKind> SourceExactTokens =
+            BuildSourceExactTokenIndex();
+
+        private static readonly string[] FixedCategoryExactTokens =
+        [
+            FixedCategoryName,
+            "other",
         ];
 
         private readonly IReadOnlyList<SkillCatalogItem> _items;
@@ -37,7 +45,7 @@ namespace HaloCreek.Services.Completions
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var query = text ?? string.Empty;
+            var query = (text ?? string.Empty).Trim();
             var items = string.IsNullOrEmpty(query)
                 ? BuildSourceItems()
                 : BuildQueriedItems(query);
@@ -49,50 +57,70 @@ namespace HaloCreek.Services.Completions
         private IReadOnlyList<PromptCompletionItem> BuildSourceItems()
         {
             return SourceOrder
-                .Select(source => BuildSourceItem(source))
-                .Where(item => item is not null)
-                .Select(item => item!)
+                .Select(source => new
+                {
+                    Source = source,
+                    Skills = GetSourceSkills(source).ToArray(),
+                })
+                .Where(group => group.Skills.Length > 0)
+                .Select(group => new PromptCompletionItem
+                {
+                    Title = group.Source.ToString(),
+                    Children =
+                    [
+                        new PromptCompletionItem
+                        {
+                            Title = FixedCategoryName,
+                            Children = group.Skills.Select(BuildSkillItem).ToArray(),
+                        },
+                    ],
+                })
                 .ToArray();
-        }
-
-        private PromptCompletionItem? BuildSourceItem(SkillSourceKind source)
-        {
-            var sourceSkills = GetSourceSkills(source).ToArray();
-            if (sourceSkills.Length == 0)
-            {
-                return null;
-            }
-
-            return new PromptCompletionItem
-            {
-                Title = source.ToString(),
-                Children =
-                [
-                    new PromptCompletionItem
-                    {
-                        Title = FixedCategoryName,
-                        Children = sourceSkills.Select(BuildSkillItem).ToArray(),
-                    },
-                ],
-            };
         }
 
         private IReadOnlyList<PromptCompletionItem> BuildQueriedItems(string query)
         {
-            // 这里需要在下一step 扩充规则
-            return _items
-                .Where(item => ContainsQuery(item.Name, query))
-                .OrderBy(GetSourceRank)
-                .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            if (FixedCategoryExactTokens.Contains(query, StringComparer.OrdinalIgnoreCase))
+            {
+                return GetSortedSkills(_items)
+                    .Select(BuildSkillItem)
+                    .ToArray();
+            }
+
+            if (SourceExactTokens.TryGetValue(query, out var source))
+            {
+                var skills = GetSourceSkills(source).ToArray();
+                if (skills.Length == 0)
+                {
+                    return Array.Empty<PromptCompletionItem>();
+                }
+
+                return
+                [
+                    new PromptCompletionItem
+                    {
+                        Title = FixedCategoryName,
+                        Children = skills.Select(BuildSkillItem).ToArray(),
+                    },
+                ];
+            }
+
+            var exactSkillMatches = GetSortedSkills(_items)
+                .Where(item => string.Equals(item.Name, query, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            var exactSkillMatchSet = new HashSet<SkillCatalogItem>(exactSkillMatches);
+            var fuzzyMatches = GetSortedFuzzyMatches(query)
+                .Where(item => !exactSkillMatchSet.Contains(item));
+
+            return exactSkillMatches
+                .Concat(fuzzyMatches)
                 .Select(BuildSkillItem)
                 .ToArray();
         }
 
         private IEnumerable<SkillCatalogItem> GetSourceSkills(SkillSourceKind source)
         {
-            return _items
-                .Where(item => item.Source == source)
-                .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase);
+            return GetSortedSkills(_items.Where(item => item.Source == source));
         }
 
         private static PromptCompletionItem BuildSkillItem(SkillCatalogItem skill)
@@ -100,32 +128,81 @@ namespace HaloCreek.Services.Completions
             return new PromptCompletionItem
             {
                 Title = skill.Name,
-                Description = FormatSkillDescription(skill),
+                Description = skill.Description,
                 InsertText = TriggerCharacter + skill.Name,
             };
         }
 
-        private static string FormatSkillDescription(SkillCatalogItem skill)
+        private IEnumerable<SkillCatalogItem> GetSortedFuzzyMatches(string query)
         {
-            var prefix = $"{skill.Source} · {FixedCategoryName}";
-            if (string.IsNullOrWhiteSpace(skill.Description))
-            {
-                return prefix;
-            }
-
-            // prefix 没什么信息量 直接用description就好
-            return $"{skill.Description}";
+            return _items
+                .Select(item => new
+                {
+                    Item = item,
+                    Rank = GetMatchRank(item, query),
+                })
+                .Where(match => match.Rank is not null)
+                .OrderBy(match => match.Rank)
+                .ThenBy(match => GetSourceRank(match.Item))
+                .ThenBy(match => match.Item.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(match => match.Item);
         }
 
-        private static bool ContainsQuery(string? text, string query)
+        private static int? GetMatchRank(SkillCatalogItem item, string query)
         {
-            return text?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
+            Func<string?, bool> containsQuery = text =>
+                text?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
+
+            if (containsQuery(item.Name))
+            {
+                return 0;
+            }
+
+            if (containsQuery(item.Description))
+            {
+                return 1;
+            }
+
+            if (containsQuery(item.Source.ToString())
+                || containsQuery(FixedCategoryName))
+            {
+                return 2;
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<SkillCatalogItem> GetSortedSkills(IEnumerable<SkillCatalogItem> items)
+        {
+            return items
+                .OrderBy(GetSourceRank)
+                .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase);
         }
 
         private static int GetSourceRank(SkillCatalogItem item)
         {
             var index = Array.IndexOf(SourceOrder, item.Source);
             return index < 0 ? SourceOrder.Length : index;
+        }
+
+        // 下面两个只服务于初始化 未来考虑拆个类
+        private static IReadOnlyDictionary<string, SkillSourceKind> BuildSourceExactTokenIndex()
+        {
+            var sourceByToken = new Dictionary<string, SkillSourceKind>(StringComparer.OrdinalIgnoreCase);
+            Action<SkillSourceKind, string[]> addSourceTokens = (source, aliases) =>
+            {
+                sourceByToken[source.ToString()] = source;
+                foreach (var alias in aliases)
+                {
+                    sourceByToken[alias] = source;
+                }
+            };
+
+            addSourceTokens(SkillSourceKind.Project, ["project", "workspace"]);
+            addSourceTokens(SkillSourceKind.System, ["system", "builtin"]);
+            addSourceTokens(SkillSourceKind.User, ["user", "personal"]);
+            addSourceTokens(SkillSourceKind.Other, ["other"]);
+            return sourceByToken;
         }
     }
 }
