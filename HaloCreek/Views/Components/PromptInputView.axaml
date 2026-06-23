@@ -41,6 +41,10 @@
                 <KeyBinding Gesture="Ctrl+Enter"
                             Command="{Binding LaunchCommand}"/>
             </TextBox.KeyBindings>
+            <TextBox.ContextMenu>
+                <ContextMenu Opened="PromptContextMenu_OnOpened"
+                             Closed="PromptContextMenu_OnClosed"/>
+            </TextBox.ContextMenu>
         </TextBox>
 
         <ItemsControl x:Name="CompletionMenu"

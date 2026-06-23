@@ -6,6 +6,7 @@ using Avalonia.Controls.Presenters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using HaloCreek.Models;
 using HaloCreek.ViewModels.Components;
 
 namespace HaloCreek.Views.Components
@@ -53,6 +54,96 @@ namespace HaloCreek.Views.Components
             {
                 UpdateCompletionMenuPosition();
             }
+        }
+
+        private void PromptContextMenu_OnOpened(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not ContextMenu menu
+                || DataContext is not PromptInputViewModel { TemplatePicker.HasItems: true } viewModel)
+            {
+                return;
+            }
+
+            var templateItems = viewModel.TemplatePicker.Items
+                .Select(CreateTemplateMenuItem)
+                .ToList();
+            var templatesMenuItem = new MenuItem
+            {
+                Header = "Templates",
+                ItemsSource = templateItems,
+            };
+
+            menu.ItemsSource = new[] { templatesMenuItem };
+        }
+
+        private void PromptContextMenu_OnClosed(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is PromptInputViewModel viewModel)
+            {
+                viewModel.TemplatePicker.HidePreview();
+            }
+        }
+
+        private MenuItem CreateTemplateMenuItem(PromptTemplateItem templateItem)
+        {
+            var menuItem = new MenuItem
+            {
+                Header = templateItem.Title,
+                Tag = templateItem,
+            };
+
+            menuItem.Click += TemplateMenuItem_OnClick;
+            menuItem.PropertyChanged += TemplateMenuItem_OnPropertyChanged;
+            return menuItem;
+        }
+
+        private void TemplateMenuItem_OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+        {
+            if (e.Property != MenuItem.IsSelectedProperty
+                || sender is not MenuItem { IsSelected: true, Tag: PromptTemplateItem templateItem }
+                || DataContext is not PromptInputViewModel viewModel)
+            {
+                return;
+            }
+
+            viewModel.TemplatePicker.ShowPreview(templateItem);
+        }
+
+        private void TemplateMenuItem_OnClick(object? sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem { Tag: PromptTemplateItem templateItem })
+            {
+                return;
+            }
+
+            InsertTemplateText(templateItem.InsertText);
+            e.Handled = true;
+        }
+
+        private void InsertTemplateText(string insertText)
+        {
+            // 这个逻辑写在这里感觉有点职责不清 选择到底是view还是vm管? 但是只为了纯度把选择绑到vm又有点重了
+            // 先不想那么多实现在这里 如果未来出现重复再考虑提取的事情
+            var text = PromptTextBox.Text ?? string.Empty;
+            var selectionStart = Math.Clamp(PromptTextBox.SelectionStart, 0, text.Length);
+            var selectionEnd = Math.Clamp(PromptTextBox.SelectionEnd, 0, text.Length);
+            var replaceStart = Math.Min(selectionStart, selectionEnd);
+            var replaceEnd = Math.Max(selectionStart, selectionEnd);
+            var prefix = replaceStart > 0 && !char.IsWhiteSpace(text[replaceStart - 1])
+                ? Environment.NewLine
+                : string.Empty;
+            var suffix = replaceEnd < text.Length && !char.IsWhiteSpace(text[replaceEnd])
+                ? Environment.NewLine
+                : string.Empty;
+            var replacement = prefix + insertText + suffix;
+            var updatedText = text[..replaceStart] + replacement + text[replaceEnd..];
+            var caretIndex = replaceStart + prefix.Length + insertText.Length;
+
+            PromptTextBox.Text = updatedText;
+            PromptTextBox.CaretIndex = caretIndex;
+            PromptTextBox.SelectionStart = caretIndex;
+            PromptTextBox.SelectionEnd = caretIndex;
+            PromptTextBox.Focus();
         }
 
         private void UpdateCompletionMenuPosition()

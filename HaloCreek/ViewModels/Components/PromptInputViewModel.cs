@@ -9,6 +9,7 @@ using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.Services.Completions;
+using HaloCreek.Services.PromptTemplates;
 
 namespace HaloCreek.ViewModels.Components
 {
@@ -45,6 +46,7 @@ namespace HaloCreek.ViewModels.Components
             _transientEventService = appCommonRuntime.TransientEventService;
             _completionCoordinator = completionCoordinator
                 ?? throw new ArgumentNullException(nameof(completionCoordinator));
+            TemplatePicker = new PromptTemplatePickerViewModel(PromptTemplateStaticConfig.Items);
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
             SendToFrontCommand = new RelayCommand(SendToFront, CanSendToFront);
@@ -81,6 +83,8 @@ namespace HaloCreek.ViewModels.Components
         }
 
         public string PlaceholderText => DefaultPlaceholderText;
+
+        public PromptTemplatePickerViewModel TemplatePicker { get; }
 
         public bool IsCompletionOpen
         {
