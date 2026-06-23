@@ -4,7 +4,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -348,32 +350,11 @@ namespace HaloCreek.Infrastructure
 
             try
             {
-                using var process = new Process();
-                process.StartInfo = new ProcessStartInfo
-                {
-                    FileName = fileName,
-                    WorkingDirectory = workingDirectory ?? string.Empty,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    StandardOutputEncoding = Encoding.UTF8,
-                    StandardErrorEncoding = Encoding.UTF8,
-                };
-
-                foreach (var argument in arguments)
-                {
-                    process.StartInfo.ArgumentList.Add(argument);
-                }
-
-                if (environmentVariables is not null)
-                {
-                    foreach (var pair in environmentVariables)
-                    {
-                        process.StartInfo.Environment[pair.Key] = pair.Value;
-                    }
-                }
-
+                using var process = CreateRedirectedProcess(
+                    fileName,
+                    arguments,
+                    workingDirectory,
+                    environmentVariables);
                 process.Start();
                 var output = process.StandardOutput.ReadToEnd();
                 var error = process.StandardError.ReadToEnd();
@@ -391,6 +372,145 @@ namespace HaloCreek.Infrastructure
                 or UnauthorizedAccessException)
             {
                 return new PlatformProcessResult(false, null, string.Empty, ex.Message, ex);
+            }
+        }
+
+        public static async IAsyncEnumerable<string> StreamNullSeparatedProcessOutput(
+            string fileName,
+            IEnumerable<string> arguments,
+            string? workingDirectory = null,
+            IReadOnlyDictionary<string, string?>? environmentVariables = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            using var process = CreateRedirectedProcess(
+                fileName,
+                arguments,
+                workingDirectory,
+                environmentVariables);
+
+            try
+            {
+                process.Start();
+            }
+            catch (Exception ex) when (ex is Win32Exception
+                or InvalidOperationException
+                or IOException
+                or UnauthorizedAccessException)
+            {
+                throw new InvalidOperationException($"Process failed to start. FileName={fileName}", ex);
+            }
+
+            using var cancellationRegistration = cancellationToken.Register(
+                static state => KillProcessTree((Process)state!),
+                process);
+
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            var tokenBuilder = new StringBuilder();
+            var buffer = new char[4096];
+
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var readCount = await process.StandardOutput.ReadAsync(
+                    buffer.AsMemory(0, buffer.Length),
+                    cancellationToken).ConfigureAwait(false);
+                if (readCount == 0)
+                {
+                    break;
+                }
+
+                var tokenStart = 0;
+                for (var index = 0; index < readCount; index++)
+                {
+                    if (buffer[index] != '\0')
+                    {
+                        continue;
+                    }
+
+                    tokenBuilder.Append(buffer, tokenStart, index - tokenStart);
+                    if (tokenBuilder.Length > 0)
+                    {
+                        yield return tokenBuilder.ToString();
+                        tokenBuilder.Clear();
+                    }
+
+                    tokenStart = index + 1;
+                }
+
+                if (tokenStart < readCount)
+                {
+                    tokenBuilder.Append(buffer, tokenStart, readCount - tokenStart);
+                }
+            }
+
+            if (tokenBuilder.Length > 0)
+            {
+                yield return tokenBuilder.ToString();
+            }
+
+            var errorMessage = await stderrTask.ConfigureAwait(false);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+
+            if (process.ExitCode != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Process exited with code {process.ExitCode}. FileName={fileName}, Error={errorMessage.Trim()}");
+            }
+        }
+
+        private static Process CreateRedirectedProcess(
+            string fileName,
+            IEnumerable<string> arguments,
+            string? workingDirectory,
+            IReadOnlyDictionary<string, string?>? environmentVariables)
+        {
+            var process = new Process();
+            process.StartInfo = new ProcessStartInfo
+            {
+                FileName = fileName,
+                WorkingDirectory = workingDirectory ?? string.Empty,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
+            };
+
+            foreach (var argument in arguments)
+            {
+                process.StartInfo.ArgumentList.Add(argument);
+            }
+
+            if (environmentVariables is not null)
+            {
+                foreach (var pair in environmentVariables)
+                {
+                    process.StartInfo.Environment[pair.Key] = pair.Value;
+                }
+            }
+
+            return process;
+        }
+
+        private static void KillProcessTree(Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException
+                or Win32Exception
+                or NotSupportedException)
+            {
+                Log.Warning(LogCategory, $"Failed to kill process tree. Error={ex.Message}");
             }
         }
 

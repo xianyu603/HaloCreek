@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Models;
@@ -57,6 +59,30 @@ namespace HaloCreek.Services
             return commandResult.Output
                 .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
                 .ToArray();
+        }
+
+        public async IAsyncEnumerable<string> StreamWorkspaceFilePaths(
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            var gitArguments = new List<string>
+            {
+                "-C",
+                workspacePath,
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+            };
+
+            await foreach (var relativePath in PlatformInfrastructure.StreamNullSeparatedProcessOutput(
+                    GitExecutableName,
+                    gitArguments,
+                    cancellationToken: cancellationToken))
+            {
+                yield return relativePath;
+            }
         }
 
         public string? GetHeadBlobId(string? relativePath)
