@@ -125,5 +125,41 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <Border x:Name="TemplatePreview"
+                IsVisible="{Binding TemplatePicker.IsPreviewVisible, FallbackValue=False}"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                MaxWidth="520"
+                Margin="10,0,10,10"
+                Background="#FFFFFF"
+                BorderBrush="#CBD5E1"
+                BorderThickness="1"
+                CornerRadius="4"
+                Padding="12">
+            <Grid RowDefinitions="Auto,Auto,*"
+                  RowSpacing="6">
+                <TextBlock Text="{Binding TemplatePicker.PreviewTitle}"
+                           Foreground="#0F172A"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock Grid.Row="1"
+                           Text="{Binding TemplatePicker.PreviewDescription}"
+                           Foreground="#64748B"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           TextTrimming="CharacterEllipsis"/>
+                <ScrollViewer Grid.Row="2"
+                              MaxHeight="220"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock Text="{Binding TemplatePicker.PreviewBody}"
+                               Foreground="#334155"
+                               FontSize="12"
+                               TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>
