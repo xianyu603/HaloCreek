@@ -119,7 +119,8 @@ namespace HaloCreek.Services.Completions.Skills
 
                 return new SkillCatalogItem(
                     name,
-                    string.IsNullOrWhiteSpace(metadata.Description) ? null : metadata.Description.Trim());
+                    string.IsNullOrWhiteSpace(metadata.Description) ? null : metadata.Description.Trim(),
+                    skillDirectoryPath);
             }
             catch (Exception ex) when (ex is IOException
                 or UnauthorizedAccessException

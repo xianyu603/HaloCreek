@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using FuzzySharp;
 using HaloCreek.Models;
 using HaloCreek.Services.Completions;
 
@@ -11,6 +12,8 @@ namespace HaloCreek.Services.Completions.Skills
     internal sealed class SkillCompletionSource : ICompletionSource
     {
         public const char TriggerCharacter = '$';
+
+        private const int MaxFuzzyMatchItems = 10;
 
         private static readonly SkillSourceKind[] SourceOrder =
         [
@@ -65,14 +68,6 @@ namespace HaloCreek.Services.Completions.Skills
 
         private IReadOnlyList<PromptCompletionItem> BuildQueriedItems(string query)
         {
-            if (CategoryExactTokens.TryGetValue(query, out var category))
-            {
-                return GetAllSortedSkills()
-                    .Where(item => SkillCategoryClassifier.Classify(item) == category)
-                    .Select(BuildSkillItem)
-                    .ToArray();
-            }
-
             if (SourceExactTokens.TryGetValue(query, out var source))
             {
                 var skills = GetSourceSkills(source).ToArray();
@@ -84,6 +79,14 @@ namespace HaloCreek.Services.Completions.Skills
                 return BuildCategoryItems(skills);
             }
 
+            if (CategoryExactTokens.TryGetValue(query, out var category))
+            {
+                return GetAllSortedSkills()
+                    .Where(item => SkillCategoryClassifier.Classify(item) == category)
+                    .Select(BuildSkillItem)
+                    .ToArray();
+            }
+
             var exactSkillMatches = GetAllSortedSkills()
                 .Where(item => string.Equals(item.Name, query, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
@@ -93,6 +96,7 @@ namespace HaloCreek.Services.Completions.Skills
 
             return exactSkillMatches
                 .Concat(fuzzyMatches)
+                .Take(MaxFuzzyMatchItems)
                 .Select(BuildSkillItem)
                 .ToArray();
         }
@@ -137,39 +141,17 @@ namespace HaloCreek.Services.Completions.Skills
 
         private IEnumerable<SkillCatalogItem> GetSortedFuzzyMatches(string query)
         {
-            return GetAllSortedSkills()
-                .Select(item => new
-                {
-                    Item = item,
-                    Rank = GetMatchRank(item, query),
-                })
-                .Where(match => match.Rank is not null)
-                .OrderBy(match => match.Rank)
-                .ThenBy(match => match.Item.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(match => match.Item);
-        }
-
-        private static int? GetMatchRank(SkillCatalogItem item, string query)
-        {
-            Func<string?, bool> containsQuery = text =>
-                text?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
-
-            if (containsQuery(item.Name))
+            var searchItems = GetAllSortedSkillSearchItems()
+                .ToArray();
+            if (searchItems.Length == 0)
             {
-                return 0;
+                return Array.Empty<SkillCatalogItem>();
             }
 
-            if (containsQuery(item.Description))
-            {
-                return 1;
-            }
-
-            if (containsQuery(SkillCategoryClassifier.Classify(item)))
-            {
-                return 2;
-            }
-
-            return null;
+            var queryItem = new SkillSearchItem(null, query);
+            return Process.ExtractSorted(queryItem, searchItems, item => item.SearchText)
+                .Select(match => match.Value.Value
+                    ?? throw new InvalidOperationException("Skill search result is missing its item."));
         }
 
         private static IEnumerable<SkillCatalogItem> GetSortedSkills(IEnumerable<SkillCatalogItem> items)
@@ -182,6 +164,24 @@ namespace HaloCreek.Services.Completions.Skills
         {
             return GetSortedSources(_sources)
                 .SelectMany(source => GetSortedSkills(source.Skills));
+        }
+
+        private IEnumerable<SkillSearchItem> GetAllSortedSkillSearchItems()
+        {
+            return GetSortedSources(_sources)
+                .SelectMany(source => GetSortedSkills(source.Skills)
+                    .Select(item => new SkillSearchItem(
+                        item,
+                        string.Join(
+                            " ",
+                            new[]
+                            {
+                                item.Name,
+                                item.Description,
+                                SkillCategoryClassifier.Classify(item),
+                                source.Source.ToString(),
+                                item.DirectoryPath,
+                            }.Where(text => !string.IsNullOrWhiteSpace(text))))));
         }
 
         private static IEnumerable<SkillCatalogSource> GetSortedSources(
@@ -237,5 +237,9 @@ namespace HaloCreek.Services.Completions.Skills
             addCategoryTokens(SkillCategoryClassifier.OtherCategoryName, ["other"]);
             return categoryByToken;
         }
+
+        private sealed record SkillSearchItem(
+            SkillCatalogItem? Value,
+            string SearchText);
     }
 }

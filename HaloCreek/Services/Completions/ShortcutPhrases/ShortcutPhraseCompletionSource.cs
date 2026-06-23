@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using FuzzySharp;
 using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services.Completions;
@@ -14,6 +15,7 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
         public const char TriggerCharacter = '#';
 
         private const string LogCategory = "Completion";
+        private const int MaxFuzzyMatchItems = 10;
 
         private readonly IReadOnlyList<ShortcutPhraseCategory> _categories;
         private readonly IReadOnlyDictionary<string, ShortcutPhraseCategory> _categoriesByExactToken;
@@ -65,10 +67,26 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
                     .ToArray();
             }
 
-            return _categories
+            var searchItems = _categories
                 .SelectMany(category => category.Items)
-                .Where(item => MatchesItem(item, query))
-                .Select(BuildPromptCompletionItem)
+                .Select(item => new ShortcutPhraseSearchItem(
+                    item,
+                    string.Join(
+                        " ",
+                        new[] { item.Title, item.Description, item.InsertText }
+                            .Concat(item.Aliases)
+                            .Where(text => !string.IsNullOrWhiteSpace(text)))))
+                .ToArray();
+            if (searchItems.Length == 0)
+            {
+                return Array.Empty<PromptCompletionItem>();
+            }
+
+            var queryItem = new ShortcutPhraseSearchItem(null, query);
+            return Process.ExtractSorted(queryItem, searchItems, item => item.SearchText)
+                .Take(MaxFuzzyMatchItems)
+                .Select(match => BuildPromptCompletionItem(match.Value.Value
+                    ?? throw new InvalidOperationException("Shortcut phrase search result is missing its item.")))
                 .ToArray();
         }
 
@@ -80,19 +98,6 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
                 Description = item.Description,
                 InsertText = item.InsertText,
             };
-        }
-
-        private static bool MatchesItem(ShortcutPhraseItem item, string query)
-        {
-            return ContainsQuery(item.Title, query)
-                || item.Aliases.Any(alias => ContainsQuery(alias, query))
-                || ContainsQuery(item.Description, query)
-                || ContainsQuery(item.InsertText, query);
-        }
-
-        private static bool ContainsQuery(string? text, string query)
-        {
-            return text?.Contains(query, StringComparison.OrdinalIgnoreCase) == true;
         }
 
         private static IReadOnlyDictionary<string, ShortcutPhraseCategory> BuildExactCategoryIndex(
@@ -131,5 +136,9 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
                 yield return alias;
             }
         }
+
+        private sealed record ShortcutPhraseSearchItem(
+            ShortcutPhraseItem? Value,
+            string SearchText);
     }
 }

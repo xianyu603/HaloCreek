@@ -4,7 +4,8 @@ namespace HaloCreek.Services.Completions.Skills
 {
     internal sealed record SkillCatalogItem(
         string Name,
-        string? Description);
+        string? Description,
+        string DirectoryPath);
 
     internal sealed record SkillCatalogSource(
         SkillSourceKind Source,
