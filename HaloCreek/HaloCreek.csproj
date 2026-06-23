@@ -28,5 +28,6 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
+    <PackageReference Include="FuzzySharp" Version="2.0.2" />
   </ItemGroup>
 </Project>

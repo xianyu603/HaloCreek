@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using FuzzySharp;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Models;
@@ -15,7 +16,7 @@ namespace HaloCreek.Services.Completions.Files
         public const char TriggerCharacter = '@';
 
         private const string LogCategory = "FileCompletion";
-        private const int MaxSnapshotItems = 50;
+        private const int MaxSnapshotItems = 10;
         private const int SnapshotBatchPathCount = 50;
         private const int RecentCommitCount = 5;
 
@@ -41,7 +42,7 @@ namespace HaloCreek.Services.Completions.Files
             }
 
             await System.Threading.Tasks.Task.Yield();
-            await foreach (var snapshot in StreamWorkspaceSnapshots(cancellationToken))
+            await foreach (var snapshot in StreamWorkspaceSnapshots(query, cancellationToken))
             {
                 yield return snapshot;
             }
@@ -79,6 +80,7 @@ namespace HaloCreek.Services.Completions.Files
         }
 
         private async IAsyncEnumerable<CompletionQuerySnapshot> StreamWorkspaceSnapshots(
+            string query,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -88,7 +90,15 @@ namespace HaloCreek.Services.Completions.Files
                 .GetAsyncEnumerator(cancellationToken);
             IReadOnlyList<PromptCompletionItem> BuildSnapshotItems()
             {
-                paths.Sort(StringComparer.OrdinalIgnoreCase); // 后续接入评分排序改这里
+                paths.Sort((left, right) =>
+                {
+                    var scoreComparison = GetFileMatchScore(right, query)
+                        .CompareTo(GetFileMatchScore(left, query));
+                    return scoreComparison != 0
+                        ? scoreComparison
+                        : StringComparer.OrdinalIgnoreCase.Compare(left, right);
+                });
+
                 if (paths.Count > MaxSnapshotItems)
                 {
                     paths.RemoveRange(MaxSnapshotItems, paths.Count - MaxSnapshotItems);
@@ -157,6 +167,15 @@ namespace HaloCreek.Services.Completions.Files
                 Description = relativePath,
                 InsertText = relativePath,
             };
+        }
+
+        private static int GetFileMatchScore(string relativePath, string query)
+        {
+            var fileName = Path.GetFileName(
+                PlatformInfrastructure.NormalizePathForCurrentPlatform(relativePath));
+            return Math.Max(
+                Fuzz.WeightedRatio(query, fileName),
+                Fuzz.WeightedRatio(query, relativePath));
         }
     }
 }
