@@ -107,7 +107,8 @@ namespace HaloCreek
 
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
-            var sessionHistoryRefreshService = new SessionHistoryRefreshService(sessionHistoryQueryService);
+            var sessionHistoryStore = new SessionHistoryStore(sessionHistoryQueryService);
+            sessionHistoryStore.StartRefresh();
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
@@ -119,7 +120,7 @@ namespace HaloCreek
                 externalActionService,
                 appCommonRuntime);
             var historySessions = new HistorySessionsViewModel(
-                sessionHistoryRefreshService,
+                sessionHistoryStore,
                 sessionLifecycleService,
                 appCommonRuntime);
             var logs = new LogPanelViewModel();
@@ -146,9 +147,10 @@ namespace HaloCreek
                 promptEditor,
                 workspaceFooter,
                 review,
+                historySessions,
                 logs,
+                sessionHistoryStore,
                 sessionLifecycleService,
-                sessionHistoryRefreshService,
                 tmuxService,
                 floatingPromptService,
                 globalHotkeyRegistrar);
@@ -162,8 +164,9 @@ namespace HaloCreek
             private readonly PromptEditorViewModel _promptEditor;
             private readonly WorkspaceFooterViewModel _workspaceFooter;
             private readonly ReviewViewModel _review;
+            private readonly HistorySessionsViewModel _historySessions;
+            private readonly SessionHistoryStore _sessionHistoryStore;
             private readonly SessionLifecycleService _sessionLifecycleService;
-            private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
             private readonly TmuxService _tmuxService;
             private readonly FloatingPromptService _floatingPromptService;
             private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
@@ -174,9 +177,10 @@ namespace HaloCreek
                 PromptEditorViewModel promptEditor,
                 WorkspaceFooterViewModel workspaceFooter,
                 ReviewViewModel review,
+                HistorySessionsViewModel historySessions,
                 LogPanelViewModel logs,
+                SessionHistoryStore sessionHistoryStore,
                 SessionLifecycleService sessionLifecycleService,
-                SessionHistoryRefreshService sessionHistoryRefreshService,
                 TmuxService tmuxService,
                 FloatingPromptService floatingPromptService,
                 GlobalHotkeyRegistrar globalHotkeyRegistrar)
@@ -185,9 +189,12 @@ namespace HaloCreek
                 _promptEditor = promptEditor ?? throw new ArgumentNullException(nameof(promptEditor));
                 _workspaceFooter = workspaceFooter ?? throw new ArgumentNullException(nameof(workspaceFooter));
                 _review = review ?? throw new ArgumentNullException(nameof(review));
+                _historySessions = historySessions
+                    ?? throw new ArgumentNullException(nameof(historySessions));
                 _logs = logs;
+                _sessionHistoryStore = sessionHistoryStore
+                    ?? throw new ArgumentNullException(nameof(sessionHistoryStore));
                 _sessionLifecycleService = sessionLifecycleService;
-                _sessionHistoryRefreshService = sessionHistoryRefreshService;
                 _tmuxService = tmuxService;
                 _floatingPromptService = floatingPromptService
                     ?? throw new ArgumentNullException(nameof(floatingPromptService));
@@ -210,8 +217,9 @@ namespace HaloCreek
                 _workspaceFooter.Dispose();
                 _promptEditor.Dispose();
                 _review.Dispose();
+                _historySessions.Dispose();
                 _logs.Dispose();
-                _sessionHistoryRefreshService.Dispose();
+                _sessionHistoryStore.Dispose();
                 _sessionLifecycleService.Dispose();
                 _tmuxService.Dispose();
             }

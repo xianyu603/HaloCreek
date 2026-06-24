@@ -7,6 +7,7 @@ using HaloCreek.Services;
 namespace HaloCreek.Services.SessionHistory
 {
     // 因为占用了系统资源(timer) 所以要写IDisposable
+    // TODO: 后续把该类重命名为更贴近内部实现定位的 refresher 名称。
     public sealed class SessionHistoryRefreshService : IDisposable
     {
         private static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromSeconds(10);
@@ -23,7 +24,6 @@ namespace HaloCreek.Services.SessionHistory
         private readonly TimeSpan _refreshInterval;
         private readonly Timer _refreshTimer;
         private readonly object _lock = new();
-        private Action<SessionHistoryRefreshResult>? _refreshCompleted;
         private string? _workspacePath;
         private int _maxSessionHistoryFiles;
         private RefreshState _state = RefreshState.Idle;
@@ -50,6 +50,8 @@ namespace HaloCreek.Services.SessionHistory
             : this(new SessionHistoryQueryService(reader))
         {
         }
+
+        public event Action<SessionHistoryRefreshResult>? RefreshCompleted;
 
         private void ApplyWorkspaceTarget(WorkspaceContext workspaceContext)
         {
@@ -82,9 +84,8 @@ namespace HaloCreek.Services.SessionHistory
             }
         }
 
-        public void StartRefreshAndListen(Action<SessionHistoryRefreshResult> refreshCompleted)
+        public void StartRefresh()
         {
-            _refreshCompleted = refreshCompleted ?? throw new ArgumentNullException(nameof(refreshCompleted));
             WorkspaceRuntime.Changed += OnWorkspaceChanged;
             ApplyWorkspaceTarget(WorkspaceRuntime.Current);
         }
@@ -201,7 +202,7 @@ namespace HaloCreek.Services.SessionHistory
 
             if (shouldNotify)
             {
-                Dispatcher.UIThread.Post(() => _refreshCompleted?.Invoke(refreshResult));
+                Dispatcher.UIThread.Post(() => RefreshCompleted?.Invoke(refreshResult));
             }
 
             if (shouldStartNextRefresh)

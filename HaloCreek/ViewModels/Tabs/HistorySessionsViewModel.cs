@@ -10,32 +10,31 @@ using HaloCreek.Services.SessionHistory;
 
 namespace HaloCreek.ViewModels.Tabs
 {
-    public sealed class HistorySessionsViewModel : ViewModelBase
+    public sealed class HistorySessionsViewModel : ViewModelBase, IDisposable
     {
-        private readonly SessionHistoryRefreshService _sessionHistoryRefreshService;
+        private readonly SessionHistoryStore _sessionHistoryStore;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
-        private IReadOnlyList<HistorySessionInfo> _loadedSessions = Array.Empty<HistorySessionInfo>();
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
         private string _searchText = string.Empty;
         private HistorySessionInfo? _selectedSession;
+        private bool _isDisposed;
 
         public HistorySessionsViewModel(
-            SessionHistoryRefreshService sessionHistoryRefreshService,
+            SessionHistoryStore sessionHistoryStore,
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
-            _sessionHistoryRefreshService = sessionHistoryRefreshService
-                ?? throw new ArgumentNullException(nameof(sessionHistoryRefreshService));
+            _sessionHistoryStore = sessionHistoryStore
+                ?? throw new ArgumentNullException(nameof(sessionHistoryStore));
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _transientEventService = appCommonRuntime.TransientEventService;
-            // 如果后续要拆成独立注册和启动，需要先明确“多处注册后再启动”
-            // 或“先启动再允许多处注册”的调用约束，避免刷新结果分发语义含混。
-            _sessionHistoryRefreshService.StartRefreshAndListen(HandleRefreshCompleted);
             ResumeCommand = new AsyncRelayCommand<HistorySessionInfo>(ResumeAsync, HasSelectedSession);
+            _sessionHistoryStore.HistoryChanged += HandleHistoryChanged;
+            ApplySearch();
         }
 
         public string SearchText
@@ -75,7 +74,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void ApplySearch()
         {
-            var filteredSessions = FilterSessions(_loadedSessions, SearchText);
+            var filteredSessions = FilterSessions(_sessionHistoryStore.Sessions, SearchText);
             var previousSelection = SelectedSession;
 
             if (!AreVisibleSessionListsEquivalent(Sessions, filteredSessions))
@@ -161,26 +160,23 @@ namespace HaloCreek.ViewModels.Tabs
             return string.Equals(currentSession.SessionSummaryText, refreshedSession.SessionSummaryText, StringComparison.Ordinal);
         }
 
-        private void HandleRefreshCompleted(SessionHistoryRefreshResult refreshResult)
+        private void HandleHistoryChanged(object? sender, EventArgs e)
         {
-            if (refreshResult.HistoryResult is null)
-            {
-                if (!string.IsNullOrWhiteSpace(refreshResult.ErrorMessage))
-                {
-                    Log.Warning("HistorySessions", $"Failed to load history sessions: {refreshResult.ErrorMessage}");
-                }
-
-                return;
-            }
-
-            _loadedSessions = refreshResult.HistoryResult.Sessions;
-            ApplySearch();
-
-            if (refreshResult.HistoryResult.SkippedFileCount > 0)
+            if (!string.IsNullOrWhiteSpace(_sessionHistoryStore.LastErrorMessage))
             {
                 Log.Warning(
                     "HistorySessions",
-                    $"Loaded {_loadedSessions.Count} sessions, skipped {refreshResult.HistoryResult.SkippedFileCount} invalid files.");
+                    $"Failed to load history sessions: {_sessionHistoryStore.LastErrorMessage}");
+            }
+
+            ApplySearch();
+
+            if (string.IsNullOrWhiteSpace(_sessionHistoryStore.LastErrorMessage)
+                && _sessionHistoryStore.SkippedFileCount > 0)
+            {
+                Log.Warning(
+                    "HistorySessions",
+                    $"Loaded {_sessionHistoryStore.Sessions.Count} sessions, skipped {_sessionHistoryStore.SkippedFileCount} invalid files.");
             }
         }
 
@@ -208,6 +204,17 @@ namespace HaloCreek.ViewModels.Tabs
         private static bool HasSelectedSession(HistorySessionInfo? session)
         {
             return session is not null;
+        }
+
+        public void Dispose()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            _sessionHistoryStore.HistoryChanged -= HandleHistoryChanged;
         }
     }
 }
