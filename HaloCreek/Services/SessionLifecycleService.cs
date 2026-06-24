@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using HaloCreek.Infrastructure;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services
 {
     public sealed class SessionLifecycleService : IDisposable
     {
-        private const int FirstPromptSummaryMaxLength = 20;
-
         // 正确性前提是所有共享状态的直接操作都来自同一个 UI 线程。
         private readonly Dictionary<string, OngoingSessionInfo> _sessionsById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
@@ -131,7 +130,7 @@ namespace HaloCreek.Services
 
             ArgumentNullException.ThrowIfNull(config.CodexLaunchArguments);
 
-            var title = BuildFirstPromptSummary(titleSource);
+            var title = FirstPromptSummaryFormatter.Format(titleSource);
             if (string.IsNullOrWhiteSpace(title))
             {
                 title = "Codex session";
@@ -411,25 +410,6 @@ namespace HaloCreek.Services
             {
                 SessionsChanged?.Invoke(this, EventArgs.Empty);
             }
-        }
-
-        private static string BuildFirstPromptSummary(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return string.Empty;
-            }
-
-            var summary = string.Join(
-                " ",
-                text.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-
-            if (summary.Length > FirstPromptSummaryMaxLength)
-            {
-                summary = summary[..FirstPromptSummaryMaxLength];
-            }
-
-            return summary;
         }
 
         private bool TryGetFrontSessionId(out string frontSessionId)
