@@ -7,8 +7,7 @@ using HaloCreek.Services;
 namespace HaloCreek.Services.SessionHistory
 {
     // 因为占用了系统资源(timer) 所以要写IDisposable
-    // TODO: 后续把该类重命名为更贴近内部实现定位的 refresher 名称。
-    public sealed class SessionHistoryRefreshService : IDisposable
+    public sealed class SessionHistoryRefresher : IDisposable
     {
         private static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromSeconds(10);
 
@@ -28,7 +27,7 @@ namespace HaloCreek.Services.SessionHistory
         private int _maxSessionHistoryFiles;
         private RefreshState _state = RefreshState.Idle;
 
-        public SessionHistoryRefreshService(
+        public SessionHistoryRefresher(
             SessionHistoryQueryService queryService,
             TimeSpan? refreshInterval = null)
         {
@@ -46,7 +45,7 @@ namespace HaloCreek.Services.SessionHistory
                 Timeout.InfiniteTimeSpan);
         }
 
-        public SessionHistoryRefreshService(ISessionHistoryReader reader)
+        public SessionHistoryRefresher(ISessionHistoryReader reader)
             : this(new SessionHistoryQueryService(reader))
         {
         }

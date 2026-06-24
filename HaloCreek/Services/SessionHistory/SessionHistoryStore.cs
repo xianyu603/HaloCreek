@@ -6,13 +6,13 @@ namespace HaloCreek.Services.SessionHistory
 {
     public sealed class SessionHistoryStore : IDisposable
     {
-        private readonly SessionHistoryRefreshService _refreshService;
+        private readonly SessionHistoryRefresher _refresher;
         private bool _isDisposed;
 
         public SessionHistoryStore(SessionHistoryQueryService queryService)
         {
-            _refreshService = new SessionHistoryRefreshService(queryService);
-            _refreshService.RefreshCompleted += ApplyRefreshResult;
+            _refresher = new SessionHistoryRefresher(queryService);
+            _refresher.RefreshCompleted += ApplyRefreshResult;
         }
 
         public SessionHistoryStore(ISessionHistoryReader reader)
@@ -33,7 +33,7 @@ namespace HaloCreek.Services.SessionHistory
 
         public void StartRefresh()
         {
-            _refreshService.StartRefresh();
+            _refresher.StartRefresh();
         }
 
         public void Dispose()
@@ -44,8 +44,8 @@ namespace HaloCreek.Services.SessionHistory
             }
 
             _isDisposed = true;
-            _refreshService.RefreshCompleted -= ApplyRefreshResult;
-            _refreshService.Dispose();
+            _refresher.RefreshCompleted -= ApplyRefreshResult;
+            _refresher.Dispose();
         }
 
         private void ApplyRefreshResult(SessionHistoryRefreshResult refreshResult)
