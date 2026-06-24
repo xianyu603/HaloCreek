@@ -778,9 +778,6 @@ namespace HaloCreek.Infrastructure
             ArgumentException.ThrowIfNullOrWhiteSpace(command.FileNameHint);
             ArgumentException.ThrowIfNullOrWhiteSpace(command.ScriptText);
 
-            var directory = Path.Combine(Path.GetTempPath(), "HaloCreek", "wsl-scripts");
-            Directory.CreateDirectory(directory);
-
             var fileName = SanitizeFileNameSegment(command.FileNameHint);
             if (fileName.Length == 0)
             {
@@ -791,11 +788,7 @@ namespace HaloCreek.Infrastructure
                 fileName += ".sh";
             }
 
-            var scriptPath = Path.Combine(directory, fileName);
-            File.WriteAllText(
-                scriptPath,
-                command.ScriptText,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            var scriptPath = WriteTempFile(fileName, command.ScriptText);
 
             return new TerminalExecutableCommandSpec(
                 command.WorkingDirectory,
