@@ -10,6 +10,7 @@ using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.Services.Completions;
 using HaloCreek.Services.PromptTemplates;
+using HaloCreek.Services.SessionHistory;
 
 namespace HaloCreek.ViewModels.Components
 {
@@ -37,7 +38,8 @@ namespace HaloCreek.ViewModels.Components
         public PromptInputViewModel(
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime,
-            CompletionCoordinator completionCoordinator)
+            CompletionCoordinator completionCoordinator,
+            SessionHistoryStore sessionHistoryStore)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
@@ -46,7 +48,9 @@ namespace HaloCreek.ViewModels.Components
             _transientEventService = appCommonRuntime.TransientEventService;
             _completionCoordinator = completionCoordinator
                 ?? throw new ArgumentNullException(nameof(completionCoordinator));
-            TemplatePicker = new PromptTemplatePickerViewModel(PromptTemplateStaticConfig.Items);
+            TemplatePicker = new PromptTemplatePickerViewModel(
+                PromptTemplateStaticConfig.Items,
+                sessionHistoryStore);
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
             SendToFrontCommand = new RelayCommand(SendToFront, CanSendToFront);

@@ -7,6 +7,7 @@ using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.Services.Completions;
+using HaloCreek.Services.SessionHistory;
 using HaloCreek.ViewModels.Components;
 
 namespace HaloCreek.ViewModels.Tabs
@@ -21,7 +22,8 @@ namespace HaloCreek.ViewModels.Tabs
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime,
-            CompletionCoordinator completionCoordinator)
+            CompletionCoordinator completionCoordinator,
+            SessionHistoryStore sessionHistoryStore)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             ArgumentNullException.ThrowIfNull(completionCoordinator);
@@ -31,7 +33,8 @@ namespace HaloCreek.ViewModels.Tabs
             PromptInput = new PromptInputViewModel(
                 _sessionLifecycleService,
                 appCommonRuntime,
-                completionCoordinator);
+                completionCoordinator,
+                sessionHistoryStore);
 
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);

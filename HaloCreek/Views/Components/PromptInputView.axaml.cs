@@ -59,21 +59,31 @@ namespace HaloCreek.Views.Components
         private void PromptContextMenu_OnOpened(object? sender, RoutedEventArgs e)
         {
             if (sender is not ContextMenu menu
-                || DataContext is not PromptInputViewModel { TemplatePicker.HasItems: true } viewModel)
+                || DataContext is not PromptInputViewModel viewModel)
             {
                 return;
             }
 
-            var templateItems = viewModel.TemplatePicker.Items
-                .Select(CreateTemplateMenuItem)
+            var groupMenuItems = viewModel.TemplatePicker.GetGroupsSnapshot()
+                .Select(CreateTemplateGroupMenuItem)
                 .ToList();
-            var templatesMenuItem = new MenuItem
-            {
-                Header = "Templates",
-                ItemsSource = templateItems,
-            };
 
-            menu.ItemsSource = new[] { templatesMenuItem };
+            menu.ItemsSource = groupMenuItems.Count == 0
+                ? null
+                : groupMenuItems;
+        }
+
+        private MenuItem CreateTemplateGroupMenuItem(PromptTemplateItemGroup group)
+        {
+            var childItems = group.Items
+                .Select(CreatePromptMenuItem)
+                .ToList();
+
+            return new MenuItem
+            {
+                Header = group.Title,
+                ItemsSource = childItems,
+            };
         }
 
         private void PromptContextMenu_OnClosed(object? sender, RoutedEventArgs e)
@@ -84,7 +94,7 @@ namespace HaloCreek.Views.Components
             }
         }
 
-        private MenuItem CreateTemplateMenuItem(PromptTemplateItem templateItem)
+        private MenuItem CreatePromptMenuItem(PromptTemplateItem templateItem)
         {
             var menuItem = new MenuItem
             {
@@ -116,11 +126,11 @@ namespace HaloCreek.Views.Components
                 return;
             }
 
-            InsertTemplateText(templateItem.InsertText);
+            InsertPromptText(templateItem.InsertText);
             e.Handled = true;
         }
 
-        private void InsertTemplateText(string insertText)
+        private void InsertPromptText(string insertText)
         {
             // 这个逻辑写在这里感觉有点职责不清 选择到底是view还是vm管? 但是只为了纯度把选择绑到vm又有点重了
             // 先不想那么多实现在这里 如果未来出现重复再考虑提取的事情

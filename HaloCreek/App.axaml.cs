@@ -100,20 +100,22 @@ namespace HaloCreek
                     [FileCompletionSource.TriggerCharacter] = new FileCompletionSource(
                         new FileCompletionCandidateReader(gitService)),
                 });
-            var floatingPromptService = new FloatingPromptService(
-                sessionLifecycleService,
-                appCommonRuntime,
-                completionCoordinator);
-
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
             var sessionHistoryStore = new SessionHistoryStore(sessionHistoryQueryService);
             sessionHistoryStore.StartRefresh();
 
+            var floatingPromptService = new FloatingPromptService(
+                sessionLifecycleService,
+                appCommonRuntime,
+                completionCoordinator,
+                sessionHistoryStore);
+
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
                 appCommonRuntime,
-                completionCoordinator);
+                completionCoordinator,
+                sessionHistoryStore);
             var review = new ReviewViewModel(
                 reviewSnapshotService,
                 gitService,

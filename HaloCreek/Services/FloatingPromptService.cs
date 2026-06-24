@@ -1,5 +1,6 @@
 using System;
 using HaloCreek.Services.Completions;
+using HaloCreek.Services.SessionHistory;
 using HaloCreek.ViewModels;
 using HaloCreek.ViewModels.Components;
 using HaloCreek.Views;
@@ -15,13 +16,15 @@ namespace HaloCreek.Services
         public FloatingPromptService(
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime,
-            CompletionCoordinator completionCoordinator)
+            CompletionCoordinator completionCoordinator,
+            SessionHistoryStore sessionHistoryStore)
         {
             _viewModel = new FloatingPromptViewModel(
                 new PromptInputViewModel(
                     sessionLifecycleService,
                     appCommonRuntime,
-                    completionCoordinator));
+                    completionCoordinator,
+                    sessionHistoryStore));
             _window = new FloatingPromptWindow
             {
                 DataContext = _viewModel,
