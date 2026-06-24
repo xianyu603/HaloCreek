@@ -315,6 +315,16 @@ namespace HaloCreek.Infrastructure
             ArgumentException.ThrowIfNullOrWhiteSpace(desiredFileName);
             ArgumentNullException.ThrowIfNull(content);
 
+            return WriteTempFile(
+                desiredFileName,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(content));
+        }
+
+        public static string WriteTempFile(string desiredFileName, byte[] content)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(desiredFileName);
+            ArgumentNullException.ThrowIfNull(content);
+
             var directory = Path.Combine(Path.GetTempPath(), "HaloCreek");
             Directory.CreateDirectory(directory);
 
@@ -330,12 +340,9 @@ namespace HaloCreek.Infrastructure
             var randomSuffix = Guid.NewGuid().ToString("N")[..8];
             var tempPath = Path.Combine(directory, $"{stem}-{randomSuffix}{extension}");
 
-            // External diff tools may read these files after Process.Start returns.
-            // Keep them for now; startup or shutdown can later prune old review-diff files.
-            File.WriteAllText(
-                tempPath,
-                content,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            // Callers may pass these paths to external tools or prompts after this method returns.
+            // Keep them for now; startup or shutdown can later prune old HaloCreek temp files.
+            File.WriteAllBytes(tempPath, content);
             return tempPath;
         }
 

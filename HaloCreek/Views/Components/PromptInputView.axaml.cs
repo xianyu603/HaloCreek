@@ -1,11 +1,16 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using HaloCreek.Infrastructure;
+using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.ViewModels.Components;
 
@@ -17,6 +22,8 @@ namespace HaloCreek.Views.Components
         private const double CompletionMenuCaretGap = 4;
         private const double CompletionMenuBottomPadding = 10;
         private const double CompletionMenuFallbackHeight = 186;
+        private const string ClipboardImageTempFileName = "prompt-paste-image.png";
+        private const string LogCategory = "PromptInputView";
 
         public PromptInputView()
         {
@@ -26,6 +33,7 @@ namespace HaloCreek.Views.Components
                 PromptTextBox_OnKeyDown,
                 RoutingStrategies.Tunnel,
                 handledEventsToo: true);
+            PromptTextBox.PastingFromClipboard += PromptTextBox_OnPastingFromClipboard;
             CompletionMenu.PropertyChanged += CompletionMenu_OnPropertyChanged;
         }
 
@@ -46,6 +54,48 @@ namespace HaloCreek.Views.Components
         public void FocusPromptTextBox()
         {
             PromptTextBox.Focus();
+        }
+
+        private async void PromptTextBox_OnPastingFromClipboard(object? sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+
+            try
+            {
+                var clipboard = TopLevel.GetTopLevel(this)?.Clipboard
+                    ?? throw new InvalidOperationException("Clipboard API is not available.");
+
+                var imagePath = await TrySaveClipboardImageAsync(clipboard);
+                if (imagePath is not null)
+                {
+                    InsertRawText(imagePath);
+                    return;
+                }
+
+                var text = await clipboard.TryGetTextAsync();
+                if (text is not null)
+                {
+                    InsertRawText(text);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(LogCategory, "Clipboard paste failed.");
+                Log.Debug(LogCategory, ex.ToString());
+            }
+        }
+
+        private async Task<string?> TrySaveClipboardImageAsync(IClipboard clipboard)
+        {
+            using var bitmap = await clipboard.TryGetBitmapAsync();
+            if (bitmap is null)
+            {
+                return null;
+            }
+
+            using var stream = new MemoryStream();
+            bitmap.Save(stream);
+            return PlatformInfrastructure.WriteTempFile(ClipboardImageTempFileName, stream.ToArray());
         }
 
         private void CompletionMenu_OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
@@ -134,20 +184,33 @@ namespace HaloCreek.Views.Components
         {
             // 这个逻辑写在这里感觉有点职责不清 选择到底是view还是vm管? 但是只为了纯度把选择绑到vm又有点重了
             // 先不想那么多实现在这里 如果未来出现重复再考虑提取的事情
+            ReplaceSelection((text, replaceStart, replaceEnd) =>
+            {
+                var prefix = replaceStart > 0 && !char.IsWhiteSpace(text[replaceStart - 1])
+                    ? Environment.NewLine
+                    : string.Empty;
+                var suffix = replaceEnd < text.Length && !char.IsWhiteSpace(text[replaceEnd])
+                    ? Environment.NewLine
+                    : string.Empty;
+                return (prefix + insertText + suffix, prefix.Length + insertText.Length);
+            });
+        }
+
+        private void InsertRawText(string insertText)
+        {
+            ReplaceSelection((_, _, _) => (insertText, insertText.Length));
+        }
+
+        private void ReplaceSelection(Func<string, int, int, (string Replacement, int CaretOffset)> createReplacement)
+        {
             var text = PromptTextBox.Text ?? string.Empty;
             var selectionStart = Math.Clamp(PromptTextBox.SelectionStart, 0, text.Length);
             var selectionEnd = Math.Clamp(PromptTextBox.SelectionEnd, 0, text.Length);
             var replaceStart = Math.Min(selectionStart, selectionEnd);
             var replaceEnd = Math.Max(selectionStart, selectionEnd);
-            var prefix = replaceStart > 0 && !char.IsWhiteSpace(text[replaceStart - 1])
-                ? Environment.NewLine
-                : string.Empty;
-            var suffix = replaceEnd < text.Length && !char.IsWhiteSpace(text[replaceEnd])
-                ? Environment.NewLine
-                : string.Empty;
-            var replacement = prefix + insertText + suffix;
+            var (replacement, caretOffset) = createReplacement(text, replaceStart, replaceEnd);
             var updatedText = text[..replaceStart] + replacement + text[replaceEnd..];
-            var caretIndex = replaceStart + prefix.Length + insertText.Length;
+            var caretIndex = replaceStart + caretOffset;
 
             PromptTextBox.Text = updatedText;
             PromptTextBox.CaretIndex = caretIndex;
