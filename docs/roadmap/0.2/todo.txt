@@ -1,4 +1,3 @@
-悬浮框应该在alt + enter后自动隐藏
 悬浮菜单的鼠标交互和tooltip
 file 的空query有点点卡 考虑加缓存
 file 的项目导航模式

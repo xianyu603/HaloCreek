@@ -110,6 +110,16 @@ namespace HaloCreek.ViewModels.Components
             get => _completionTrigger.FilterText;
         }
 
+        public string CompletionPreviewText
+        {
+            get => ActiveCompletionLevel.SelectedItem?.Description ?? string.Empty;
+        }
+
+        public bool IsCompletionPreviewVisible
+        {
+            get => IsCompletionOpen && !string.IsNullOrWhiteSpace(CompletionPreviewText);
+        }
+
         public ObservableCollection<PromptCompletionMenuLevel> CompletionMenuLevels
         {
             get => _completionMenuLevels;
@@ -395,6 +405,7 @@ namespace HaloCreek.ViewModels.Components
             _activeCompletionLevelIndex = 0;
             _completionMenuLevels[0] = new PromptCompletionMenuLevel(query.Current.Items);
             TrimCompletionLevelsAfter(0);
+            NotifyCompletionPreviewChanged();
         }
 
         private bool IsCompletionNavigating
@@ -420,6 +431,7 @@ namespace HaloCreek.ViewModels.Components
 
             activeLevel.SelectedItem = activeLevel.Items[nextIndex];
             TrimCompletionLevelsAfter(_activeCompletionLevelIndex);
+            NotifyCompletionPreviewChanged();
         }
 
         private bool OpenNextCompletionLevel()
@@ -437,6 +449,7 @@ namespace HaloCreek.ViewModels.Components
             };
             _completionMenuLevels.Add(nextLevel);
             _activeCompletionLevelIndex = _completionMenuLevels.Count - 1;
+            NotifyCompletionPreviewChanged();
             Log.Info(
                 LogCategory,
                 $"Completion menu level opened. Level={_activeCompletionLevelIndex}, ParentTitle='{selectedItem.Title}', ItemCount={selectedItem.Children.Count}");
@@ -452,6 +465,7 @@ namespace HaloCreek.ViewModels.Components
 
             _activeCompletionLevelIndex--;
             TrimCompletionLevelsAfter(_activeCompletionLevelIndex);
+            NotifyCompletionPreviewChanged();
             Log.Info(LogCategory, $"Completion menu level closed. Level={_activeCompletionLevelIndex}");
             return true;
         }
@@ -461,6 +475,7 @@ namespace HaloCreek.ViewModels.Components
             _activeCompletionLevelIndex = 0;
             _completionMenuLevels[0].SelectedItem = null;
             TrimCompletionLevelsAfter(0);
+            NotifyCompletionPreviewChanged();
         }
 
         private PromptCompletionMenuLevel ActiveCompletionLevel
@@ -495,6 +510,12 @@ namespace HaloCreek.ViewModels.Components
             }
         }
 
+        private void NotifyCompletionPreviewChanged()
+        {
+            OnPropertyChanged(nameof(CompletionPreviewText));
+            OnPropertyChanged(nameof(IsCompletionPreviewVisible));
+        }
+
         private void SetCompletionTrigger(CompletionTriggerState analysis)
         {
             if (_completionTrigger == analysis)
@@ -508,6 +529,7 @@ namespace HaloCreek.ViewModels.Components
             if (previous.IsValid != analysis.IsValid)
             {
                 OnPropertyChanged(nameof(IsCompletionOpen));
+                OnPropertyChanged(nameof(IsCompletionPreviewVisible));
             }
 
             if (previous.TokenStart != analysis.TokenStart)

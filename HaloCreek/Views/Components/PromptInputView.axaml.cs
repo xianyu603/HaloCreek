@@ -21,7 +21,8 @@ namespace HaloCreek.Views.Components
         private const double CompletionMenuLeft = 10;
         private const double CompletionMenuCaretGap = 4;
         private const double CompletionMenuBottomPadding = 10;
-        private const double CompletionMenuFallbackHeight = 186;
+        private const double CompletionPopupHorizontalMargin = 10;
+        private const double CompletionMenuFallbackHeight = 290;
         private const string ClipboardImageTempFileName = "prompt-paste-image.png";
         private const string LogCategory = "PromptInputView";
 
@@ -34,7 +35,7 @@ namespace HaloCreek.Views.Components
                 RoutingStrategies.Tunnel,
                 handledEventsToo: true);
             PromptTextBox.PastingFromClipboard += PromptTextBox_OnPastingFromClipboard;
-            CompletionMenu.PropertyChanged += CompletionMenu_OnPropertyChanged;
+            CompletionPopup.PropertyChanged += CompletionPopup_OnPropertyChanged;
         }
 
         private void PromptTextBox_OnKeyDown(object? sender, KeyEventArgs e)
@@ -98,11 +99,11 @@ namespace HaloCreek.Views.Components
             return PlatformInfrastructure.WriteTempFile(ClipboardImageTempFileName, stream.ToArray());
         }
 
-        private void CompletionMenu_OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+        private void CompletionPopup_OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
         {
-            if (e.Property == IsVisibleProperty && CompletionMenu.IsVisible)
+            if (e.Property == IsVisibleProperty && CompletionPopup.IsVisible)
             {
-                UpdateCompletionMenuPosition();
+                UpdateCompletionPopupPosition();
             }
         }
 
@@ -219,10 +220,10 @@ namespace HaloCreek.Views.Components
             PromptTextBox.Focus();
         }
 
-        private void UpdateCompletionMenuPosition()
+        private void UpdateCompletionPopupPosition()
         {
-            var menuHeight = CompletionMenu.Bounds.Height > 0
-                ? CompletionMenu.Bounds.Height
+            var menuHeight = CompletionPopup.Bounds.Height > 0
+                ? CompletionPopup.Bounds.Height
                 : CompletionMenuFallbackHeight;
             var fallbackTop = Math.Max(0, Bounds.Height - menuHeight - CompletionMenuBottomPadding);
             var textPresenter = PromptTextBox
@@ -232,7 +233,11 @@ namespace HaloCreek.Views.Components
 
             if (textPresenter?.TextLayout is null)
             {
-                CompletionMenu.Margin = new Thickness(CompletionMenuLeft, fallbackTop, 0, 0);
+                CompletionPopup.Margin = new Thickness(
+                    CompletionMenuLeft,
+                    fallbackTop,
+                    CompletionPopupHorizontalMargin,
+                    0);
                 return;
             }
 
@@ -242,13 +247,21 @@ namespace HaloCreek.Views.Components
 
             if (transform is null)
             {
-                CompletionMenu.Margin = new Thickness(CompletionMenuLeft, fallbackTop, 0, 0);
+                CompletionPopup.Margin = new Thickness(
+                    CompletionMenuLeft,
+                    fallbackTop,
+                    CompletionPopupHorizontalMargin,
+                    0);
                 return;
             }
 
             var caretBottom = transform.Value.Transform(new Point(caretRect.X, caretRect.Y + caretRect.Height)).Y;
             var desiredTop = caretBottom + CompletionMenuCaretGap;
-            CompletionMenu.Margin = new Thickness(CompletionMenuLeft, Math.Clamp(desiredTop, 0, fallbackTop), 0, 0);
+            CompletionPopup.Margin = new Thickness(
+                CompletionMenuLeft,
+                Math.Clamp(desiredTop, 0, fallbackTop),
+                CompletionPopupHorizontalMargin,
+                0);
         }
     }
 }
