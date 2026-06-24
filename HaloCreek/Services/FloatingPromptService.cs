@@ -25,6 +25,7 @@ namespace HaloCreek.Services
                     appCommonRuntime,
                     completionCoordinator,
                     sessionHistoryStore));
+            _viewModel.PromptInput.PromptSubmitted += OnPromptSubmitted;
             _window = new FloatingPromptWindow
             {
                 DataContext = _viewModel,
@@ -43,6 +44,16 @@ namespace HaloCreek.Services
             _window.FocusPromptInput();
         }
 
+        private void OnPromptSubmitted(object? sender, EventArgs e)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _window.Hide();
+        }
+
         public void Dispose()
         {
             if (_isDisposed)
@@ -51,6 +62,7 @@ namespace HaloCreek.Services
             }
 
             _isDisposed = true;
+            _viewModel.PromptInput.PromptSubmitted -= OnPromptSubmitted;
             _window.CloseForDispose();
             _viewModel.Dispose();
         }

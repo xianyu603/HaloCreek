@@ -119,6 +119,9 @@ namespace HaloCreek.ViewModels.Components
 
         public IRelayCommand SendToFrontCommand { get; }
 
+        // 在真正干活之前触发 消息处理抛异常会导致发送失败 不过目前风险可控
+        public event EventHandler? PromptSubmitted;
+
         private void RefreshCompletionTrigger()
         {
             UpdateCompletionTrigger(PromptText, PromptCaretIndex);
@@ -527,6 +530,7 @@ namespace HaloCreek.ViewModels.Components
         {
             try
             {
+                PromptSubmitted?.Invoke(this, EventArgs.Empty);
                 var session = await _sessionLifecycleService.LaunchAsync(PromptText);
                 Log.Info(LogCategory, $"Codex session launch requested: {session.Id}");
             }
@@ -541,6 +545,7 @@ namespace HaloCreek.ViewModels.Components
 
         private void SendToFront()
         {
+            PromptSubmitted?.Invoke(this, EventArgs.Empty);
             _sessionLifecycleService.SendMessageToFrontSession(PromptText);
         }
 
