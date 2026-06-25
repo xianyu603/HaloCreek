@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Models;
@@ -68,22 +66,6 @@ namespace HaloCreek.Services.Completions.Files
             {
                 Log.Warning(LogCategory, $"Failed to read recent committed file completions. {ex}");
                 return Array.Empty<string>();
-            }
-        }
-
-        public async IAsyncEnumerable<string> StreamWorkspaceFiles(
-            [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
-            await foreach (var relativePath in _gitService.StreamWorkspaceFilePaths(cancellationToken))
-            {
-                var normalizedPath = NormalizePathOrNull(relativePath, "workspace files");
-                if (PlatformInfrastructure.IsExistingFileUnderDirectory(
-                    workspacePath,
-                    normalizedPath))
-                {
-                    yield return normalizedPath!;
-                }
             }
         }
 

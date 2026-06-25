@@ -100,7 +100,8 @@ namespace HaloCreek
                     [ShortcutPhraseCompletionSource.TriggerCharacter] = new ShortcutPhraseCompletionSource(),
                     [SkillCompletionSource.TriggerCharacter] = new SkillCompletionSource(skillCatalogReader),
                     [FileCompletionSource.TriggerCharacter] = new FileCompletionSource(
-                        new FileCompletionCandidateReader(gitService)),
+                        new FileCompletionCandidateReader(gitService),
+                        workspacePathIndexService),
                 });
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);

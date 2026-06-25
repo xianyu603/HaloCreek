@@ -70,7 +70,9 @@ namespace HaloCreek.Services.Completions
                 {
                     ApplyUpdate(snapshot);
                 }
-
+                // todo 这里会在最后一个yield return 连续广播两次Changed 希望能改成
+                // 1. CompletionQuerySnapshot 不加pending 用stream结束表示结束
+                // 2. 内容变更和pending结束分别通知
                 CompletePendingSnapshot();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

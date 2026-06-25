@@ -44,10 +44,17 @@ namespace HaloCreek.Services.WorkspacePaths
             }
         }
 
+        // Contract:
+        // - The first yielded item is the current cached snapshot observed when the watch attaches.
+        // - The watch also starts or reuses one full index build for the current workspace.
+        // - When that build publishes a changed snapshot, the changed snapshot is yielded once.
+        // - When the build finishes with no published change, the stream ends silently after the first item.
+        // - Stream completion means this watch's pending state is finished.
         public async IAsyncEnumerable<WorkspacePathIndexSnapshot> Watch(
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             Task<WorkspacePathIndexSnapshot?> buildTask;
+            WorkspacePathIndexSnapshot currentSnapshot;
 
             lock (_lock)
             {
@@ -57,10 +64,13 @@ namespace HaloCreek.Services.WorkspacePaths
                 }
 
                 buildTask = EnsureBuildStartedLocked("watch");
+                currentSnapshot = _snapshot;
                 Log.Debug(
                     LogCategory,
                     $"Watch attached. Generation={_generation}, Workspace={_workspacePath}");
             }
+
+            yield return currentSnapshot;
 
             var publishedSnapshot = await buildTask.WaitAsync(cancellationToken);
             if (publishedSnapshot is not null)

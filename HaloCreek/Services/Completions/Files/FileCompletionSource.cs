@@ -6,8 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using FuzzySharp;
 using HaloCreek.Infrastructure;
-using HaloCreek.Logging;
 using HaloCreek.Models;
+using HaloCreek.Services.WorkspacePaths;
 
 namespace HaloCreek.Services.Completions.Files
 {
@@ -15,17 +15,20 @@ namespace HaloCreek.Services.Completions.Files
     {
         public const char TriggerCharacter = '@';
 
-        private const string LogCategory = "FileCompletion";
         private const int MaxSnapshotItems = 10;
-        private const int SnapshotBatchPathCount = 50;
         private const int RecentCommitCount = 5;
 
         private readonly FileCompletionCandidateReader _candidateReader;
+        private readonly WorkspacePathIndexService _workspacePathIndexService;
 
-        public FileCompletionSource(FileCompletionCandidateReader candidateReader)
+        public FileCompletionSource(
+            FileCompletionCandidateReader candidateReader,
+            WorkspacePathIndexService workspacePathIndexService)
         {
             _candidateReader = candidateReader
                 ?? throw new ArgumentNullException(nameof(candidateReader));
+            _workspacePathIndexService = workspacePathIndexService
+                ?? throw new ArgumentNullException(nameof(workspacePathIndexService));
         }
 
         public async IAsyncEnumerable<CompletionQuerySnapshot> StartQuery(
@@ -83,79 +86,29 @@ namespace HaloCreek.Services.Completions.Files
             string query,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var paths = new List<string>(MaxSnapshotItems + SnapshotBatchPathCount);
-            var pendingPathCount = 0;
-            var workspaceFiles = _candidateReader.StreamWorkspaceFiles(cancellationToken)
-                .GetAsyncEnumerator(cancellationToken);
-            IReadOnlyList<PromptCompletionItem> BuildSnapshotItems()
+            await foreach (var snapshot in _workspacePathIndexService.Watch(cancellationToken))
             {
-                paths.Sort((left, right) =>
-                {
-                    var scoreComparison = GetFileMatchScore(right, query)
-                        .CompareTo(GetFileMatchScore(left, query));
-                    return scoreComparison != 0
-                        ? scoreComparison
-                        : StringComparer.OrdinalIgnoreCase.Compare(left, right);
-                });
-
-                if (paths.Count > MaxSnapshotItems)
-                {
-                    paths.RemoveRange(MaxSnapshotItems, paths.Count - MaxSnapshotItems);
-                }
-
-                return paths
-                    .Select(BuildFileItem)
-                    .ToArray();
+                yield return new CompletionQuerySnapshot(
+                    BuildSnapshotItems(snapshot, query),
+                    true);
             }
+        }
 
-            try
-            {
-                while (true)
+        private static IReadOnlyList<PromptCompletionItem> BuildSnapshotItems(
+            WorkspacePathIndexSnapshot snapshot,
+            string query)
+        {
+            return snapshot.Files
+                .Select(file => new
                 {
-                    string relativePath;
-                    try
-                    {
-                        if (!await workspaceFiles.MoveNextAsync())
-                        {
-                            break;
-                        }
-
-                        relativePath = workspaceFiles.Current;
-                    }
-                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Warning(LogCategory, $"Failed to stream workspace file completions. {ex}");
-                        break;
-                    }
-
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (!seenPaths.Add(relativePath))
-                    {
-                        continue;
-                    }
-
-                    paths.Add(relativePath);
-                    pendingPathCount++;
-
-                    if (pendingPathCount >= SnapshotBatchPathCount)
-                    {
-                        pendingPathCount = 0;
-                        yield return new CompletionQuerySnapshot(BuildSnapshotItems(), true);
-                    }
-                }
-            }
-            finally
-            {
-                await workspaceFiles.DisposeAsync();
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            yield return new CompletionQuerySnapshot(BuildSnapshotItems(), false);
+                    file.RelativePath,
+                    Score = GetFileMatchScore(file.RelativePath, query),
+                })
+                .OrderByDescending(file => file.Score)
+                .ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+                .Take(MaxSnapshotItems)
+                .Select(file => BuildFileItem(file.RelativePath))
+                .ToArray();
         }
 
         private static PromptCompletionItem BuildFileItem(string relativePath)
