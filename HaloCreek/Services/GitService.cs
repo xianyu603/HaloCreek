@@ -64,7 +64,20 @@ namespace HaloCreek.Services
         public async IAsyncEnumerable<string> StreamWorkspaceFilePaths(
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            await foreach (var relativePath in StreamWorkspaceFilePaths(
+                WorkspaceRuntime.Current.GitRootPath,
+                cancellationToken))
+            {
+                yield return relativePath;
+            }
+        }
+
+        public async IAsyncEnumerable<string> StreamWorkspaceFilePaths(
+            string workspacePath,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
             var gitArguments = new List<string>
             {
                 "-C",
