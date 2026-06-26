@@ -117,7 +117,7 @@ namespace HaloCreek.Services.Completions.Files
             string query,
             CancellationToken cancellationToken)
         {
-            var files = new List<FileMatch>(snapshot.Files.Count);
+            var matches = new List<PathMatch>(snapshot.Files.Count + snapshot.Directories.Count);
             for (var index = 0; index < snapshot.Files.Count; index++)
             {
                 if (index % 128 == 0)
@@ -126,13 +126,33 @@ namespace HaloCreek.Services.Completions.Files
                 }
 
                 var file = snapshot.Files[index];
-                files.Add(new FileMatch(
+                matches.Add(new PathMatch(
+                    file.Name,
                     file.RelativePath,
-                    GetFileMatchScore(file.RelativePath, query)));
+                    GetPathMatchScore(file.Name, file.RelativePath, query)));
+            }
+
+            for (var index = 0; index < snapshot.Directories.Count; index++)
+            {
+                if (index % 128 == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                var directory = snapshot.Directories[index];
+                if (string.IsNullOrEmpty(directory.RelativePath))
+                {
+                    continue;
+                }
+
+                matches.Add(new PathMatch(
+                    directory.Name,
+                    directory.RelativePath,
+                    GetPathMatchScore(directory.Name, directory.RelativePath, query)));
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            files.Sort(
+            matches.Sort(
                 (left, right) =>
                 {
                     var scoreComparison = right.Score.CompareTo(left.Score);
@@ -142,9 +162,9 @@ namespace HaloCreek.Services.Completions.Files
                 });
 
             cancellationToken.ThrowIfCancellationRequested();
-            return files
+            return matches
                 .Take(MaxSnapshotItems)
-                .Select(file => BuildFileItem(file.RelativePath))
+                .Select(match => BuildPathItem(match.Name, match.RelativePath))
                 .ToArray();
         }
 
@@ -159,16 +179,25 @@ namespace HaloCreek.Services.Completions.Files
             };
         }
 
-        private static int GetFileMatchScore(string relativePath, string query)
+        private static PromptCompletionItem BuildPathItem(string name, string relativePath)
         {
-            var fileName = Path.GetFileName(
-                PlatformInfrastructure.NormalizePathForCurrentPlatform(relativePath));
+            return new PromptCompletionItem
+            {
+                Title = name,
+                Description = relativePath,
+                InsertText = relativePath,
+            };
+        }
+
+        private static int GetPathMatchScore(string name, string relativePath, string query)
+        {
             return Math.Max(
-                Fuzz.WeightedRatio(query, fileName),
+                Fuzz.WeightedRatio(query, name),
                 Fuzz.WeightedRatio(query, relativePath));
         }
 
-        private sealed record FileMatch(
+        private sealed record PathMatch(
+            string Name,
             string RelativePath,
             int Score);
     }
