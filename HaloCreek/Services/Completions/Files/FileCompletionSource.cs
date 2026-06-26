@@ -87,31 +87,29 @@ namespace HaloCreek.Services.Completions.Files
             string query,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            await foreach (var snapshot in _workspacePathIndexService.Watch(cancellationToken))
-            {
-                var items = await Task.Run(
-                    () =>
-                    {
-                        try
-                        {
-                            return BuildSnapshotItems(snapshot, query, cancellationToken);
-                        }
-                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                        {
-                            return null;
-                        }
-                    },
-                    CancellationToken.None).ConfigureAwait(false);
-
-                if (items is null)
+            var snapshot = _workspacePathIndexService.Snapshot;
+            var items = await Task.Run(
+                () =>
                 {
-                    yield break;
-                }
+                    try
+                    {
+                        return BuildSnapshotItems(snapshot, query, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        return null;
+                    }
+                },
+                CancellationToken.None).ConfigureAwait(false);
 
-                yield return new CompletionQuerySnapshot(
-                    items,
-                    true);
+            if (items is null)
+            {
+                yield break;
             }
+
+            yield return new CompletionQuerySnapshot(
+                items,
+                false);
         }
 
         private static IReadOnlyList<PromptCompletionItem> BuildSnapshotItems(

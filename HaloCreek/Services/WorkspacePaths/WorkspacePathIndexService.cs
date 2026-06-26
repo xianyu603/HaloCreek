@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using HaloCreek.Infrastructure;
@@ -14,14 +13,16 @@ namespace HaloCreek.Services.WorkspacePaths
     {
         private const string LogCategory = "WorkspacePathIndex";
         private const int DebugSamplePathCount = 5;
+        private static readonly TimeSpan ScanInterval = TimeSpan.FromSeconds(10);
 
         private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
 
         private readonly object _lock = new();
         private readonly GitService _gitService;
+        private readonly Timer _scanTimer;
         private WorkspacePathIndexSnapshot _snapshot = CreateEmptySnapshot(string.Empty);
         private CancellationTokenSource? _buildCancellation;
-        private Task<WorkspacePathIndexSnapshot?>? _buildTask;
+        private Task? _buildTask;
         private string _workspacePath = string.Empty;
         private int _generation;
         private bool _isDisposed;
@@ -29,6 +30,11 @@ namespace HaloCreek.Services.WorkspacePaths
         public WorkspacePathIndexService(GitService gitService)
         {
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
+            _scanTimer = new Timer(
+                OnScanTimerTick,
+                state: null,
+                Timeout.InfiniteTimeSpan,
+                Timeout.InfiniteTimeSpan);
             WorkspaceRuntime.Changed += OnWorkspaceChanged;
             ApplyWorkspace(WorkspaceRuntime.Current);
         }
@@ -41,41 +47,6 @@ namespace HaloCreek.Services.WorkspacePaths
                 {
                     return _snapshot;
                 }
-            }
-        }
-
-        // Contract:
-        // - The first yielded item is the current cached snapshot observed when the watch attaches.
-        // - The watch also starts or reuses one full index build for the current workspace.
-        // - When that build publishes a changed snapshot, the changed snapshot is yielded once.
-        // - When the build finishes with no published change, the stream ends silently after the first item.
-        // - Stream completion means this watch's pending state is finished.
-        public async IAsyncEnumerable<WorkspacePathIndexSnapshot> Watch(
-            [EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            Task<WorkspacePathIndexSnapshot?> buildTask;
-            WorkspacePathIndexSnapshot currentSnapshot;
-
-            lock (_lock)
-            {
-                if (_isDisposed)
-                {
-                    yield break;
-                }
-
-                buildTask = EnsureBuildStartedLocked("watch");
-                currentSnapshot = _snapshot;
-                Log.Debug(
-                    LogCategory,
-                    $"Watch attached. Generation={_generation}, Workspace={_workspacePath}");
-            }
-
-            yield return currentSnapshot;
-
-            var publishedSnapshot = await buildTask.WaitAsync(cancellationToken);
-            if (publishedSnapshot is not null)
-            {
-                yield return publishedSnapshot;
             }
         }
 
@@ -93,15 +64,30 @@ namespace HaloCreek.Services.WorkspacePaths
                 _isDisposed = true;
                 cancellation = _buildCancellation;
                 _buildCancellation = null;
+                _scanTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
 
             WorkspaceRuntime.Changed -= OnWorkspaceChanged;
             TryCancel(cancellation);
+            _scanTimer.Dispose();
         }
 
         private void OnWorkspaceChanged(WorkspaceContext workspaceContext)
         {
             ApplyWorkspace(workspaceContext);
+        }
+
+        private void OnScanTimerTick(object? state)
+        {
+            lock (_lock)
+            {
+                if (_isDisposed)
+                {
+                    return;
+                }
+
+                EnsureBuildStartedLocked("timer");
+            }
         }
 
         private void ApplyWorkspace(WorkspaceContext workspaceContext)
@@ -129,16 +115,17 @@ namespace HaloCreek.Services.WorkspacePaths
                     $"Workspace applied. Generation={_generation}, Workspace={_workspacePath}");
 
                 EnsureBuildStartedLocked("workspace");
+                _scanTimer.Change(ScanInterval, ScanInterval);
             }
 
             TryCancel(oldCancellation);
         }
 
-        private Task<WorkspacePathIndexSnapshot?> EnsureBuildStartedLocked(string reason)
+        private void EnsureBuildStartedLocked(string reason)
         {
             if (_buildTask is not null && !_buildTask.IsCompleted)
             {
-                return _buildTask;
+                return;
             }
 
             var buildCancellation = new CancellationTokenSource();
@@ -166,11 +153,9 @@ namespace HaloCreek.Services.WorkspacePaths
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
-
-            return _buildTask;
         }
 
-        private async Task<WorkspacePathIndexSnapshot?> BuildAndPublishAsync(
+        private async Task BuildAndPublishAsync(
             string workspacePath,
             int generation,
             string reason,
@@ -195,7 +180,7 @@ namespace HaloCreek.Services.WorkspacePaths
                         Log.Debug(
                             LogCategory,
                             $"Build discarded. Generation={generation}, Workspace={workspacePath}");
-                        return null;
+                        return;
                     }
 
                     if (!HasPathContentChanged(_snapshot, snapshot))
@@ -203,7 +188,7 @@ namespace HaloCreek.Services.WorkspacePaths
                         Log.Debug(
                             LogCategory,
                             $"Build completed with no changes. Generation={generation}, Files={snapshot.Files.Count}, Directories={snapshot.Directories.Count}, ElapsedMs={stopwatch.ElapsedMilliseconds}");
-                        return null;
+                        return;
                     }
 
                     _snapshot = snapshot;
@@ -211,7 +196,6 @@ namespace HaloCreek.Services.WorkspacePaths
                         LogCategory,
                         $"Snapshot published. Generation={generation}, Files={snapshot.Files.Count}, Directories={snapshot.Directories.Count}, RootDirectories={snapshot.Root.Directories.Count}, RootFiles={snapshot.Root.Files.Count}, ElapsedMs={stopwatch.ElapsedMilliseconds}");
                     LogSnapshotSamples(snapshot);
-                    return snapshot;
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -219,14 +203,12 @@ namespace HaloCreek.Services.WorkspacePaths
                 Log.Debug(
                     LogCategory,
                     $"Build canceled. Generation={generation}, Workspace={workspacePath}");
-                return null;
             }
             catch (Exception ex)
             {
                 Log.Warning(
                     LogCategory,
                     $"Build failed. Generation={generation}, Workspace={workspacePath}, Error={ex}");
-                return null;
             }
         }
 
