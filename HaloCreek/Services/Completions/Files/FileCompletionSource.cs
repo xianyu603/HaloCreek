@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using FuzzySharp;
 using HaloCreek.Infrastructure;
 using HaloCreek.Models;
@@ -88,24 +89,62 @@ namespace HaloCreek.Services.Completions.Files
         {
             await foreach (var snapshot in _workspacePathIndexService.Watch(cancellationToken))
             {
+                var items = await Task.Run(
+                    () =>
+                    {
+                        try
+                        {
+                            return BuildSnapshotItems(snapshot, query, cancellationToken);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            return null;
+                        }
+                    },
+                    CancellationToken.None).ConfigureAwait(false);
+
+                if (items is null)
+                {
+                    yield break;
+                }
+
                 yield return new CompletionQuerySnapshot(
-                    BuildSnapshotItems(snapshot, query),
+                    items,
                     true);
             }
         }
 
         private static IReadOnlyList<PromptCompletionItem> BuildSnapshotItems(
             WorkspacePathIndexSnapshot snapshot,
-            string query)
+            string query,
+            CancellationToken cancellationToken)
         {
-            return snapshot.Files
-                .Select(file => new
+            var files = new List<FileMatch>(snapshot.Files.Count);
+            for (var index = 0; index < snapshot.Files.Count; index++)
+            {
+                if (index % 128 == 0)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                var file = snapshot.Files[index];
+                files.Add(new FileMatch(
                     file.RelativePath,
-                    Score = GetFileMatchScore(file.RelativePath, query),
-                })
-                .OrderByDescending(file => file.Score)
-                .ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+                    GetFileMatchScore(file.RelativePath, query)));
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            files.Sort(
+                (left, right) =>
+                {
+                    var scoreComparison = right.Score.CompareTo(left.Score);
+                    return scoreComparison != 0
+                        ? scoreComparison
+                        : StringComparer.OrdinalIgnoreCase.Compare(left.RelativePath, right.RelativePath);
+                });
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return files
                 .Take(MaxSnapshotItems)
                 .Select(file => BuildFileItem(file.RelativePath))
                 .ToArray();
@@ -130,5 +169,9 @@ namespace HaloCreek.Services.Completions.Files
                 Fuzz.WeightedRatio(query, fileName),
                 Fuzz.WeightedRatio(query, relativePath));
         }
+
+        private sealed record FileMatch(
+            string RelativePath,
+            int Score);
     }
 }
