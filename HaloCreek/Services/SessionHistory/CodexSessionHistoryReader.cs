@@ -9,7 +9,7 @@ using HaloCreek.Models;
 
 namespace HaloCreek.Services.SessionHistory
 {
-    public sealed class CodexSessionHistoryReader : ISessionHistoryReader
+    public static class CodexSessionHistoryReader
     {
         private const string JsonlSearchPattern = "*.jsonl";
         private const string SessionsDirectoryName = "sessions";
@@ -21,14 +21,9 @@ namespace HaloCreek.Services.SessionHistory
             RecurseSubdirectories = true,
         };
 
-        private readonly Dictionary<string, CachedSessionFile> _fileCache = new(GetFilePathComparer());
+        private static readonly Dictionary<string, CachedSessionFile> _fileCache = new(GetFilePathComparer());
 
-        public CodexSessionHistoryReader(AppCommonRuntime appCommonRuntime)
-        {
-            ArgumentNullException.ThrowIfNull(appCommonRuntime);
-        }
-
-        public SessionHistoryResult ReadSessions(string workspacePath, int maxSessionHistoryFiles)
+        public static SessionHistoryResult ReadSessions(string workspacePath, int maxSessionHistoryFiles)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
 
@@ -49,30 +44,36 @@ namespace HaloCreek.Services.SessionHistory
 
             var sessions = new List<HistorySessionInfo>();
             var skippedFileCount = 0;
-            PruneFileCache(sessionFiles);
 
             foreach (var sessionFile in sessionFiles)
             {
-                var cachedSessionFile = GetCachedSessionFile(sessionFile);
-                if (!cachedSessionFile.WasParsedSuccessfully)
+                HistorySessionInfo session;
+                try
+                {
+                    session = ReadSessionFile(sessionFile.FilePath);
+                }
+                catch (Exception ex) when (ex is JsonException
+                    or IOException
+                    or InvalidDataException
+                    or NotSupportedException
+                    or UnauthorizedAccessException)
                 {
                     skippedFileCount++;
                     continue;
                 }
 
-                if (cachedSessionFile.Session is not null
-                    && PlatformInfrastructure.AreWorkspacePathsEquivalent(
-                        cachedSessionFile.Session.WorkspacePath,
-                        workspacePath))
+                if (PlatformInfrastructure.AreWorkspacePathsEquivalent(
+                    session.WorkspacePath,
+                    workspacePath))
                 {
-                    sessions.Add(cachedSessionFile.Session);
+                    sessions.Add(session);
                 }
             }
 
             return new SessionHistoryResult(sessions, skippedFileCount);
         }
 
-        private string? FindSessionHistoryRootPath()
+        private static string? FindSessionHistoryRootPath()
         {
             if (!PlatformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath))
             {
@@ -122,7 +123,7 @@ namespace HaloCreek.Services.SessionHistory
             }
         }
 
-        private CachedSessionFile GetCachedSessionFile(SessionFileMetadata sessionFile)
+        private static CachedSessionFile GetCachedSessionFile(SessionFileMetadata sessionFile)
         {
             if (_fileCache.TryGetValue(sessionFile.FilePath, out var cachedSessionFile)
                 && cachedSessionFile.Metadata.HasSameContentAs(sessionFile))
@@ -149,11 +150,12 @@ namespace HaloCreek.Services.SessionHistory
                     WasParsedSuccessfully: false);
             }
 
-            _fileCache[sessionFile.FilePath] = cachedSessionFile;
+            // TODO: 后续如果恢复增量缓存，应由 Store 提供 scan context 或明确缓存所有权。
+            // _fileCache[sessionFile.FilePath] = cachedSessionFile;
             return cachedSessionFile;
         }
 
-        private void PruneFileCache(IReadOnlyList<SessionFileMetadata> sessionFiles)
+        private static void PruneFileCache(IReadOnlyList<SessionFileMetadata> sessionFiles)
         {
             // 删掉之前缓存 但是本轮没有枚举的cache
             var activePaths = new HashSet<string>(
