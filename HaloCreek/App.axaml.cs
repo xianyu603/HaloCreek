@@ -91,6 +91,8 @@ namespace HaloCreek
             var gitService = new GitService();
             var workspacePathIndexSnapshots =
                 new WorkspaceSnapshotStore<WorkspacePathIndexSnapshot>();
+            var sessionHistorySnapshots =
+                new WorkspaceSnapshotStore<SessionHistorySnapshot>();
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
             var skillCatalogReader = new SkillCatalogReader();
@@ -103,29 +105,25 @@ namespace HaloCreek
                         new FileCompletionCandidateReader(gitService),
                         workspacePathIndexSnapshots),
                 });
-            ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
-            var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
-            var sessionHistoryStore = new SessionHistoryStore(sessionHistoryQueryService);
-            sessionHistoryStore.StartRefresh();
 
             var floatingPromptService = new FloatingPromptService(
                 sessionLifecycleService,
                 appCommonRuntime,
                 completionCoordinator,
-                sessionHistoryStore);
+                sessionHistorySnapshots);
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
                 appCommonRuntime,
                 completionCoordinator,
-                sessionHistoryStore);
+                sessionHistorySnapshots);
             var review = new ReviewViewModel(
                 reviewSnapshotService,
                 gitService,
                 externalActionService,
                 appCommonRuntime);
             var historySessions = new HistorySessionsViewModel(
-                sessionHistoryStore,
+                sessionHistorySnapshots,
                 sessionLifecycleService,
                 appCommonRuntime);
             var logs = new LogPanelViewModel();
@@ -154,10 +152,10 @@ namespace HaloCreek
                 review,
                 historySessions,
                 logs,
-                sessionHistoryStore,
                 sessionLifecycleService,
                 tmuxService,
                 workspacePathIndexSnapshots,
+                sessionHistorySnapshots,
                 floatingPromptService,
                 globalHotkeyRegistrar);
         }
@@ -171,10 +169,10 @@ namespace HaloCreek
             private readonly WorkspaceFooterViewModel _workspaceFooter;
             private readonly ReviewViewModel _review;
             private readonly HistorySessionsViewModel _historySessions;
-            private readonly SessionHistoryStore _sessionHistoryStore;
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly TmuxService _tmuxService;
             private readonly WorkspaceSnapshotStore<WorkspacePathIndexSnapshot> _workspacePathIndexSnapshots;
+            private readonly WorkspaceSnapshotStore<SessionHistorySnapshot> _sessionHistorySnapshots;
             private readonly FloatingPromptService _floatingPromptService;
             private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
             private bool _isDisposed;
@@ -186,10 +184,10 @@ namespace HaloCreek
                 ReviewViewModel review,
                 HistorySessionsViewModel historySessions,
                 LogPanelViewModel logs,
-                SessionHistoryStore sessionHistoryStore,
                 SessionLifecycleService sessionLifecycleService,
                 TmuxService tmuxService,
                 WorkspaceSnapshotStore<WorkspacePathIndexSnapshot> workspacePathIndexSnapshots,
+                WorkspaceSnapshotStore<SessionHistorySnapshot> sessionHistorySnapshots,
                 FloatingPromptService floatingPromptService,
                 GlobalHotkeyRegistrar globalHotkeyRegistrar)
             {
@@ -200,12 +198,12 @@ namespace HaloCreek
                 _historySessions = historySessions
                     ?? throw new ArgumentNullException(nameof(historySessions));
                 _logs = logs;
-                _sessionHistoryStore = sessionHistoryStore
-                    ?? throw new ArgumentNullException(nameof(sessionHistoryStore));
                 _sessionLifecycleService = sessionLifecycleService;
                 _tmuxService = tmuxService;
                 _workspacePathIndexSnapshots = workspacePathIndexSnapshots
                     ?? throw new ArgumentNullException(nameof(workspacePathIndexSnapshots));
+                _sessionHistorySnapshots = sessionHistorySnapshots
+                    ?? throw new ArgumentNullException(nameof(sessionHistorySnapshots));
                 _floatingPromptService = floatingPromptService
                     ?? throw new ArgumentNullException(nameof(floatingPromptService));
                 _globalHotkeyRegistrar = globalHotkeyRegistrar
@@ -229,8 +227,8 @@ namespace HaloCreek
                 _review.Dispose();
                 _historySessions.Dispose();
                 _logs.Dispose();
-                _sessionHistoryStore.Dispose();
                 _workspacePathIndexSnapshots.Dispose();
+                _sessionHistorySnapshots.Dispose();
                 _sessionLifecycleService.Dispose();
                 _tmuxService.Dispose();
             }

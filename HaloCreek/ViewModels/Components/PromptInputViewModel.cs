@@ -11,6 +11,7 @@ using HaloCreek.Services;
 using HaloCreek.Services.Completions;
 using HaloCreek.Services.PromptTemplates;
 using HaloCreek.Services.SessionHistory;
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.ViewModels.Components
 {
@@ -39,7 +40,7 @@ namespace HaloCreek.ViewModels.Components
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime,
             CompletionCoordinator completionCoordinator,
-            SessionHistoryStore sessionHistoryStore)
+            IWorkspaceSnapshotSource<SessionHistorySnapshot> historySnapshots)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
@@ -50,7 +51,7 @@ namespace HaloCreek.ViewModels.Components
                 ?? throw new ArgumentNullException(nameof(completionCoordinator));
             TemplatePicker = new PromptTemplatePickerViewModel(
                 PromptTemplateStaticConfig.Items,
-                sessionHistoryStore);
+                historySnapshots);
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
             SendToFrontCommand = new RelayCommand(SendToFront, CanSendToFront);

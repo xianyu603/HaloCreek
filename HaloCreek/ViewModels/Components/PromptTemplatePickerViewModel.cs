@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using HaloCreek.Models;
 using HaloCreek.Services.PromptTemplates;
 using HaloCreek.Services.SessionHistory;
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.ViewModels.Components
 {
@@ -12,16 +13,16 @@ namespace HaloCreek.ViewModels.Components
         private const string RecentInitialPromptsGroupTitle = "Recent Initial Prompts";
 
         private readonly IReadOnlyList<PromptTemplateItem> _templateItems;
-        private readonly SessionHistoryStore _sessionHistoryStore;
+        private readonly IWorkspaceSnapshotSource<SessionHistorySnapshot> _historySnapshots;
         private PromptTemplateItem? _previewItem;
 
         public PromptTemplatePickerViewModel(
             IReadOnlyList<PromptTemplateItem> items,
-            SessionHistoryStore sessionHistoryStore)
+            IWorkspaceSnapshotSource<SessionHistorySnapshot> historySnapshots)
         {
             _templateItems = items ?? throw new ArgumentNullException(nameof(items));
-            _sessionHistoryStore = sessionHistoryStore
-                ?? throw new ArgumentNullException(nameof(sessionHistoryStore));
+            _historySnapshots = historySnapshots
+                ?? throw new ArgumentNullException(nameof(historySnapshots));
         }
 
         public PromptTemplateItem? PreviewItem
@@ -57,7 +58,7 @@ namespace HaloCreek.ViewModels.Components
             }
 
             var recentInitialPrompts =
-                RecentInitialPromptTemplateItemBuilder.Build(_sessionHistoryStore.Sessions);
+                RecentInitialPromptTemplateItemBuilder.Build(_historySnapshots.Current.Sessions);
             if (recentInitialPrompts.Count > 0)
             {
                 groups.Add(new PromptTemplateItemGroup(

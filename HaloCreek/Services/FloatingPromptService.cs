@@ -1,6 +1,7 @@
 using System;
 using HaloCreek.Services.Completions;
 using HaloCreek.Services.SessionHistory;
+using HaloCreek.Services.WorkspaceSnapshots;
 using HaloCreek.ViewModels;
 using HaloCreek.ViewModels.Components;
 using HaloCreek.Views;
@@ -17,14 +18,14 @@ namespace HaloCreek.Services
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime,
             CompletionCoordinator completionCoordinator,
-            SessionHistoryStore sessionHistoryStore)
+            IWorkspaceSnapshotSource<SessionHistorySnapshot> historySnapshots)
         {
             _viewModel = new FloatingPromptViewModel(
                 new PromptInputViewModel(
                     sessionLifecycleService,
                     appCommonRuntime,
                     completionCoordinator,
-                    sessionHistoryStore));
+                    historySnapshots));
             _viewModel.PromptInput.PromptSubmitted += OnPromptSubmitted;
             _window = new FloatingPromptWindow
             {

@@ -7,12 +7,13 @@ using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.Services.SessionHistory;
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.ViewModels.Tabs
 {
     public sealed class HistorySessionsViewModel : ViewModelBase, IDisposable
     {
-        private readonly SessionHistoryStore _sessionHistoryStore;
+        private readonly IWorkspaceSnapshotSource<SessionHistorySnapshot> _historySnapshots;
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<HistorySessionInfo> _sessions = Array.Empty<HistorySessionInfo>();
@@ -21,19 +22,19 @@ namespace HaloCreek.ViewModels.Tabs
         private bool _isDisposed;
 
         public HistorySessionsViewModel(
-            SessionHistoryStore sessionHistoryStore,
+            IWorkspaceSnapshotSource<SessionHistorySnapshot> historySnapshots,
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
-            _sessionHistoryStore = sessionHistoryStore
-                ?? throw new ArgumentNullException(nameof(sessionHistoryStore));
+            _historySnapshots = historySnapshots
+                ?? throw new ArgumentNullException(nameof(historySnapshots));
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _transientEventService = appCommonRuntime.TransientEventService;
             ResumeCommand = new AsyncRelayCommand<HistorySessionInfo>(ResumeAsync, HasSelectedSession);
-            _sessionHistoryStore.HistoryChanged += HandleHistoryChanged;
+            _historySnapshots.Changed += HandleHistoryChanged;
             ApplySearch();
         }
 
@@ -74,7 +75,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void ApplySearch()
         {
-            var filteredSessions = FilterSessions(_sessionHistoryStore.Sessions, SearchText);
+            var filteredSessions = FilterSessions(_historySnapshots.Current.Sessions, SearchText);
             var previousSelection = SelectedSession;
 
             if (!AreVisibleSessionListsEquivalent(Sessions, filteredSessions))
@@ -162,21 +163,15 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void HandleHistoryChanged(object? sender, EventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(_sessionHistoryStore.LastErrorMessage))
-            {
-                Log.Warning(
-                    "HistorySessions",
-                    $"Failed to load history sessions: {_sessionHistoryStore.LastErrorMessage}");
-            }
+            var snapshot = _historySnapshots.Current;
 
             ApplySearch();
 
-            if (string.IsNullOrWhiteSpace(_sessionHistoryStore.LastErrorMessage)
-                && _sessionHistoryStore.SkippedFileCount > 0)
+            if (snapshot.SkippedFileCount > 0)
             {
                 Log.Warning(
                     "HistorySessions",
-                    $"Loaded {_sessionHistoryStore.Sessions.Count} sessions, skipped {_sessionHistoryStore.SkippedFileCount} invalid files.");
+                    $"Loaded {snapshot.Sessions.Count} sessions, skipped {snapshot.SkippedFileCount} invalid files.");
             }
         }
 
@@ -214,7 +209,7 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _isDisposed = true;
-            _sessionHistoryStore.HistoryChanged -= HandleHistoryChanged;
+            _historySnapshots.Changed -= HandleHistoryChanged;
         }
     }
 }

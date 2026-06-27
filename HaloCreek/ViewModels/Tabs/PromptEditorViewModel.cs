@@ -8,6 +8,7 @@ using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.Services.Completions;
 using HaloCreek.Services.SessionHistory;
+using HaloCreek.Services.WorkspaceSnapshots;
 using HaloCreek.ViewModels.Components;
 
 namespace HaloCreek.ViewModels.Tabs
@@ -23,7 +24,7 @@ namespace HaloCreek.ViewModels.Tabs
             SessionLifecycleService sessionLifecycleService,
             AppCommonRuntime appCommonRuntime,
             CompletionCoordinator completionCoordinator,
-            SessionHistoryStore sessionHistoryStore)
+            IWorkspaceSnapshotSource<SessionHistorySnapshot> historySnapshots)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             ArgumentNullException.ThrowIfNull(completionCoordinator);
@@ -34,7 +35,7 @@ namespace HaloCreek.ViewModels.Tabs
                 _sessionLifecycleService,
                 appCommonRuntime,
                 completionCoordinator,
-                sessionHistoryStore);
+                historySnapshots);
 
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
