@@ -17,7 +17,6 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         private static readonly TimeSpan RefreshJitter = TimeSpan.FromSeconds(2);
 
         private readonly object _lock = new();
-        // 后续需要更快响应文件变化时，由具体 Snapshot 声明关心的路径，再在 Store 统一接文件系统事件。
         private readonly Timer _refreshTimer;
         private TSnapshot _current;
         private RefreshState _state;
@@ -105,6 +104,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             }
 
             PublishChanged(workspace);
+            // todo 这里不应该温柔request 应该停掉之前的
             RequestRefresh(SnapshotRefreshReason.WorkspaceChanged);
         }
 
