@@ -1,8 +1,11 @@
 using System.Collections.Generic;
+using HaloCreek.Services;
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.Services.WorkspacePaths
 {
-    internal sealed class WorkspacePathIndexSnapshot
+    internal sealed class WorkspacePathIndexSnapshot :
+        IWorkspaceSnapshot<WorkspacePathIndexSnapshot>
     {
         public required string WorkspacePath { get; init; }
 
@@ -11,6 +14,23 @@ namespace HaloCreek.Services.WorkspacePaths
         public required IReadOnlyList<WorkspacePathIndexFileNode> Files { get; init; }
 
         public required IReadOnlyList<WorkspacePathIndexDirectoryNode> Directories { get; init; }
+
+        public static WorkspacePathIndexSnapshot CreateEmpty(WorkspaceContext workspace)
+        {
+            return WorkspacePathIndexSnapshotReader.CreateEmpty(workspace);
+        }
+
+        public static WorkspacePathIndexSnapshot ReadSnapshot(WorkspaceContext workspace)
+        {
+            return WorkspacePathIndexSnapshotReader.Read(workspace);
+        }
+
+        public static bool ContentEquals(
+            WorkspacePathIndexSnapshot left,
+            WorkspacePathIndexSnapshot right)
+        {
+            return WorkspacePathIndexSnapshotReader.ContentEquals(left, right);
+        }
     }
 
     internal sealed class WorkspacePathIndexDirectoryNode

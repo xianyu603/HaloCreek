@@ -15,6 +15,7 @@ using HaloCreek.Services.Completions.ShortcutPhrases;
 using HaloCreek.Services.Completions.Skills;
 using HaloCreek.Services.SessionHistory;
 using HaloCreek.Services.WorkspacePaths;
+using HaloCreek.Services.WorkspaceSnapshots;
 using HaloCreek.ViewModels;
 using HaloCreek.ViewModels.Components;
 using HaloCreek.ViewModels.Tabs;
@@ -88,7 +89,8 @@ namespace HaloCreek
                 terminalService,
                 appCommonRuntime);
             var gitService = new GitService();
-            var workspacePathIndexService = new WorkspacePathIndexService(gitService);
+            var workspacePathIndexSnapshots =
+                new WorkspaceSnapshotStore<WorkspacePathIndexSnapshot>();
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
             var skillCatalogReader = new SkillCatalogReader(
@@ -101,7 +103,7 @@ namespace HaloCreek
                     [SkillCompletionSource.TriggerCharacter] = new SkillCompletionSource(skillCatalogReader),
                     [FileCompletionSource.TriggerCharacter] = new FileCompletionSource(
                         new FileCompletionCandidateReader(gitService),
-                        workspacePathIndexService),
+                        workspacePathIndexSnapshots),
                 });
             ISessionHistoryReader sessionHistoryReader = new CodexSessionHistoryReader(appCommonRuntime);
             var sessionHistoryQueryService = new SessionHistoryQueryService(sessionHistoryReader);
@@ -157,7 +159,7 @@ namespace HaloCreek
                 sessionHistoryStore,
                 sessionLifecycleService,
                 tmuxService,
-                workspacePathIndexService,
+                workspacePathIndexSnapshots,
                 floatingPromptService,
                 globalHotkeyRegistrar);
         }
@@ -174,7 +176,7 @@ namespace HaloCreek
             private readonly SessionHistoryStore _sessionHistoryStore;
             private readonly SessionLifecycleService _sessionLifecycleService;
             private readonly TmuxService _tmuxService;
-            private readonly WorkspacePathIndexService _workspacePathIndexService;
+            private readonly WorkspaceSnapshotStore<WorkspacePathIndexSnapshot> _workspacePathIndexSnapshots;
             private readonly FloatingPromptService _floatingPromptService;
             private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
             private bool _isDisposed;
@@ -189,7 +191,7 @@ namespace HaloCreek
                 SessionHistoryStore sessionHistoryStore,
                 SessionLifecycleService sessionLifecycleService,
                 TmuxService tmuxService,
-                WorkspacePathIndexService workspacePathIndexService,
+                WorkspaceSnapshotStore<WorkspacePathIndexSnapshot> workspacePathIndexSnapshots,
                 FloatingPromptService floatingPromptService,
                 GlobalHotkeyRegistrar globalHotkeyRegistrar)
             {
@@ -204,8 +206,8 @@ namespace HaloCreek
                     ?? throw new ArgumentNullException(nameof(sessionHistoryStore));
                 _sessionLifecycleService = sessionLifecycleService;
                 _tmuxService = tmuxService;
-                _workspacePathIndexService = workspacePathIndexService
-                    ?? throw new ArgumentNullException(nameof(workspacePathIndexService));
+                _workspacePathIndexSnapshots = workspacePathIndexSnapshots
+                    ?? throw new ArgumentNullException(nameof(workspacePathIndexSnapshots));
                 _floatingPromptService = floatingPromptService
                     ?? throw new ArgumentNullException(nameof(floatingPromptService));
                 _globalHotkeyRegistrar = globalHotkeyRegistrar
@@ -230,7 +232,7 @@ namespace HaloCreek
                 _historySessions.Dispose();
                 _logs.Dispose();
                 _sessionHistoryStore.Dispose();
-                _workspacePathIndexService.Dispose();
+                _workspacePathIndexSnapshots.Dispose();
                 _sessionLifecycleService.Dispose();
                 _tmuxService.Dispose();
             }

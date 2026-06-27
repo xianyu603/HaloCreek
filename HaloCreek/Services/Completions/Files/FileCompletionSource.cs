@@ -9,6 +9,7 @@ using FuzzySharp;
 using HaloCreek.Infrastructure;
 using HaloCreek.Models;
 using HaloCreek.Services.WorkspacePaths;
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.Services.Completions.Files
 {
@@ -20,16 +21,16 @@ namespace HaloCreek.Services.Completions.Files
         private const int RecentCommitCount = 5;
 
         private readonly FileCompletionCandidateReader _candidateReader;
-        private readonly WorkspacePathIndexService _workspacePathIndexService;
+        private readonly IWorkspaceSnapshotSource<WorkspacePathIndexSnapshot> _workspacePathIndexSnapshots;
 
         public FileCompletionSource(
             FileCompletionCandidateReader candidateReader,
-            WorkspacePathIndexService workspacePathIndexService)
+            IWorkspaceSnapshotSource<WorkspacePathIndexSnapshot> workspacePathIndexSnapshots)
         {
             _candidateReader = candidateReader
                 ?? throw new ArgumentNullException(nameof(candidateReader));
-            _workspacePathIndexService = workspacePathIndexService
-                ?? throw new ArgumentNullException(nameof(workspacePathIndexService));
+            _workspacePathIndexSnapshots = workspacePathIndexSnapshots
+                ?? throw new ArgumentNullException(nameof(workspacePathIndexSnapshots));
         }
 
         public async IAsyncEnumerable<CompletionQuerySnapshot> StartQuery(
@@ -87,7 +88,7 @@ namespace HaloCreek.Services.Completions.Files
             string query,
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            var snapshot = _workspacePathIndexService.Snapshot;
+            var snapshot = _workspacePathIndexSnapshots.Current;
             var items = await Task.Run(
                 () =>
                 {

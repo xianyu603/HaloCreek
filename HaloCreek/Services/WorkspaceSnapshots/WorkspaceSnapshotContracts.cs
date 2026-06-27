@@ -1,5 +1,10 @@
 using System;
-using HaloCreek.Services;
+
+// 后续演进TODO
+// 若恢复增量扫描缓存，应由 Store 提供扫描上下文，不放在 Reader 静态状态里。
+// 需要更快响应文件变化时，由具体 Snapshot 声明关心的路径，再在 Store 统一接文件系统事件。
+// 需要抢占慢速快照读取时，由 Store 统一提供刷新取消能力，不在具体 Reader 内部维护生命周期状态。
+
 
 namespace HaloCreek.Services.WorkspaceSnapshots
 {
