@@ -93,9 +93,7 @@ namespace HaloCreek
                 new WorkspaceSnapshotStore<WorkspacePathIndexSnapshot>();
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
-            var skillCatalogReader = new SkillCatalogReader(
-                WorkspaceRuntime.Current.WorkspacePath,
-                appCommonRuntime.PlatformInfrastructure);
+            var skillCatalogReader = new SkillCatalogReader();
             var completionCoordinator = new CompletionCoordinator(
                 new Dictionary<char, ICompletionSource>
                 {

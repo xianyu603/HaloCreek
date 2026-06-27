@@ -31,8 +31,9 @@ namespace HaloCreek.Infrastructure
         private const string LogCategory = "Platform";
         private const int WslCommandTimeoutMilliseconds = 10000;
 
+        private static IReadOnlyList<string>? _wslDistributionNames;
+
         private readonly Window _owner;
-        private IReadOnlyList<string>? _wslDistributionNames;
 
         public PlatformInfrastructure(Window owner)
         {
@@ -570,7 +571,7 @@ namespace HaloCreek.Infrastructure
                 && path[2] == '/';
         }
 
-        public bool TryGetWslEnvironmentVariable(string name, out string value)
+        public static bool TryGetWslEnvironmentVariable(string name, out string value)
         {
             value = string.Empty;
 
@@ -596,7 +597,7 @@ namespace HaloCreek.Infrastructure
             return !string.IsNullOrWhiteSpace(value);
         }
 
-        public bool TryGetReadableWslHomeDirectoryPath(out string homeDirectoryPath)
+        public static bool TryGetReadableWslHomeDirectoryPath(out string homeDirectoryPath)
         {
             homeDirectoryPath = string.Empty;
 
@@ -626,7 +627,7 @@ namespace HaloCreek.Infrastructure
             return true;
         }
 
-        public bool TryConvertWslPathToReadablePath(string wslPath, out string readablePath)
+        public static bool TryConvertWslPathToReadablePath(string wslPath, out string readablePath)
         {
             readablePath = string.Empty;
 
@@ -848,7 +849,7 @@ namespace HaloCreek.Infrastructure
             return Process.Start(startInfo);
         }
 
-        private IReadOnlyList<string> GetWslDistributionNames()
+        private static IReadOnlyList<string> GetWslDistributionNames()
         {
             if (_wslDistributionNames is not null)
             {

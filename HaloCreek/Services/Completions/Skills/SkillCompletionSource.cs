@@ -29,13 +29,13 @@ namespace HaloCreek.Services.Completions.Skills
         private static readonly IReadOnlyDictionary<string, string> CategoryExactTokens =
             BuildCategoryExactTokenIndex();
 
-        private readonly IReadOnlyList<SkillCatalogSource> _sources;
+        private readonly SkillCatalogReader _catalogReader;
 
         public SkillCompletionSource(SkillCatalogReader catalogReader)
         {
             ArgumentNullException.ThrowIfNull(catalogReader);
 
-            _sources = catalogReader.ReadCatalog();
+            _catalogReader = catalogReader;
         }
 
         public async IAsyncEnumerable<CompletionQuerySnapshot> StartQuery(
@@ -44,18 +44,21 @@ namespace HaloCreek.Services.Completions.Skills
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // TODO: If the workspace changes after a query starts, discard stale skill results at this layer.
+            var sources = _catalogReader.ReadCatalog();
             var query = (text ?? string.Empty).Trim();
             var items = string.IsNullOrEmpty(query)
-                ? BuildSourceItems()
-                : BuildQueriedItems(query);
+                ? BuildSourceItems(sources)
+                : BuildQueriedItems(query, sources);
 
             yield return new CompletionQuerySnapshot(items, false);
             await System.Threading.Tasks.Task.CompletedTask;
         }
 
-        private IReadOnlyList<PromptCompletionItem> BuildSourceItems()
+        private static IReadOnlyList<PromptCompletionItem> BuildSourceItems(
+            IReadOnlyList<SkillCatalogSource> sources)
         {
-            return GetSortedSources(_sources)
+            return GetSortedSources(sources)
                 .Where(source => source.Skills.Count > 0)
                 .Select(source => new PromptCompletionItem
                 {
@@ -66,11 +69,13 @@ namespace HaloCreek.Services.Completions.Skills
                 .ToArray();
         }
 
-        private IReadOnlyList<PromptCompletionItem> BuildQueriedItems(string query)
+        private IReadOnlyList<PromptCompletionItem> BuildQueriedItems(
+            string query,
+            IReadOnlyList<SkillCatalogSource> sources)
         {
             if (SourceExactTokens.TryGetValue(query, out var source))
             {
-                var skills = GetSourceSkills(source).ToArray();
+                var skills = GetSourceSkills(source, sources).ToArray();
                 if (skills.Length == 0)
                 {
                     return Array.Empty<PromptCompletionItem>();
@@ -81,17 +86,17 @@ namespace HaloCreek.Services.Completions.Skills
 
             if (CategoryExactTokens.TryGetValue(query, out var category))
             {
-                return GetAllSortedSkills()
+                return GetAllSortedSkills(sources)
                     .Where(item => SkillCategoryClassifier.Classify(item) == category)
                     .Select(BuildSkillItem)
                     .ToArray();
             }
 
-            var exactSkillMatches = GetAllSortedSkills()
+            var exactSkillMatches = GetAllSortedSkills(sources)
                 .Where(item => string.Equals(item.Name, query, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
             var exactSkillMatchSet = new HashSet<SkillCatalogItem>(exactSkillMatches);
-            var fuzzyMatches = GetSortedFuzzyMatches(query)
+            var fuzzyMatches = GetSortedFuzzyMatches(query, sources)
                 .Where(item => !exactSkillMatchSet.Contains(item));
 
             return exactSkillMatches
@@ -101,9 +106,11 @@ namespace HaloCreek.Services.Completions.Skills
                 .ToArray();
         }
 
-        private IEnumerable<SkillCatalogItem> GetSourceSkills(SkillSourceKind source)
+        private static IEnumerable<SkillCatalogItem> GetSourceSkills(
+            SkillSourceKind source,
+            IReadOnlyList<SkillCatalogSource> sources)
         {
-            return GetSortedSources(_sources)
+            return GetSortedSources(sources)
                 .Where(catalogSource => catalogSource.Source == source)
                 .SelectMany(catalogSource => GetSortedSkills(catalogSource.Skills));
         }
@@ -139,9 +146,11 @@ namespace HaloCreek.Services.Completions.Skills
             };
         }
 
-        private IEnumerable<SkillCatalogItem> GetSortedFuzzyMatches(string query)
+        private static IEnumerable<SkillCatalogItem> GetSortedFuzzyMatches(
+            string query,
+            IReadOnlyList<SkillCatalogSource> sources)
         {
-            var searchItems = GetAllSortedSkillSearchItems()
+            var searchItems = GetAllSortedSkillSearchItems(sources)
                 .ToArray();
             if (searchItems.Length == 0)
             {
@@ -160,15 +169,17 @@ namespace HaloCreek.Services.Completions.Skills
                 .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase);
         }
 
-        private IEnumerable<SkillCatalogItem> GetAllSortedSkills()
+        private static IEnumerable<SkillCatalogItem> GetAllSortedSkills(
+            IReadOnlyList<SkillCatalogSource> sources)
         {
-            return GetSortedSources(_sources)
+            return GetSortedSources(sources)
                 .SelectMany(source => GetSortedSkills(source.Skills));
         }
 
-        private IEnumerable<SkillSearchItem> GetAllSortedSkillSearchItems()
+        private static IEnumerable<SkillSearchItem> GetAllSortedSkillSearchItems(
+            IReadOnlyList<SkillCatalogSource> sources)
         {
-            return GetSortedSources(_sources)
+            return GetSortedSources(sources)
                 .SelectMany(source => GetSortedSkills(source.Skills)
                     .Select(item => new SkillSearchItem(
                         item,

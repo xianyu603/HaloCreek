@@ -15,24 +15,18 @@ namespace HaloCreek.Services.Completions.Skills
         private const string SkillsDirectoryName = "skills";
         private const string SystemSkillsDirectoryName = ".system";
 
-        private readonly string _workspacePath;
         private readonly string? _homeDirectoryPath;
 
-        public SkillCatalogReader(string workspacePath, PlatformInfrastructure platformInfrastructure)
+        public SkillCatalogReader()
             : this(
-                workspacePath,
-                (platformInfrastructure ?? throw new ArgumentNullException(nameof(platformInfrastructure)))
-                    .TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath)
+                PlatformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath)
                     ? homeDirectoryPath
                     : null)
         {
         }
 
-        internal SkillCatalogReader(string workspacePath, string? homeDirectoryPath)
+        internal SkillCatalogReader(string? homeDirectoryPath)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
-
-            _workspacePath = workspacePath;
             _homeDirectoryPath = string.IsNullOrWhiteSpace(homeDirectoryPath)
                 ? null
                 : homeDirectoryPath;
@@ -208,7 +202,7 @@ namespace HaloCreek.Services.Completions.Skills
         private IReadOnlyList<SkillSourceDirectory> GetSourceDirectories()
         {
             var projectSkillsPath = Path.Combine(
-                _workspacePath,
+                WorkspaceRuntime.Current.WorkspacePath,
                 CodexDirectoryName,
                 SkillsDirectoryName);
 

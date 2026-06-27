@@ -21,14 +21,11 @@ namespace HaloCreek.Services.SessionHistory
             RecurseSubdirectories = true,
         };
 
-        private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly Dictionary<string, CachedSessionFile> _fileCache = new(GetFilePathComparer());
 
         public CodexSessionHistoryReader(AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
-
-            _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
         }
 
         public SessionHistoryResult ReadSessions(string workspacePath, int maxSessionHistoryFiles)
@@ -77,7 +74,7 @@ namespace HaloCreek.Services.SessionHistory
 
         private string? FindSessionHistoryRootPath()
         {
-            if (!_platformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath))
+            if (!PlatformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath))
             {
                 return null;
             }
