@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.ViewModels.Tabs
 {
-    public sealed class GitViewModel : ViewModelBase
+    public sealed class GitViewModel : ViewModelBase, IDisposable
     {
-        private readonly GitService _gitService;
+        private readonly IWorkspaceSnapshotSource<GitSnapshot> _gitSnapshots;
         private readonly ExternalActionService _externalActionService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
@@ -21,22 +21,28 @@ namespace HaloCreek.ViewModels.Tabs
         private IReadOnlyList<IGitFileAction> _workspaceRootActions = Array.Empty<IGitFileAction>();
         private GitChangeInfo? _selectedChange;
         private GitSelectedPathActionDescriptor _doubleClickAction = null!;
+        private bool _isDisposed;
 
         public GitViewModel(
-            GitService gitService,
+            IWorkspaceSnapshotSource<GitSnapshot> gitSnapshots,
             ExternalActionService externalActionService,
             AppCommonRuntime appCommonRuntime,
             ICommand refreshCommand)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
-            _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
+            _gitSnapshots = gitSnapshots ?? throw new ArgumentNullException(nameof(gitSnapshots));
             _externalActionService = externalActionService
                 ?? throw new ArgumentNullException(nameof(externalActionService));
             _transientEventService = appCommonRuntime.TransientEventService;
             RefreshCommand = refreshCommand ?? throw new ArgumentNullException(nameof(refreshCommand));
             OpenSelectedChangeCommand = new RelayCommand<GitChangeInfo>(OpenSelectedChange, CanOpenSelectedChange);
             LoadActionConfig();
+            _gitSnapshots.Changed += OnGitSnapshotChanged;
+            var snapshot = _gitSnapshots.Current;
+            SelectedChange = null;
+            Changes = snapshot.Changes;
+            Log.Info("Git", snapshot.Message);
         }
 
         public IReadOnlyList<GitChangeInfo> Changes
@@ -74,17 +80,28 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<GitChangeInfo> OpenSelectedChangeCommand { get; }
 
-        public async Task RefreshChangesAsync()
+        public void Dispose()
         {
-            var result = await Task.Run(_gitService.GetChanges);
-
-            if (!Changes.SequenceEqual(result.Changes))
+            if (_isDisposed)
             {
-                SelectedChange = null;
-                Changes = result.Changes;
+                return;
             }
 
-            Log.Info("Git", result.Message);
+            _isDisposed = true;
+            _gitSnapshots.Changed -= OnGitSnapshotChanged;
+        }
+
+        private void OnGitSnapshotChanged(object? sender, EventArgs e)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            var snapshot = _gitSnapshots.Current;
+            SelectedChange = null;
+            Changes = snapshot.Changes;
+            Log.Info("Git", snapshot.Message);
         }
 
         private void LoadActionConfig()

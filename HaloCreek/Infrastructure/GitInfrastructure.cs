@@ -16,8 +16,12 @@ namespace HaloCreek.Infrastructure
 
         public static GitChangesResult GetChanges()
         {
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            return GetChanges(WorkspaceRuntime.Current.GitRootPath);
+        }
 
+        public static GitChangesResult GetChanges(string workspacePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
             var commandResult = RunGitStatus(workspacePath);
             if (!commandResult.Succeeded)
             {
@@ -37,6 +41,27 @@ namespace HaloCreek.Infrastructure
                 : $"Loaded {changes.Length} Git changes.";
 
             return new GitChangesResult(changes, loadedMessage, workspacePath);
+        }
+
+        public static string? GetHeadId(string workspacePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
+            var commandResult = RunGit(
+                workspacePath,
+                new[] { "rev-parse", "HEAD" });
+            if (commandResult.Succeeded)
+            {
+                return NormalizeBlobId(commandResult.Output);
+            }
+
+            var message = commandResult.ErrorMessage.Trim();
+            if (IsMissingHeadPathError(message))
+            {
+                return null;
+            }
+
+            throw new InvalidOperationException($"Git HEAD query failed. {message}");
         }
 
         public static IReadOnlyList<string> GetRecentCommittedFilePaths(int commitCount)
@@ -100,7 +125,12 @@ namespace HaloCreek.Infrastructure
 
         public static string? GetHeadBlobId(string? relativePath)
         {
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            return GetHeadBlobId(WorkspaceRuntime.Current.GitRootPath, relativePath);
+        }
+
+        public static string? GetHeadBlobId(string workspacePath, string? relativePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var commandResult = RunGit(
@@ -122,7 +152,12 @@ namespace HaloCreek.Infrastructure
 
         public static string? HashWorkingTreeFile(string? relativePath)
         {
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            return HashWorkingTreeFile(WorkspaceRuntime.Current.GitRootPath, relativePath);
+        }
+
+        public static string? HashWorkingTreeFile(string workspacePath, string? relativePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var absoluteFilePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
@@ -236,6 +271,7 @@ namespace HaloCreek.Infrastructure
             return message.Contains("does not exist in", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("exists on disk, but not in", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("invalid object name 'HEAD'", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("ambiguous argument 'HEAD'", StringComparison.OrdinalIgnoreCase)
                 || message.Contains("ambiguous argument 'HEAD:", StringComparison.OrdinalIgnoreCase);
         }
 

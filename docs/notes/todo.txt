@@ -15,3 +15,4 @@ wt的检查 win 10默认没有wt 需要同步修改user guide
 
 review加点提示信息，方便先捡软柿子review
 CompletionQuerySnapshot.IsPending 和 async stream 生命周期语义重复，后续考虑用 stream 结束表达 pending 完成，简化补全查询模型
+不支持应用内热切换 workspace；选择另一个 workspace 时，校验成功后重启应用到新 workspace。

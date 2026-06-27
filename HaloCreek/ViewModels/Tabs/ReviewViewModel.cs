@@ -8,6 +8,7 @@ using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.ViewModels.Tabs
 {
@@ -18,6 +19,7 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly ReviewSnapshotService _reviewSnapshotService;
         private readonly GitService _gitService;
         private readonly ExternalActionService _externalActionService;
+        private readonly IWorkspaceSnapshotSource<GitSnapshot> _gitSnapshots;
         private readonly TransientEventService _transientEventService;
         private readonly DispatcherTimer _autoRefreshTimer;
         private IReadOnlyList<ReviewFilePath> _unreviewedFiles = Array.Empty<ReviewFilePath>();
@@ -30,6 +32,7 @@ namespace HaloCreek.ViewModels.Tabs
             ReviewSnapshotService reviewSnapshotService,
             GitService gitService,
             ExternalActionService externalActionService,
+            IWorkspaceSnapshotSource<GitSnapshot> gitSnapshots,
             AppCommonRuntime appCommonRuntime)
         {
             _reviewSnapshotService = reviewSnapshotService
@@ -37,11 +40,12 @@ namespace HaloCreek.ViewModels.Tabs
             _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
             _externalActionService = externalActionService
                 ?? throw new ArgumentNullException(nameof(externalActionService));
+            _gitSnapshots = gitSnapshots ?? throw new ArgumentNullException(nameof(gitSnapshots));
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             _transientEventService = appCommonRuntime.TransientEventService;
             RefreshCommand = new AsyncRelayCommand(RefreshReviewFilesAsync);
             ModifiedGit = new GitViewModel(
-                _gitService,
+                gitSnapshots,
                 _externalActionService,
                 appCommonRuntime,
                 RefreshCommand);
@@ -136,6 +140,7 @@ namespace HaloCreek.ViewModels.Tabs
             _autoRefreshTimer.Stop();
             _autoRefreshTimer.Tick -= OnAutoRefreshTimerTick;
             WorkspaceRuntime.Changed -= OnWorkspaceChanged;
+            ModifiedGit.Dispose();
         }
 
         public void OnSelected()
@@ -157,6 +162,9 @@ namespace HaloCreek.ViewModels.Tabs
             // requests are ignored instead of running concurrent review index updates. If workspace
             // switching needs stale async result cancellation, keep that as a WorkspaceRuntime-bound
             // operation rather than adding per-view-model pending/generation handling here.
+            // ReviewIndexSnapshot is not split yet. Until then this parent refresh command requests
+            // GitSnapshot and refreshes the legacy ReviewSnapshotService lists together; after the
+            // index split, keep this as the single command that requests both snapshot stores.
             if (RefreshCommand.CanExecute(null))
             {
                 RefreshCommand.Execute(null);
@@ -168,6 +176,7 @@ namespace HaloCreek.ViewModels.Tabs
             try
             {
                 Log.Info("Review", "RefreshReviewSnapshot invoked.");
+                _gitSnapshots.RequestRefresh(SnapshotRefreshReason.Manual);
                 var result = await Task.Run(() =>
                 {
                     _reviewSnapshotService.RefreshReviewSnapshot();
@@ -189,8 +198,6 @@ namespace HaloCreek.ViewModels.Tabs
                     UnreviewedFiles = result.UnreviewedFiles;
                     ReviewedFiles = result.ReviewedFiles;
                 }
-
-                await ModifiedGit.RefreshChangesAsync();
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {

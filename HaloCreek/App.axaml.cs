@@ -93,6 +93,8 @@ namespace HaloCreek
                 new WorkspaceSnapshotStore<WorkspacePathIndexSnapshot>();
             var sessionHistorySnapshots =
                 new WorkspaceSnapshotStore<SessionHistorySnapshot>();
+            var gitSnapshots =
+                new WorkspaceSnapshotStore<GitSnapshot>();
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
             var skillCatalogReader = new SkillCatalogReader();
@@ -121,6 +123,7 @@ namespace HaloCreek
                 reviewSnapshotService,
                 gitService,
                 externalActionService,
+                gitSnapshots,
                 appCommonRuntime);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistorySnapshots,
@@ -156,6 +159,7 @@ namespace HaloCreek
                 tmuxService,
                 workspacePathIndexSnapshots,
                 sessionHistorySnapshots,
+                gitSnapshots,
                 floatingPromptService,
                 globalHotkeyRegistrar);
         }
@@ -173,6 +177,7 @@ namespace HaloCreek
             private readonly TmuxService _tmuxService;
             private readonly WorkspaceSnapshotStore<WorkspacePathIndexSnapshot> _workspacePathIndexSnapshots;
             private readonly WorkspaceSnapshotStore<SessionHistorySnapshot> _sessionHistorySnapshots;
+            private readonly WorkspaceSnapshotStore<GitSnapshot> _gitSnapshots;
             private readonly FloatingPromptService _floatingPromptService;
             private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
             private bool _isDisposed;
@@ -188,6 +193,7 @@ namespace HaloCreek
                 TmuxService tmuxService,
                 WorkspaceSnapshotStore<WorkspacePathIndexSnapshot> workspacePathIndexSnapshots,
                 WorkspaceSnapshotStore<SessionHistorySnapshot> sessionHistorySnapshots,
+                WorkspaceSnapshotStore<GitSnapshot> gitSnapshots,
                 FloatingPromptService floatingPromptService,
                 GlobalHotkeyRegistrar globalHotkeyRegistrar)
             {
@@ -204,6 +210,8 @@ namespace HaloCreek
                     ?? throw new ArgumentNullException(nameof(workspacePathIndexSnapshots));
                 _sessionHistorySnapshots = sessionHistorySnapshots
                     ?? throw new ArgumentNullException(nameof(sessionHistorySnapshots));
+                _gitSnapshots = gitSnapshots
+                    ?? throw new ArgumentNullException(nameof(gitSnapshots));
                 _floatingPromptService = floatingPromptService
                     ?? throw new ArgumentNullException(nameof(floatingPromptService));
                 _globalHotkeyRegistrar = globalHotkeyRegistrar
@@ -227,6 +235,7 @@ namespace HaloCreek
                 _review.Dispose();
                 _historySessions.Dispose();
                 _logs.Dispose();
+                _gitSnapshots.Dispose();
                 _workspacePathIndexSnapshots.Dispose();
                 _sessionHistorySnapshots.Dispose();
                 _sessionLifecycleService.Dispose();
