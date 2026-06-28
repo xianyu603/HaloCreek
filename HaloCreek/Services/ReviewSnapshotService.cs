@@ -10,10 +10,6 @@ namespace HaloCreek.Services
 {
     public sealed class ReviewSnapshotService
     {
-        private const string GitExecutableName = "git";
-        private const string HaloCreekDirectoryName = ".HaloCreek";
-        private const string HaloCreekIndexFileName = "HaloCreekIndex";
-
         private readonly GitService _gitService;
 
         public ReviewSnapshotService(GitService gitService)
@@ -47,33 +43,25 @@ namespace HaloCreek.Services
                 return;
             }
 
-            Directory.CreateDirectory(Path.Combine(workspacePath, HaloCreekDirectoryName));
-            var haloCreekIndexPath = GetHaloCreekIndexPath(workspacePath);
-            RunReviewGit(
-                workspacePath,
-                haloCreekIndexPath,
-                new[] { "update-index", "--add", "--", gitRelativePath });
+            ReviewIndexOperator.AddWorkingTreeFile(workspacePath, gitRelativePath);
         }
 
         public void MarkFileUnreviewed(string? relativePath)
         {
             var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
-            if (!IsHaloCreekIndexAvailable(workspacePath))
+            if (!ReviewIndexOperator.IsIndexAvailable(workspacePath))
             {
                 Log.Warning(
                     "Review",
                     "MarkFileUnreviewed skipped because HaloCreekIndex is missing. "
                     + "This may indicate stale Review UI state or command misuse. "
-                    + $"File={relativePath} Index={GetHaloCreekIndexPath(workspacePath)}");
+                    + $"File={relativePath} Index={ReviewIndexOperator.GetIndexPath(workspacePath)}");
                 return;
             }
 
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
-            RunReviewGit(
-                workspacePath,
-                GetHaloCreekIndexPath(workspacePath),
-                new[] { "update-index", "--force-remove", "--", gitRelativePath });
+            ReviewIndexOperator.RemoveFile(workspacePath, gitRelativePath);
         }
 
         public void RevertWorkingTreeFileToReviewed(string? relativePath)
@@ -85,7 +73,7 @@ namespace HaloCreek.Services
                 workspacePath,
                 gitRelativePath);
 
-            var reviewedEntry = ReadReviewedIndexEntries(workspacePath)
+            var reviewedEntry = ReviewIndexOperator.ReadEntries(workspacePath)
                 .FirstOrDefault(entry => string.Equals(
                     entry.RelativePath,
                     gitRelativePath,
@@ -98,10 +86,7 @@ namespace HaloCreek.Services
                     Directory.CreateDirectory(parentDirectory);
                 }
 
-                RunReviewGit(
-                    workspacePath,
-                    GetHaloCreekIndexPath(workspacePath),
-                    new[] { "checkout-index", "--force", "--", gitRelativePath });
+                ReviewIndexOperator.CheckoutFileToWorkingTree(workspacePath, gitRelativePath);
                 return;
             }
 
@@ -126,7 +111,7 @@ namespace HaloCreek.Services
         {
             var workspacePath = WorkspaceRuntime.Current.GitRootPath;
 
-            var reviewedEntries = ReadReviewedIndexEntries(workspacePath);
+            var reviewedEntries = ReviewIndexOperator.ReadEntries(workspacePath);
             if (reviewedEntries.Count == 0)
             {
                 Log.Info("Review", "RefreshReviewSnapshot completed. cleaned=0 reviewedEntries=0");
@@ -155,10 +140,7 @@ namespace HaloCreek.Services
                     continue;
                 }
 
-                RunReviewGit(
-                    workspacePath,
-                    GetHaloCreekIndexPath(workspacePath),
-                    new[] { "update-index", "--force-remove", "--", entry.RelativePath });
+                ReviewIndexOperator.RemoveFile(workspacePath, entry.RelativePath);
                 cleanedCount++;
                 Log.Info(
                     "Review",
@@ -173,12 +155,12 @@ namespace HaloCreek.Services
         public IReadOnlyList<ReviewFilePath> GetReviewedAgainstHeadFiles()
         {
             var workspacePath = WorkspaceRuntime.Current.GitRootPath;
-            if (!IsHaloCreekIndexAvailable(workspacePath))
+            if (!ReviewIndexOperator.IsIndexAvailable(workspacePath))
             {
                 return Array.Empty<ReviewFilePath>();
             }
 
-            return ReadReviewedIndexEntries(workspacePath)
+            return ReviewIndexOperator.ReadEntries(workspacePath)
                 .Where(entry =>
                 {
                     var headBlobId = _gitService.GetHeadBlobId(entry.RelativePath);
@@ -193,7 +175,7 @@ namespace HaloCreek.Services
         public IReadOnlyList<ReviewFilePath> GetWorkingTreeAgainstReviewedFiles()
         {
             var workspacePath = WorkspaceRuntime.Current.GitRootPath;
-            var reviewedEntries = ReadReviewedIndexEntries(workspacePath)
+            var reviewedEntries = ReviewIndexOperator.ReadEntries(workspacePath)
                 .GroupBy(entry => entry.RelativePath, StringComparer.Ordinal)
                 .ToDictionary(
                     group => group.Key,
@@ -218,12 +200,12 @@ namespace HaloCreek.Services
             var workspacePath = WorkspaceRuntime.Current.GitRootPath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
-            if (!IsHaloCreekIndexAvailable(workspacePath))
+            if (!ReviewIndexOperator.IsIndexAvailable(workspacePath))
             {
                 return _gitService.CreateTempHeadFile(gitRelativePath);
             }
 
-            var hasReviewedEntry = ReadReviewedIndexEntries(workspacePath)
+            var hasReviewedEntry = ReviewIndexOperator.ReadEntries(workspacePath)
                 .Any(entry => string.Equals(
                     entry.RelativePath,
                     gitRelativePath,
@@ -233,77 +215,7 @@ namespace HaloCreek.Services
                 return _gitService.CreateTempHeadFile(gitRelativePath);
             }
 
-            var reviewedContent = RunReviewGit(
-                workspacePath,
-                GetHaloCreekIndexPath(workspacePath),
-                new[] { "show", $":{gitRelativePath}" });
-            var fileName = Path.GetFileName(
-                PlatformInfrastructure.NormalizePathForCurrentPlatform(gitRelativePath));
-            return PlatformInfrastructure.WriteTempFile(
-                $"reviewed-{fileName}",
-                reviewedContent);
-        }
-
-        private static string GetHaloCreekIndexPath(string workspacePath)
-        {
-            return Path.Combine(workspacePath, HaloCreekDirectoryName, HaloCreekIndexFileName);
-        }
-
-        private static bool IsHaloCreekIndexAvailable(string workspacePath)
-        {
-            return File.Exists(GetHaloCreekIndexPath(workspacePath));
-        }
-
-        private IReadOnlyList<ReviewedIndexEntry> ReadReviewedIndexEntries(string workspacePath)
-        {
-            if (!IsHaloCreekIndexAvailable(workspacePath))
-            {
-                return Array.Empty<ReviewedIndexEntry>();
-            }
-
-            var output = RunReviewGit(
-                workspacePath,
-                GetHaloCreekIndexPath(workspacePath),
-                new[] { "ls-files", "-s", "-z" });
-            if (string.IsNullOrEmpty(output))
-            {
-                return Array.Empty<ReviewedIndexEntry>();
-            }
-
-            return output
-                .Split('\0', StringSplitOptions.RemoveEmptyEntries)
-                .Select(ParseReviewedIndexEntry)
-                .Where(entry => entry is not null)
-                .Cast<ReviewedIndexEntry>()
-                .ToArray();
-        }
-
-        private string RunReviewGit(
-            string workspacePath,
-            string haloCreekIndexPath,
-            IEnumerable<string> arguments)
-        {
-            var gitArguments = new List<string>
-            {
-                "-C",
-                workspacePath,
-            };
-            gitArguments.AddRange(arguments);
-
-            var result = PlatformInfrastructure.RunProcessWithCapturedOutput(
-                GitExecutableName,
-                gitArguments,
-                environmentVariables: new Dictionary<string, string?>
-                {
-                    ["GIT_INDEX_FILE"] = haloCreekIndexPath,
-                });
-            if (result.Succeeded)
-            {
-                return result.Output;
-            }
-
-            var message = result.ErrorMessage.Trim();
-            throw new InvalidOperationException($"Review snapshot git command failed. {message}", result.Exception);
+            return ReviewIndexOperator.CreateTempReviewedFile(workspacePath, gitRelativePath);
         }
 
         private bool IsWorkingTreeDifferentFromReviewed(
@@ -335,7 +247,7 @@ namespace HaloCreek.Services
         }
 
         private string? GetRefreshCleanupReason(
-            ReviewedIndexEntry entry,
+            ReviewIndexEntry entry,
             IReadOnlyDictionary<string, GitChangeInfo> changesByPath)
         {
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(entry.RelativePath);
@@ -359,37 +271,11 @@ namespace HaloCreek.Services
             return null;
         }
 
-        private static ReviewedIndexEntry? ParseReviewedIndexEntry(string token)
-        {
-            var tabIndex = token.IndexOf('\t', StringComparison.Ordinal);
-            if (tabIndex <= 0 || tabIndex == token.Length - 1)
-            {
-                return null;
-            }
-
-            var metadata = token[..tabIndex].Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (metadata.Length < 3)
-            {
-                return null;
-            }
-
-            var blobId = metadata[1];
-            var relativePath = token[(tabIndex + 1)..];
-            if (string.IsNullOrWhiteSpace(blobId) || string.IsNullOrWhiteSpace(relativePath))
-            {
-                return null;
-            }
-
-            return new ReviewedIndexEntry(relativePath, blobId);
-        }
-
         private static bool IsReviewSupportedWorkingTreeChange(GitChangeInfo change)
         {
             return change.ChangeType is GitChangeType.Modified
                 or GitChangeType.Added
                 or GitChangeType.Untracked;
         }
-
-        private sealed record ReviewedIndexEntry(string RelativePath, string BlobId);
     }
 }
