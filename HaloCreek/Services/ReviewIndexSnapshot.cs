@@ -7,6 +7,7 @@ using HaloCreek.Services.WorkspaceSnapshots;
 namespace HaloCreek.Services
 {
     public sealed record ReviewIndexSnapshot(
+        string GitRootPath,
         IReadOnlyList<ReviewIndexSnapshotEntry> Entries)
         : IWorkspaceSnapshot<ReviewIndexSnapshot>
     {
@@ -14,7 +15,9 @@ namespace HaloCreek.Services
         {
             ArgumentNullException.ThrowIfNull(workspace);
 
-            return new ReviewIndexSnapshot(Array.Empty<ReviewIndexSnapshotEntry>());
+            return new ReviewIndexSnapshot(
+                workspace.GitRootPath,
+                Array.Empty<ReviewIndexSnapshotEntry>());
         }
 
         public static ReviewIndexSnapshot ReadSnapshot(WorkspaceContext workspace)
@@ -34,14 +37,17 @@ namespace HaloCreek.Services
                 .OrderBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-            return new ReviewIndexSnapshot(entries);
+            return new ReviewIndexSnapshot(
+                workspace.GitRootPath,
+                entries);
         }
 
         public static bool ContentEquals(
             ReviewIndexSnapshot left,
             ReviewIndexSnapshot right)
         {
-            if (left.Entries.Count != right.Entries.Count)
+            if (!PlatformInfrastructure.AreWorkspacePathsEquivalent(left.GitRootPath, right.GitRootPath)
+                || left.Entries.Count != right.Entries.Count)
             {
                 return false;
             }

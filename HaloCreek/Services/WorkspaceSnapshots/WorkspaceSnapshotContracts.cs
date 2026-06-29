@@ -23,6 +23,8 @@ namespace HaloCreek.Services.WorkspaceSnapshots
     {
         TSnapshot Current { get; }
 
+        bool HasSuccessfulRefresh { get; }
+
         event EventHandler? Changed;
 
         void RequestRefresh(SnapshotRefreshReason reason);

@@ -21,6 +21,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         private TSnapshot _current;
         private RefreshState _state;
         private SnapshotRefreshReason _pendingReason;// 调试信息 不讲究地只记录第一个pending请求的触发方
+        private bool _hasSuccessfulRefresh;
 
         public WorkspaceSnapshotStore()
         {
@@ -46,6 +47,17 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                 lock (_lock)
                 {
                     return _current;
+                }
+            }
+        }
+
+        public bool HasSuccessfulRefresh
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _hasSuccessfulRefresh;
                 }
             }
         }
@@ -101,6 +113,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                 }
 
                 _current = TSnapshot.CreateEmpty(workspace);
+                _hasSuccessfulRefresh = false;
             }
 
             PublishChanged(workspace);
@@ -138,7 +151,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                 try
                 {
                     var snapshot = TSnapshot.ReadSnapshot(workspace);
-                    PublishSnapshot(workspace, snapshot, reason);
+                    PublishRefreshResult(workspace, snapshot, reason);
                 }
                 catch (Exception ex)
                 {
@@ -155,21 +168,33 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             }
         }
 
-        private void PublishSnapshot(
+        private void PublishRefreshResult(
             WorkspaceContext workspace,
             TSnapshot snapshot,
             SnapshotRefreshReason reason)
         {
+            var shouldPublishChanged = false;
             lock (_lock)
             {
                 if (_state == RefreshState.Disposed
-                    || !IsCurrentWorkspace(workspace)
-                    || TSnapshot.ContentEquals(_current, snapshot))
+                    || !IsCurrentWorkspace(workspace))
                 {
                     return;
                 }
 
-                _current = snapshot;
+                var contentChanged = !TSnapshot.ContentEquals(_current, snapshot);
+                if (contentChanged)
+                {
+                    _current = snapshot;
+                }
+
+                shouldPublishChanged = contentChanged || !_hasSuccessfulRefresh;
+                _hasSuccessfulRefresh = true;
+            }
+
+            if (!shouldPublishChanged)
+            {
+                return;
             }
 
             Log.Debug(

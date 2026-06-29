@@ -8,6 +8,7 @@ using HaloCreek.Services.WorkspaceSnapshots;
 namespace HaloCreek.Services
 {
     public sealed record GitSnapshot(
+        string GitRootPath,
         string? HeadId,
         IReadOnlyList<GitSnapshotEntry> Entries,
         string Message)
@@ -22,6 +23,7 @@ namespace HaloCreek.Services
             ArgumentNullException.ThrowIfNull(workspace);
 
             return new GitSnapshot(
+                workspace.GitRootPath,
                 null,
                 Array.Empty<GitSnapshotEntry>(),
                 "No Git changes for current workspace.");
@@ -50,6 +52,7 @@ namespace HaloCreek.Services
                 .ToArray();
 
             return new GitSnapshot(
+                workspace.GitRootPath,
                 GitInfrastructure.GetHeadId(workspace.GitRootPath),
                 entries,
                 result.Message);
@@ -57,7 +60,8 @@ namespace HaloCreek.Services
 
         public static bool ContentEquals(GitSnapshot left, GitSnapshot right)
         {
-            if (!string.Equals(left.HeadId, right.HeadId, StringComparison.OrdinalIgnoreCase)
+            if (!PlatformInfrastructure.AreWorkspacePathsEquivalent(left.GitRootPath, right.GitRootPath)
+                || !string.Equals(left.HeadId, right.HeadId, StringComparison.OrdinalIgnoreCase)
                 || !string.Equals(left.Message, right.Message, StringComparison.Ordinal)
                 || left.Entries.Count != right.Entries.Count)
             {
