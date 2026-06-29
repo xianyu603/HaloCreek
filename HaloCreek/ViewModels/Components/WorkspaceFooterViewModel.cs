@@ -1,5 +1,7 @@
 using System;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Infrastructure;
 using HaloCreek.Services;
@@ -88,12 +90,15 @@ namespace HaloCreek.ViewModels.Components
 
             try
             {
-                WorkspaceRuntime.SwitchWorkspace(selectedPath);
+                var workspace = WorkspaceRuntime.GetWorkSpaceContextOfPath(selectedPath);
+                PlatformInfrastructure.StartCurrentApplication(workspace.WorkspacePath);
+                ShutdownCurrentApplication();
             }
             catch (Exception ex) when (ex is InvalidOperationException
                 or System.IO.IOException
                 or UnauthorizedAccessException
                 or NotSupportedException
+                or System.ComponentModel.Win32Exception
                 or ArgumentException)
             {
                 _transientEventService.ReportUserActionFailure(
@@ -103,6 +108,17 @@ namespace HaloCreek.ViewModels.Components
                     ex);
                 return;
             }
+        }
+
+        private static void ShutdownCurrentApplication()
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown(0);
+                return;
+            }
+
+            throw new InvalidOperationException("Current application lifetime is not available.");
         }
 
         private void OnStatusTextChanged(string statusText)

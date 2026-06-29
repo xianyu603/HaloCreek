@@ -563,6 +563,34 @@ namespace HaloCreek.Infrastructure
             return process.Id;
         }
 
+        public static int StartCurrentApplication(string workspacePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
+
+            var processPath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(processPath))
+            {
+                throw new InvalidOperationException("Current application executable could not be resolved.");
+            }
+
+            if (IsDotnetHostPath(processPath))
+            {
+                throw new InvalidOperationException(
+                    "Workspace restart requires HaloCreek to be started from its executable.");
+            }
+
+            return StartProcess(
+                processPath,
+                new[] { workspacePath },
+                AppContext.BaseDirectory);
+        }
+
+        private static bool IsDotnetHostPath(string path)
+        {
+            var fileName = Path.GetFileNameWithoutExtension(path);
+            return string.Equals(fileName, "dotnet", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static bool IsWindowsRootedPath(string path)
         {
             return path.Length >= 3

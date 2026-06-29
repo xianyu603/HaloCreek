@@ -53,7 +53,7 @@ namespace HaloCreek.Services
             }
         }
 
-        public bool TrySaveLastWorkspacePath(string workspacePath)
+        public bool SaveLastWorkspacePath(string workspacePath)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
 

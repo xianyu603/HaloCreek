@@ -35,9 +35,23 @@ namespace HaloCreek.Services
 
         public static WorkspaceContext SwitchWorkspace(string requestedPath)
         {
-            var platformInfrastructure = _platformInfrastructure
-                ?? throw new InvalidOperationException("Workspace runtime has not been initialized.");
             var workspaceCacheService = _workspaceCacheService
+                ?? throw new InvalidOperationException("Workspace runtime has not been initialized.");
+
+            var context = GetWorkSpaceContextOfPath(requestedPath);
+
+            _current = context;
+
+            workspaceCacheService.SaveLastWorkspacePath(context.WorkspacePath);
+            PublishChanged(context);
+
+            return context;
+        }
+
+        // 同时进行校验 解析 路径归一化 TODO 看得很难受之后再想想办法
+        public static WorkspaceContext GetWorkSpaceContextOfPath(string requestedPath)
+        {
+            var platformInfrastructure = _platformInfrastructure
                 ?? throw new InvalidOperationException("Workspace runtime has not been initialized.");
             var configService = _configService
                 ?? throw new InvalidOperationException("Workspace runtime has not been initialized.");
@@ -59,13 +73,7 @@ namespace HaloCreek.Services
                     + $"Git root: {gitRootPath}");
             }
 
-            var context = new WorkspaceContext(normalizedPath, effectiveConfig, normalizedPath);
-            _current = context;
-
-            workspaceCacheService.TrySaveLastWorkspacePath(normalizedPath);
-            PublishChanged(context);
-
-            return context;
+            return new WorkspaceContext(normalizedPath, effectiveConfig, normalizedPath);
         }
 
         private static string ResolveGitRoot(string normalizedPath)
