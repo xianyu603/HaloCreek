@@ -1,10 +1,11 @@
+using Avalonia.Threading;
+using HaloCreek.Infrastructure;
+using HaloCreek.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Avalonia.Threading;
-using HaloCreek.Infrastructure;
-using HaloCreek.Models;
+using static System.Collections.Specialized.BitVector32;
 
 namespace HaloCreek.Services
 {
@@ -110,6 +111,13 @@ namespace HaloCreek.Services
             return StartCodexSessionAsync(
                 new[] { "resume", session.Id },
                 session.InitialPrompt);
+        }
+
+        public IReadOnlyList<OngoingSessionInfo> GetOngoingSessionInfos()
+        {
+            return _sessionsById.Values
+                .OrderBy(session => session.StartedAt)
+                .ToArray();
         }
 
         private async Task<OngoingSessionInfo> StartCodexSessionAsync(

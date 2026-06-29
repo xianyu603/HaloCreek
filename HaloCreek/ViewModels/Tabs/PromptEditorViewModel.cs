@@ -78,7 +78,7 @@ namespace HaloCreek.ViewModels.Tabs
         private void RefreshOngoingSessions()
         {
             var selectedSessionId = SelectedOngoingSession?.Id;
-            OngoingSessions = _sessionLifecycleService.GetCurrentWorkspaceOngoingSessions();
+            OngoingSessions = _sessionLifecycleService.GetOngoingSessionInfos();
             SelectedOngoingSession = OngoingSessions.FirstOrDefault(
                 session => string.Equals(session.Id, selectedSessionId, StringComparison.Ordinal));
         }
