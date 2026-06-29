@@ -95,6 +95,11 @@ namespace HaloCreek
                 new WorkspaceSnapshotStore<SessionHistorySnapshot>();
             var gitSnapshots =
                 new WorkspaceSnapshotStore<GitSnapshot>();
+            var reviewIndexSnapshots =
+                new WorkspaceSnapshotStore<ReviewIndexSnapshot>();
+            var reviewIndexKeeper = new ReviewIndexKeeper(
+                reviewIndexSnapshots,
+                gitSnapshots);
             var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
             var skillCatalogReader = new SkillCatalogReader();
@@ -160,6 +165,8 @@ namespace HaloCreek
                 workspacePathIndexSnapshots,
                 sessionHistorySnapshots,
                 gitSnapshots,
+                reviewIndexSnapshots,
+                reviewIndexKeeper,
                 floatingPromptService,
                 globalHotkeyRegistrar);
         }
@@ -178,6 +185,8 @@ namespace HaloCreek
             private readonly WorkspaceSnapshotStore<WorkspacePathIndexSnapshot> _workspacePathIndexSnapshots;
             private readonly WorkspaceSnapshotStore<SessionHistorySnapshot> _sessionHistorySnapshots;
             private readonly WorkspaceSnapshotStore<GitSnapshot> _gitSnapshots;
+            private readonly WorkspaceSnapshotStore<ReviewIndexSnapshot> _reviewIndexSnapshots;
+            private readonly ReviewIndexKeeper _reviewIndexKeeper;
             private readonly FloatingPromptService _floatingPromptService;
             private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
             private bool _isDisposed;
@@ -194,6 +203,8 @@ namespace HaloCreek
                 WorkspaceSnapshotStore<WorkspacePathIndexSnapshot> workspacePathIndexSnapshots,
                 WorkspaceSnapshotStore<SessionHistorySnapshot> sessionHistorySnapshots,
                 WorkspaceSnapshotStore<GitSnapshot> gitSnapshots,
+                WorkspaceSnapshotStore<ReviewIndexSnapshot> reviewIndexSnapshots,
+                ReviewIndexKeeper reviewIndexKeeper,
                 FloatingPromptService floatingPromptService,
                 GlobalHotkeyRegistrar globalHotkeyRegistrar)
             {
@@ -212,6 +223,10 @@ namespace HaloCreek
                     ?? throw new ArgumentNullException(nameof(sessionHistorySnapshots));
                 _gitSnapshots = gitSnapshots
                     ?? throw new ArgumentNullException(nameof(gitSnapshots));
+                _reviewIndexSnapshots = reviewIndexSnapshots
+                    ?? throw new ArgumentNullException(nameof(reviewIndexSnapshots));
+                _reviewIndexKeeper = reviewIndexKeeper
+                    ?? throw new ArgumentNullException(nameof(reviewIndexKeeper));
                 _floatingPromptService = floatingPromptService
                     ?? throw new ArgumentNullException(nameof(floatingPromptService));
                 _globalHotkeyRegistrar = globalHotkeyRegistrar
@@ -233,8 +248,10 @@ namespace HaloCreek
                 _workspaceFooter.Dispose();
                 _promptEditor.Dispose();
                 _review.Dispose();
+                _reviewIndexKeeper.Dispose();
                 _historySessions.Dispose();
                 _logs.Dispose();
+                _reviewIndexSnapshots.Dispose();
                 _gitSnapshots.Dispose();
                 _workspacePathIndexSnapshots.Dispose();
                 _sessionHistorySnapshots.Dispose();
