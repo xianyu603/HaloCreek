@@ -1,12 +1,15 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using Avalonia.Threading;
 using HaloCreek.Logging;
 
 namespace HaloCreek.Infrastructure
 {
     public sealed class GlobalHotkeyRegistrar : IDisposable
     {
+        private static readonly TimeSpan RetryInterval = TimeSpan.FromSeconds(20);
+
         // TODO 再多一个hotkey这里就需要抽一些数据结构了 现在这样好抽象
         private const int MainWindowHotkeyId = 1;
         private const int FrontTerminalHotkeyId = 2;
@@ -19,14 +22,26 @@ namespace HaloCreek.Infrastructure
         private const string FrontTerminalHotkeyText = "Ctrl+Alt+T";
 
         private NativeMessageWindow? _messageWindow;
+        private readonly DispatcherTimer _retryTimer;
         private bool _mainWindowHotkeyRegistered;
         private bool _frontTerminalHotkeyRegistered;
+        private bool _isDisposed;
+
+        public GlobalHotkeyRegistrar()
+        {
+            _retryTimer = new DispatcherTimer(RetryInterval, DispatcherPriority.Background, OnRetryTimerTick);
+        }
 
         public event EventHandler? MainWindowHotkeyPressed;
         public event EventHandler? FrontTerminalHotkeyPressed;
 
         public void RegisterDefaultHotkeys()
         {
+            if (_isDisposed)
+            {
+                throw new ObjectDisposedException(nameof(GlobalHotkeyRegistrar));
+            }
+
             if (!OperatingSystem.IsWindows())
             {
                 Log.Warning(
@@ -35,53 +50,24 @@ namespace HaloCreek.Infrastructure
                 return;
             }
 
-            try
+            TryRegisterPendingHotkeys();
+            if (!AreAllHotkeysRegistered)
             {
-                _messageWindow = new NativeMessageWindow(HandleWindowMessage);
-            }
-            catch (Exception ex)
-            {
-                Log.Error("GlobalHotkey", ex, "Failed to create global hotkey message window.");
-                return;
-            }
-
-            if (RegisterHotKey(_messageWindow.Handle, MainWindowHotkeyId, ModControl | ModAlt, VirtualKeyH))
-            {
-                _mainWindowHotkeyRegistered = true;
-                Log.Info("GlobalHotkey", $"Registered main window hotkey. Hotkey={MainWindowHotkeyText}");
-            }
-            else
-            {
-                var exception = new Win32Exception(Marshal.GetLastWin32Error());
-                Log.Error(
-                    "GlobalHotkey",
-                    exception,
-                    $"Failed to register main window hotkey. Hotkey={MainWindowHotkeyText}");
-            }
-
-            if (RegisterHotKey(_messageWindow.Handle, FrontTerminalHotkeyId, ModControl | ModAlt, VirtualKeyT))
-            {
-                _frontTerminalHotkeyRegistered = true;
-                Log.Info("GlobalHotkey", $"Registered front terminal hotkey. Hotkey={FrontTerminalHotkeyText}");
-            }
-            else
-            {
-                var exception = new Win32Exception(Marshal.GetLastWin32Error());
-                Log.Error(
-                    "GlobalHotkey",
-                    exception,
-                    $"Failed to register front terminal hotkey. Hotkey={FrontTerminalHotkeyText}");
-            }
-
-            if (!_mainWindowHotkeyRegistered && !_frontTerminalHotkeyRegistered)
-            {
-                _messageWindow.Dispose();
-                _messageWindow = null;
+                _retryTimer.Start();
             }
         }
 
         public void Dispose()
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            _isDisposed = true;
+            _retryTimer.Stop();
+            _retryTimer.Tick -= OnRetryTimerTick;
+
             if (_frontTerminalHotkeyRegistered && _messageWindow is not null)
             {
                 if (!UnregisterHotKey(_messageWindow.Handle, FrontTerminalHotkeyId))
@@ -108,6 +94,85 @@ namespace HaloCreek.Infrastructure
 
             _messageWindow?.Dispose();
             _messageWindow = null;
+        }
+
+        private bool AreAllHotkeysRegistered =>
+            _mainWindowHotkeyRegistered && _frontTerminalHotkeyRegistered;
+
+        private void OnRetryTimerTick(object? sender, EventArgs e)
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            TryRegisterPendingHotkeys();
+            if (AreAllHotkeysRegistered)
+            {
+                _retryTimer.Stop();
+            }
+        }
+
+        private void TryRegisterPendingHotkeys()
+        {
+            if (_messageWindow is null)
+            {
+                try
+                {
+                    _messageWindow = new NativeMessageWindow(HandleWindowMessage);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("GlobalHotkey", ex, "Failed to create global hotkey message window.");
+                    return;
+                }
+            }
+
+            if (!_mainWindowHotkeyRegistered)
+            {
+                _mainWindowHotkeyRegistered = TryRegisterHotkey(
+                    MainWindowHotkeyId,
+                    ModControl | ModAlt,
+                    VirtualKeyH,
+                    MainWindowHotkeyText,
+                    "main window");
+            }
+
+            if (!_frontTerminalHotkeyRegistered)
+            {
+                _frontTerminalHotkeyRegistered = TryRegisterHotkey(
+                    FrontTerminalHotkeyId,
+                    ModControl | ModAlt,
+                    VirtualKeyT,
+                    FrontTerminalHotkeyText,
+                    "front terminal");
+            }
+        }
+
+        private bool TryRegisterHotkey(
+            int hotkeyId,
+            uint modifiers,
+            uint virtualKey,
+            string hotkeyText,
+            string hotkeyName)
+        {
+            if (_messageWindow is null)
+            {
+                throw new InvalidOperationException("Global hotkey message window is not available.");
+            }
+
+            if (RegisterHotKey(_messageWindow.Handle, hotkeyId, modifiers, virtualKey))
+            {
+                Log.Info("GlobalHotkey", $"Registered {hotkeyName} hotkey. Hotkey={hotkeyText}");
+                return true;
+            }
+
+            var exception = new Win32Exception(Marshal.GetLastWin32Error());
+            Log.Error(
+                "GlobalHotkey",
+                exception,
+                $"Failed to register {hotkeyName} hotkey. Hotkey={hotkeyText}");
+            return false;
         }
 
         private IntPtr HandleWindowMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam)
