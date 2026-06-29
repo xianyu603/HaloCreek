@@ -67,7 +67,7 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
                         "跑相关检查",
                         ["测试", "编译", "build", "test"],
                         "完成后运行和改动相关的检查。",
-                        "完成后运行相关 build/test；如果没法跑，说明原因。"),
+                        "完成后运行相关 build。"),
                     new(
                         "不用编译",
                         ["不要编译", "no build"],
