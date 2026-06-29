@@ -100,7 +100,6 @@ namespace HaloCreek
             var reviewIndexKeeper = new ReviewIndexKeeper(
                 reviewIndexSnapshots,
                 gitSnapshots);
-            var reviewSnapshotService = new ReviewSnapshotService(gitService);
             var externalActionService = new ExternalActionService();
             var skillCatalogReader = new SkillCatalogReader();
             var completionCoordinator = new CompletionCoordinator(
@@ -125,10 +124,9 @@ namespace HaloCreek
                 completionCoordinator,
                 sessionHistorySnapshots);
             var review = new ReviewViewModel(
-                reviewSnapshotService,
-                gitService,
                 externalActionService,
                 gitSnapshots,
+                reviewIndexSnapshots,
                 appCommonRuntime);
             var historySessions = new HistorySessionsViewModel(
                 sessionHistorySnapshots,

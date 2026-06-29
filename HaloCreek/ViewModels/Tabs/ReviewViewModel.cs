@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
@@ -14,36 +13,31 @@ namespace HaloCreek.ViewModels.Tabs
 {
     public sealed class ReviewViewModel : ViewModelBase, ITabSelectionAware, IDisposable
     {
-        private static readonly TimeSpan AutoRefreshInterval = TimeSpan.FromSeconds(10);
-
-        private readonly ReviewSnapshotService _reviewSnapshotService;
-        private readonly GitService _gitService;
         private readonly ExternalActionService _externalActionService;
         private readonly IWorkspaceSnapshotSource<GitSnapshot> _gitSnapshots;
+        private readonly IWorkspaceSnapshotSource<ReviewIndexSnapshot> _reviewIndexSnapshots;
         private readonly TransientEventService _transientEventService;
-        private readonly DispatcherTimer _autoRefreshTimer;
         private IReadOnlyList<ReviewFilePath> _unreviewedFiles = Array.Empty<ReviewFilePath>();
         private IReadOnlyList<ReviewFilePath> _reviewedFiles = Array.Empty<ReviewFilePath>();
+        private HashSet<string> _omittedPaths = new(StringComparer.Ordinal);
         private ReviewFilePath? _selectedUnreviewedFile;
         private ReviewFilePath? _selectedReviewedFile;
         private bool _isDisposed;
 
         public ReviewViewModel(
-            ReviewSnapshotService reviewSnapshotService,
-            GitService gitService,
             ExternalActionService externalActionService,
             IWorkspaceSnapshotSource<GitSnapshot> gitSnapshots,
+            IWorkspaceSnapshotSource<ReviewIndexSnapshot> reviewIndexSnapshots,
             AppCommonRuntime appCommonRuntime)
         {
-            _reviewSnapshotService = reviewSnapshotService
-                ?? throw new ArgumentNullException(nameof(reviewSnapshotService));
-            _gitService = gitService ?? throw new ArgumentNullException(nameof(gitService));
             _externalActionService = externalActionService
                 ?? throw new ArgumentNullException(nameof(externalActionService));
             _gitSnapshots = gitSnapshots ?? throw new ArgumentNullException(nameof(gitSnapshots));
+            _reviewIndexSnapshots = reviewIndexSnapshots
+                ?? throw new ArgumentNullException(nameof(reviewIndexSnapshots));
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             _transientEventService = appCommonRuntime.TransientEventService;
-            RefreshCommand = new AsyncRelayCommand(RefreshReviewFilesAsync);
+            RefreshCommand = new RelayCommand(RequestSnapshotRefresh);
             ModifiedGit = new GitViewModel(
                 gitSnapshots,
                 _externalActionService,
@@ -61,16 +55,12 @@ namespace HaloCreek.ViewModels.Tabs
                 DiffWorkingTreeAgainstReviewed);
             DiffReviewedAgainstHeadCommand = new RelayCommand<ReviewFilePath>(
                 DiffReviewedAgainstHead);
-            WorkspaceRuntime.Changed += OnWorkspaceChanged;
-            OnWorkspaceChanged(WorkspaceRuntime.Current);
-            _autoRefreshTimer = new DispatcherTimer(
-                AutoRefreshInterval,
-                DispatcherPriority.Background,
-                OnAutoRefreshTimerTick);
-            _autoRefreshTimer.Start();
+            _gitSnapshots.Changed += OnSnapshotChanged;
+            _reviewIndexSnapshots.Changed += OnSnapshotChanged;
+            RefreshReviewFilesFromSnapshots();
         }
 
-        public IAsyncRelayCommand RefreshCommand { get; }
+        public IRelayCommand RefreshCommand { get; }
 
         public IRelayCommand<ReviewFilePath> AddReviewedCommand { get; }
 
@@ -137,82 +127,48 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _isDisposed = true;
-            _autoRefreshTimer.Stop();
-            _autoRefreshTimer.Tick -= OnAutoRefreshTimerTick;
-            WorkspaceRuntime.Changed -= OnWorkspaceChanged;
+            _gitSnapshots.Changed -= OnSnapshotChanged;
+            _reviewIndexSnapshots.Changed -= OnSnapshotChanged;
             ModifiedGit.Dispose();
         }
 
         public void OnSelected()
         {
-            RequestRefreshReviewFiles();
+            RequestSnapshotRefresh();
         }
 
-        private void OnAutoRefreshTimerTick(object? sender, EventArgs e)
+        private void RequestSnapshotRefresh()
+        {
+            _gitSnapshots.RequestRefresh(SnapshotRefreshReason.Manual);
+            _reviewIndexSnapshots.RequestRefresh(SnapshotRefreshReason.Manual);
+        }
+
+        private void OnSnapshotChanged(object? sender, EventArgs e)
         {
             if (!_isDisposed)
             {
-                RequestRefreshReviewFiles();
+                RefreshReviewFilesFromSnapshots();
             }
         }
 
-        private void RequestRefreshReviewFiles()
+        private void RefreshReviewFilesFromSnapshots()
         {
-            // AsyncRelayCommand defaults to one in-flight execution, so quick repeated refresh
-            // requests are ignored instead of running concurrent review index updates. If workspace
-            // switching needs stale async result cancellation, keep that as a WorkspaceRuntime-bound
-            // operation rather than adding per-view-model pending/generation handling here.
-            // ReviewIndexSnapshot is not split yet. Until then this parent refresh command requests
-            // GitSnapshot and refreshes the legacy ReviewSnapshotService lists together; after the
-            // index split, keep this as the single command that requests both snapshot stores.
-            if (RefreshCommand.CanExecute(null))
+            var gitSnapshot = _gitSnapshots.Current;
+            var reviewIndexSnapshot = _reviewIndexSnapshots.Current;
+            _omittedPaths = ReviewIndexKeeper.GetOmittedPaths(reviewIndexSnapshot, gitSnapshot)
+                .ToHashSet(StringComparer.Ordinal);
+            var result = BuildReviewFiles(
+                gitSnapshot,
+                reviewIndexSnapshot,
+                _omittedPaths);
+            if (!UnreviewedFiles.SequenceEqual(result.UnreviewedFiles)
+                || !ReviewedFiles.SequenceEqual(result.ReviewedFiles))
             {
-                RefreshCommand.Execute(null);
+                SelectedUnreviewedFile = null;
+                SelectedReviewedFile = null;
+                UnreviewedFiles = result.UnreviewedFiles;
+                ReviewedFiles = result.ReviewedFiles;
             }
-        }
-
-        private async Task RefreshReviewFilesAsync()
-        {
-            try
-            {
-                Log.Info("Review", "RefreshReviewSnapshot invoked.");
-                _gitSnapshots.RequestRefresh(SnapshotRefreshReason.Manual);
-                var result = await Task.Run(() =>
-                {
-                    _reviewSnapshotService.RefreshReviewSnapshot();
-                    return new ReviewFilesRefreshResult(
-                        _reviewSnapshotService.GetWorkingTreeAgainstReviewedFiles(),
-                        _reviewSnapshotService.GetReviewedAgainstHeadFiles());
-                });
-
-                if (_isDisposed)
-                {
-                    return;
-                }
-
-                if (!UnreviewedFiles.SequenceEqual(result.UnreviewedFiles)
-                    || !ReviewedFiles.SequenceEqual(result.ReviewedFiles))
-                {
-                    SelectedUnreviewedFile = null;
-                    SelectedReviewedFile = null;
-                    UnreviewedFiles = result.UnreviewedFiles;
-                    ReviewedFiles = result.ReviewedFiles;
-                }
-            }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
-            {
-                _transientEventService.ReportUserActionFailure(
-                    "Review",
-                    "Review files refresh failed",
-                    ex.Message,
-                    ex);
-            }
-        }
-
-        private void OnWorkspaceChanged(WorkspaceContext workspace)
-        {
-            ArgumentNullException.ThrowIfNull(workspace);
-            RequestRefreshReviewFiles();
         }
 
         private void AddReviewed(ReviewFilePath? file)
@@ -222,11 +178,14 @@ namespace HaloCreek.ViewModels.Tabs
             try
             {
                 Log.Info("Review", $"AddReviewed invoked. File={file.RelativePath}");
-                _reviewSnapshotService.MarkFileReviewed(file.RelativePath);
+                MarkFileReviewed(file.RelativePath);
                 Log.Info("Review", $"Marked reviewed: {file.RelativePath}");
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            catch (Exception ex) when (ex is ArgumentException
+                or InvalidOperationException
+                or UnauthorizedAccessException
+                or IOException)
             {
                 _transientEventService.ReportUserActionFailure(
                     "Review",
@@ -250,15 +209,18 @@ namespace HaloCreek.ViewModels.Tabs
                 Log.Info("Review", $"MarkAllReviewed invoked. Count={files.Length}");
                 foreach (var file in files)
                 {
-                    _reviewSnapshotService.MarkFileReviewed(file.RelativePath);
+                    MarkFileReviewed(file.RelativePath);
                 }
 
                 Log.Info("Review", $"Marked all reviewed. Count={files.Length}");
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            catch (Exception ex) when (ex is ArgumentException
+                or InvalidOperationException
+                or UnauthorizedAccessException
+                or IOException)
             {
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
                 _transientEventService.ReportUserActionFailure(
                     "Review",
                     "Mark all reviewed failed",
@@ -274,9 +236,9 @@ namespace HaloCreek.ViewModels.Tabs
             try
             {
                 Log.Info("Review", $"RevertToReviewed invoked. File={file.RelativePath}");
-                _reviewSnapshotService.RevertWorkingTreeFileToReviewed(file.RelativePath);
+                RevertWorkingTreeFileToReviewed(file.RelativePath);
                 Log.Info("Review", $"Reverted to reviewed: {file.RelativePath}");
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
             }
             catch (Exception ex) when (ex is ArgumentException
                 or InvalidOperationException
@@ -300,18 +262,18 @@ namespace HaloCreek.ViewModels.Tabs
                 Log.Info("Review", $"RevertAllToReviewed invoked. Count={files.Length}");
                 foreach (var file in files)
                 {
-                    _reviewSnapshotService.RevertWorkingTreeFileToReviewed(file.RelativePath);
+                    RevertWorkingTreeFileToReviewed(file.RelativePath);
                 }
 
                 Log.Info("Review", $"Reverted all to reviewed. Count={files.Length}");
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
             }
             catch (Exception ex) when (ex is ArgumentException
                 or InvalidOperationException
                 or UnauthorizedAccessException
                 or System.IO.IOException)
             {
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
                 _transientEventService.ReportUserActionFailure(
                     "Review",
                     "Revert all to reviewed failed",
@@ -327,11 +289,14 @@ namespace HaloCreek.ViewModels.Tabs
             try
             {
                 Log.Info("Review", $"MarkUnreviewed invoked. File={file.RelativePath}");
-                _reviewSnapshotService.MarkFileUnreviewed(file.RelativePath);
+                MarkFileUnreviewed(file.RelativePath);
                 Log.Info("Review", $"Marked unreviewed: {file.RelativePath}");
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            catch (Exception ex) when (ex is ArgumentException
+                or InvalidOperationException
+                or UnauthorizedAccessException
+                or IOException)
             {
                 _transientEventService.ReportUserActionFailure(
                     "Review",
@@ -355,15 +320,18 @@ namespace HaloCreek.ViewModels.Tabs
                 Log.Info("Review", $"MarkAllUnreviewed invoked. Count={files.Length}");
                 foreach (var file in files)
                 {
-                    _reviewSnapshotService.MarkFileUnreviewed(file.RelativePath);
+                    MarkFileUnreviewed(file.RelativePath);
                 }
 
                 Log.Info("Review", $"Marked all unreviewed. Count={files.Length}");
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            catch (Exception ex) when (ex is ArgumentException
+                or InvalidOperationException
+                or UnauthorizedAccessException
+                or IOException)
             {
-                RequestRefreshReviewFiles();
+                RequestSnapshotRefresh();
                 _transientEventService.ReportUserActionFailure(
                     "Review",
                     "Mark all unreviewed failed",
@@ -380,7 +348,7 @@ namespace HaloCreek.ViewModels.Tabs
             {
                 Log.Info("Review", $"DiffWorkingTreeAgainstReviewed invoked. File={file.RelativePath}");
                 var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(file.RelativePath);
-                var reviewedPath = _reviewSnapshotService.CreateTempReviewedFile(gitRelativePath);
+                var reviewedPath = CreateReviewedTempFile(gitRelativePath);
                 var workingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
                     WorkspaceRuntime.Current.GitRootPath,
                     gitRelativePath);
@@ -389,7 +357,10 @@ namespace HaloCreek.ViewModels.Tabs
                     workingTreePath,
                     $"Working Tree vs Reviewed: {file.RelativePath}");
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            catch (Exception ex) when (ex is ArgumentException
+                or InvalidOperationException
+                or UnauthorizedAccessException
+                or IOException)
             {
                 _transientEventService.ReportUserActionFailure(
                     "Review",
@@ -407,14 +378,23 @@ namespace HaloCreek.ViewModels.Tabs
             {
                 Log.Info("Review", $"DiffReviewedAgainstHead invoked. File={file.RelativePath}");
                 var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(file.RelativePath);
-                var headPath = _gitService.CreateTempHeadFile(gitRelativePath);
-                var reviewedPath = _reviewSnapshotService.CreateTempReviewedFile(gitRelativePath);
+                var reviewEntry = GetActiveReviewEntry(gitRelativePath)
+                    ?? throw new InvalidOperationException("Reviewed file is no longer available.");
+                var headPath = reviewEntry.HeadBlobId is null
+                    ? CreateEmptyHeadTempFile(gitRelativePath)
+                    : GitInfrastructure.CreateTempHeadFile(gitRelativePath);
+                var reviewedPath = ReviewIndexOperator.CreateTempReviewedFile(
+                    WorkspaceRuntime.Current.GitRootPath,
+                    gitRelativePath);
                 _externalActionService.OpenDiff(
                     headPath,
                     reviewedPath,
                     $"Reviewed vs HEAD: {file.RelativePath}");
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            catch (Exception ex) when (ex is ArgumentException
+                or InvalidOperationException
+                or UnauthorizedAccessException
+                or IOException)
             {
                 _transientEventService.ReportUserActionFailure(
                     "Review",
@@ -422,6 +402,198 @@ namespace HaloCreek.ViewModels.Tabs
                     ex.Message,
                     ex);
             }
+        }
+
+        private void MarkFileReviewed(string relativePath)
+        {
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            var gitEntry = GetGitEntry(gitRelativePath)
+                ?? throw new InvalidOperationException("File is no longer modified in the current snapshot.");
+            if (!IsReviewSupportedWorkingTreeChange(gitEntry) || gitEntry.WorkingTreeBlobId is null)
+            {
+                throw new InvalidOperationException("File is no longer available in the working tree snapshot.");
+            }
+
+            var reviewEntry = GetActiveReviewEntry(gitRelativePath);
+            var baselineBlobId = reviewEntry?.ReviewedBlobId ?? gitEntry.HeadBlobId;
+            if (baselineBlobId is not null
+                && string.Equals(
+                    baselineBlobId,
+                    gitEntry.WorkingTreeBlobId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            ReviewIndexOperator.AddWorkingTreeFile(
+                WorkspaceRuntime.Current.GitRootPath,
+                gitRelativePath);
+        }
+
+        private void MarkFileUnreviewed(string relativePath)
+        {
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            if (GetReviewEntry(gitRelativePath) is null)
+            {
+                Log.Warning(
+                    "Review",
+                    $"MarkFileUnreviewed skipped because snapshot has no review entry. File={gitRelativePath}");
+                return;
+            }
+
+            ReviewIndexOperator.RemoveFile(
+                WorkspaceRuntime.Current.GitRootPath,
+                gitRelativePath);
+        }
+
+        private void RevertWorkingTreeFileToReviewed(string relativePath)
+        {
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            var reviewEntry = GetActiveReviewEntry(gitRelativePath);
+            if (reviewEntry is not null)
+            {
+                var absoluteWorkingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
+                    WorkspaceRuntime.Current.GitRootPath,
+                    gitRelativePath);
+                var parentDirectory = Path.GetDirectoryName(absoluteWorkingTreePath);
+                if (!string.IsNullOrWhiteSpace(parentDirectory))
+                {
+                    Directory.CreateDirectory(parentDirectory);
+                }
+
+                ReviewIndexOperator.CheckoutFileToWorkingTree(
+                    WorkspaceRuntime.Current.GitRootPath,
+                    gitRelativePath);
+                return;
+            }
+
+            var gitEntry = GetGitEntry(gitRelativePath)
+                ?? throw new InvalidOperationException("File is no longer modified in the current snapshot.");
+            if (gitEntry.HeadBlobId is not null)
+            {
+                GitInfrastructure.RestoreFileFromHead(gitRelativePath);
+                return;
+            }
+
+            if (gitEntry.WorkingTreeBlobId is null)
+            {
+                throw new InvalidOperationException("File is no longer available in the working tree snapshot.");
+            }
+
+            File.Delete(PlatformInfrastructure.CombinePathForCurrentPlatform(
+                WorkspaceRuntime.Current.GitRootPath,
+                gitRelativePath));
+        }
+
+        private string CreateReviewedTempFile(string relativePath)
+        {
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            if (GetActiveReviewEntry(gitRelativePath) is not null)
+            {
+                return ReviewIndexOperator.CreateTempReviewedFile(
+                    WorkspaceRuntime.Current.GitRootPath,
+                    gitRelativePath);
+            }
+
+            var gitEntry = GetGitEntry(gitRelativePath)
+                ?? throw new InvalidOperationException("File is no longer modified in the current snapshot.");
+            return gitEntry.HeadBlobId is null
+                ? CreateEmptyHeadTempFile(gitRelativePath)
+                : GitInfrastructure.CreateTempHeadFile(gitRelativePath);
+        }
+
+        private ReviewIndexSnapshotEntry? GetReviewEntry(string relativePath)
+        {
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            return _reviewIndexSnapshots.Current.Entries.FirstOrDefault(entry => string.Equals(
+                entry.RelativePath,
+                gitRelativePath,
+                StringComparison.Ordinal));
+        }
+
+        private ReviewIndexSnapshotEntry? GetActiveReviewEntry(string relativePath)
+        {
+            var reviewEntry = GetReviewEntry(relativePath);
+            if (reviewEntry is null)
+            {
+                return null;
+            }
+
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            return _omittedPaths.Contains(gitRelativePath)
+                ? null
+                : reviewEntry;
+        }
+
+        private GitSnapshotEntry? GetGitEntry(string relativePath)
+        {
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            return _gitSnapshots.Current.Entries.FirstOrDefault(entry => string.Equals(
+                entry.RelativePath,
+                gitRelativePath,
+                StringComparison.Ordinal));
+        }
+
+        private static ReviewFilesRefreshResult BuildReviewFiles(
+            GitSnapshot gitSnapshot,
+            ReviewIndexSnapshot reviewIndexSnapshot,
+            IReadOnlySet<string> omittedPaths)
+        {
+            var reviewEntriesByPath = reviewIndexSnapshot.Entries
+                .Where(entry => !omittedPaths.Contains(entry.RelativePath))
+                .GroupBy(entry => entry.RelativePath, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First(),
+                    StringComparer.Ordinal);
+
+            var unreviewedFiles = gitSnapshot.Entries
+                .Where(IsReviewSupportedWorkingTreeChange)
+                .Where(entry => entry.WorkingTreeBlobId is not null)
+                .Where(entry =>
+                {
+                    var baselineBlobId = reviewEntriesByPath.TryGetValue(
+                        entry.RelativePath,
+                        out var reviewEntry)
+                            ? reviewEntry.ReviewedBlobId
+                            : entry.HeadBlobId;
+                    return baselineBlobId is null
+                        || !string.Equals(
+                            baselineBlobId,
+                            entry.WorkingTreeBlobId,
+                            StringComparison.OrdinalIgnoreCase);
+                })
+                .Select(entry => new ReviewFilePath(entry.RelativePath))
+                .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var reviewedFiles = reviewIndexSnapshot.Entries
+                .Where(entry => !omittedPaths.Contains(entry.RelativePath))
+                .Where(entry => entry.HeadBlobId is null
+                    || !string.Equals(
+                        entry.ReviewedBlobId,
+                        entry.HeadBlobId,
+                        StringComparison.OrdinalIgnoreCase))
+                .Select(entry => new ReviewFilePath(entry.RelativePath))
+                .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            return new ReviewFilesRefreshResult(unreviewedFiles, reviewedFiles);
+        }
+
+        private static bool IsReviewSupportedWorkingTreeChange(GitSnapshotEntry entry)
+        {
+            return entry.ChangeType is GitChangeType.Modified
+                or GitChangeType.Added
+                or GitChangeType.Untracked;
+        }
+
+        private static string CreateEmptyHeadTempFile(string relativePath)
+        {
+            var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
+            var fileName = Path.GetFileName(
+                PlatformInfrastructure.NormalizePathForCurrentPlatform(gitRelativePath));
+            return PlatformInfrastructure.WriteTempFile($"head-{fileName}", string.Empty);
         }
 
         private sealed record ReviewFilesRefreshResult(
