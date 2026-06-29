@@ -28,7 +28,6 @@ namespace HaloCreek.Services
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             _transientEventService = appCommonRuntime.TransientEventService;
             _tmuxService.StateChanged += HandleTmuxStateChanged;
-            WorkspaceRuntime.Changed += HandleWorkspaceChanged;
         }
 
         // 只向外部汇报session或其状态发生了变化 先不实现复杂的消息通知 卡了再优化
@@ -52,7 +51,6 @@ namespace HaloCreek.Services
 
             _isDisposed = true;
             _tmuxService.StateChanged -= HandleTmuxStateChanged;
-            WorkspaceRuntime.Changed -= HandleWorkspaceChanged;
 
             var sessionIds = _sessionsById.Keys.ToArray();
 
@@ -165,15 +163,6 @@ namespace HaloCreek.Services
                     throw new InvalidOperationException("Application is closing.");
                 }
 
-                if (!string.Equals(
-                        WorkspaceRuntime.Current.WorkspacePath,
-                        workspace.WorkspacePath,
-                        StringComparison.Ordinal))
-                {
-                    _tmuxService.Exit(identifier);
-                    throw new InvalidOperationException("Workspace changed before session launch completed.");
-                }
-
                 if (!_sessionsById.TryGetValue(identifier, out session))
                 {
                     _tmuxService.Exit(identifier);
@@ -207,25 +196,6 @@ namespace HaloCreek.Services
             BringToFront(identifier);
 
             return session;
-        }
-
-        public IReadOnlyList<OngoingSessionInfo> GetCurrentWorkspaceOngoingSessions()
-        {
-            RequireUiThread();
-
-            return GetOngoingSessionsForWorkspace(WorkspaceRuntime.Current.WorkspacePath);
-        }
-
-        private IReadOnlyList<OngoingSessionInfo> GetOngoingSessionsForWorkspace(string workspacePath)
-        {
-            RequireUiThread();
-            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
-
-            return _sessionsById.Values
-                .Where(session =>
-                    string.Equals(session.WorkspacePath, workspacePath, StringComparison.Ordinal))
-                .OrderBy(session => session.StartedAt)
-                .ToArray();
         }
 
         public void BringToFront(string sessionId)
@@ -344,33 +314,6 @@ namespace HaloCreek.Services
             }
 
             SessionsChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void HandleWorkspaceChanged(WorkspaceContext workspace)
-        {
-            if (!Dispatcher.UIThread.CheckAccess())
-            {
-                Dispatcher.UIThread.Post(() => HandleWorkspaceChanged(workspace));
-                return;
-            }
-
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            ArgumentNullException.ThrowIfNull(workspace);
-
-            var sessionIds = _sessionsById.Values
-                .Where(session =>
-                    !string.Equals(session.WorkspacePath, workspace.WorkspacePath, StringComparison.Ordinal))
-                .Select(session => session.Id)
-                .ToArray();
-
-            foreach (var sessionId in sessionIds)
-            {
-                Exit(sessionId);
-            }
         }
 
         private void HandleTmuxStateChanged(object? sender, TmuxSessionStateChangedEventArgs args)

@@ -30,9 +30,7 @@ namespace HaloCreek.ViewModels.Components
             _applicationStatusService = appCommonRuntime.ApplicationStatusService;
             _transientEventService = appCommonRuntime.TransientEventService;
             _applicationStatusService.StatusTextChanged += OnStatusTextChanged;
-            WorkspaceRuntime.Changed += OnWorkspaceChanged;
             ChooseWorkspaceCommand = new AsyncRelayCommand(ChooseWorkspaceAsync);
-            OnWorkspaceChanged(WorkspaceRuntime.Current);
         }
 
         public string WorkspacePath
@@ -58,7 +56,6 @@ namespace HaloCreek.ViewModels.Components
 
             _isDisposed = true;
             _applicationStatusService.StatusTextChanged -= OnStatusTextChanged;
-            WorkspaceRuntime.Changed -= OnWorkspaceChanged;
         }
 
         private async Task ChooseWorkspaceAsync()
@@ -124,12 +121,6 @@ namespace HaloCreek.ViewModels.Components
         private void OnStatusTextChanged(string statusText)
         {
             StatusText = statusText;
-        }
-
-        private void OnWorkspaceChanged(WorkspaceContext workspace)
-        {
-            ArgumentNullException.ThrowIfNull(workspace);
-            WorkspacePath = workspace.WorkspacePath;
         }
     }
 }
