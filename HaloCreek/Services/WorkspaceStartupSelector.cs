@@ -24,8 +24,14 @@ namespace HaloCreek.Services
                 ?? throw new ArgumentNullException(nameof(workspaceCacheService));
         }
 
-        public async Task<WorkspaceContext> SelectRequiredWorkspaceAsync()
+        public async Task<WorkspaceContext> SelectRequiredWorkspaceAsync(string[]? startupArgs)
         {
+            var startupWorkspacePath = GetStartupWorkspacePath(startupArgs);
+            if (!string.IsNullOrWhiteSpace(startupWorkspacePath))
+            {
+                return WorkspaceRuntime.SwitchWorkspace(startupWorkspacePath);
+            }
+
             var cachedWorkspacePath = _workspaceCacheService.LoadLastWorkspacePath();
             if (!string.IsNullOrWhiteSpace(cachedWorkspacePath))
             {
@@ -87,6 +93,24 @@ namespace HaloCreek.Services
                         ex.Message);
                 }
             }
+        }
+
+        private static string? GetStartupWorkspacePath(string[]? startupArgs)
+        {
+            if (startupArgs is null)
+            {
+                return null;
+            }
+
+            foreach (var arg in startupArgs)
+            {
+                if (!string.IsNullOrWhiteSpace(arg))
+                {
+                    return arg.Trim();
+                }
+            }
+
+            return null;
         }
     }
 }

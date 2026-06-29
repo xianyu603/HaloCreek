@@ -37,7 +37,10 @@ namespace HaloCreek
                 desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
                 var mainWindow = new MainWindow();
                 desktop.MainWindow = mainWindow;
-                Dispatcher.UIThread.Post(async () => await InitializeMainWindowAsync(desktop, mainWindow));
+                Dispatcher.UIThread.Post(async () => await InitializeMainWindowAsync(
+                    desktop,
+                    mainWindow,
+                    desktop.Args));
             }
 
             base.OnFrameworkInitializationCompleted();
@@ -45,11 +48,12 @@ namespace HaloCreek
 
         private static async Task InitializeMainWindowAsync(
             IClassicDesktopStyleApplicationLifetime desktop,
-            MainWindow mainWindow)
+            MainWindow mainWindow,
+            string[]? startupArgs)
         {
             try
             {
-                var appDisposeScope = await CreateAppDisposeScopeAsync(mainWindow);
+                var appDisposeScope = await CreateAppDisposeScopeAsync(mainWindow, startupArgs);
                 mainWindow.DataContext = appDisposeScope.MainWindowViewModel;
                 desktop.Exit += (_, _) => appDisposeScope.Dispose();
             }
@@ -63,7 +67,9 @@ namespace HaloCreek
             }
         }
 
-        private static async Task<AppDisposeScope> CreateAppDisposeScopeAsync(MainWindow mainWindow)
+        private static async Task<AppDisposeScope> CreateAppDisposeScopeAsync(
+            MainWindow mainWindow,
+            string[]? startupArgs)
         {
             var platformInfrastructure = new PlatformInfrastructure(mainWindow);
             var applicationStatusService = new ApplicationStatusService();
@@ -81,7 +87,7 @@ namespace HaloCreek
             var workspaceStartupSelector = new WorkspaceStartupSelector(
                 appCommonRuntime,
                 workspaceCacheService);
-            await workspaceStartupSelector.SelectRequiredWorkspaceAsync();
+            await workspaceStartupSelector.SelectRequiredWorkspaceAsync(startupArgs);
             var tmuxService = new TmuxService(appCommonRuntime);
             var terminalService = new TerminalService(appCommonRuntime);
             var sessionLifecycleService = new SessionLifecycleService(
