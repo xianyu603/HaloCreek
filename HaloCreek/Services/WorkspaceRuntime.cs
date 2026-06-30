@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using Avalonia.Threading;
 using HaloCreek.Infrastructure;
 
 namespace HaloCreek.Services
@@ -13,8 +12,6 @@ namespace HaloCreek.Services
         private static WorkspaceCacheService? _workspaceCacheService;
         private static ConfigService? _configService;
         private static WorkspaceContext? _current;
-
-        public static event Action<WorkspaceContext>? Changed;
 
         public static WorkspaceContext Current =>
             _current ?? throw new InvalidOperationException("Workspace is not valid.");
@@ -43,7 +40,6 @@ namespace HaloCreek.Services
             _current = context;
 
             workspaceCacheService.SaveLastWorkspacePath(context.WorkspacePath);
-            PublishChanged(context);
 
             return context;
         }
@@ -113,17 +109,6 @@ namespace HaloCreek.Services
             }
 
             return gitRootPath;
-        }
-
-        private static void PublishChanged(WorkspaceContext context)
-        {
-            var changed = Changed;
-            if (changed is null)
-            {
-                return;
-            }
-
-            Dispatcher.UIThread.Post(() => changed.Invoke(context));
         }
     }
 }

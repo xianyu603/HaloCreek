@@ -57,7 +57,6 @@ namespace HaloCreek.ViewModels.Components
             SendToFrontCommand = new RelayCommand(SendToFront, CanSendToFront);
 
             _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
-            WorkspaceRuntime.Changed += HandleWorkspaceChanged;
             RefreshFrontSessionState();
         }
 
@@ -279,7 +278,6 @@ namespace HaloCreek.ViewModels.Components
 
             _isDisposed = true;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
-            WorkspaceRuntime.Changed -= HandleWorkspaceChanged;
             StopActiveCompletionQuery();
         }
 
@@ -601,23 +599,6 @@ namespace HaloCreek.ViewModels.Components
                 _hasFrontSession = hasFrontSession;
                 SendToFrontCommand.NotifyCanExecuteChanged();
             }
-        }
-
-        private void HandleWorkspaceChanged(WorkspaceContext workspace)
-        {
-            if (!Dispatcher.UIThread.CheckAccess())
-            {
-                Dispatcher.UIThread.Post(() => HandleWorkspaceChanged(workspace));
-                return;
-            }
-
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            PromptText = string.Empty;
-            PromptCaretIndex = 0;
         }
 
         private readonly record struct CompletionTriggerState(

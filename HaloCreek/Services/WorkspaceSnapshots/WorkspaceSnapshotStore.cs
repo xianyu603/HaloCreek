@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
-using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 
 namespace HaloCreek.Services.WorkspaceSnapshots
@@ -33,7 +32,6 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                 Timeout.InfiniteTimeSpan,
                 Timeout.InfiniteTimeSpan);
 
-            WorkspaceRuntime.Changed += OnWorkspaceChanged;
             RequestRefresh(SnapshotRefreshReason.WorkspaceChanged);
             ScheduleNextTimerTick();
         }
@@ -97,28 +95,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                 _refreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
 
-            WorkspaceRuntime.Changed -= OnWorkspaceChanged;
             _refreshTimer.Dispose();
-        }
-
-        private void OnWorkspaceChanged(WorkspaceContext workspace)
-        {
-            ArgumentNullException.ThrowIfNull(workspace);
-
-            lock (_lock)
-            {
-                if (_state == RefreshState.Disposed)
-                {
-                    return;
-                }
-
-                _current = TSnapshot.CreateEmpty(workspace);
-                _hasSuccessfulRefresh = false;
-            }
-
-            PublishChanged(workspace);
-            // todo 这里不应该温柔request 应该停掉之前的
-            RequestRefresh(SnapshotRefreshReason.WorkspaceChanged);
         }
 
         private void OnRefreshTimerTick(object? state)
@@ -176,8 +153,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             var shouldPublishChanged = false;
             lock (_lock)
             {
-                if (_state == RefreshState.Disposed
-                    || !IsCurrentWorkspace(workspace))
+                if (_state == RefreshState.Disposed)
                 {
                     return;
                 }
@@ -200,7 +176,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             Log.Debug(
                 LogCategory,
                 $"Snapshot published. Snapshot={typeof(TSnapshot).Name}, Reason={reason}, Workspace={workspace.WorkspacePath}");
-            PublishChanged(workspace);
+            PublishChanged();
         }
 
         private bool CompleteRefreshAndGetIsPending(out SnapshotRefreshReason reason)
@@ -226,13 +202,13 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             }
         }
 
-        private void PublishChanged(WorkspaceContext expectedWorkspace)
+        private void PublishChanged()
         {
             Dispatcher.UIThread.Post(() =>
             {
                 lock (_lock)
                 {
-                    if (_state == RefreshState.Disposed || !IsCurrentWorkspace(expectedWorkspace))
+                    if (_state == RefreshState.Disposed)
                     {
                         return;
                     }
@@ -247,17 +223,6 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                     Log.Error(LogCategory, ex, "Snapshot changed subscriber failed.");
                 }
             });
-        }
-
-        private static bool IsCurrentWorkspace(WorkspaceContext expectedWorkspace)
-        {
-            var currentWorkspace = WorkspaceRuntime.Current;
-            return PlatformInfrastructure.AreWorkspacePathsEquivalent(
-                    expectedWorkspace.WorkspacePath,
-                    currentWorkspace.WorkspacePath)
-                && PlatformInfrastructure.AreWorkspacePathsEquivalent(
-                    expectedWorkspace.GitRootPath,
-                    currentWorkspace.GitRootPath);
         }
 
         private enum RefreshState
