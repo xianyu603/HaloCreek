@@ -10,7 +10,6 @@ namespace HaloCreek.ViewModels.Components
 {
     public sealed class WorkspaceFooterViewModel : ViewModelBase, IDisposable
     {
-        private const string NoWorkspaceSelectedText = "No workspace selected";
         private const string SelectingWorkspaceStatusText = "Selecting workspace...";
         private const string WorkspaceCategory = "Workspace";
         private const string WorkspaceSwitchFailureTitle = "Workspace switch failed";
@@ -18,7 +17,7 @@ namespace HaloCreek.ViewModels.Components
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly ApplicationStatusService _applicationStatusService;
         private readonly TransientEventService _transientEventService;
-        private string _workspacePath = NoWorkspaceSelectedText;
+        private string _workspacePath;
         private string _statusText = string.Empty;
         private bool _isDisposed;
 
@@ -29,6 +28,7 @@ namespace HaloCreek.ViewModels.Components
             _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             _applicationStatusService = appCommonRuntime.ApplicationStatusService;
             _transientEventService = appCommonRuntime.TransientEventService;
+            _workspacePath = WorkspaceRuntime.Current.WorkspacePath;
             _applicationStatusService.StatusTextChanged += OnStatusTextChanged;
             ChooseWorkspaceCommand = new AsyncRelayCommand(ChooseWorkspaceAsync);
         }
