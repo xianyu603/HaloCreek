@@ -50,7 +50,7 @@ namespace HaloCreek.Services.Completions.Skills
                 ? BuildSourceItems(sources)
                 : BuildQueriedItems(query, sources);
 
-            yield return new CompletionQuerySnapshot(items, false);
+            yield return new CompletionQuerySnapshot(items);
             await System.Threading.Tasks.Task.CompletedTask;
         }
 

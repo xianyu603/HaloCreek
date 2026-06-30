@@ -40,10 +40,10 @@ namespace HaloCreek.Services.Completions
         internal static CompletionQuery Empty()
         {
             return new CompletionQuery(
-                new CompletionQuerySnapshot(Array.Empty<PromptCompletionItem>(), false));
+                new CompletionQuerySnapshot(Array.Empty<PromptCompletionItem>()));
         }
 
-        internal static CompletionQuery StartPending(
+        internal static CompletionQuery Start(
             IAsyncEnumerable<CompletionQuerySnapshot> snapshots,
             CancellationTokenSource cancellation)
         {
@@ -51,11 +51,11 @@ namespace HaloCreek.Services.Completions
             ArgumentNullException.ThrowIfNull(cancellation);
 
             var query = new CompletionQuery(
-                new CompletionQuerySnapshot(Array.Empty<PromptCompletionItem>(), true),
+                new CompletionQuerySnapshot(Array.Empty<PromptCompletionItem>()),
                 cancellation);
             // ReadSnapshotsAsync runs synchronously until the source stream's first incomplete await.
-            // A synchronously yielded snapshot is applied before StartPending returns; Changed is
-            // still unobserved at that point, so that notification is intentionally ignored.
+            // A synchronously yielded snapshot may update Current before the caller subscribes to
+            // Changed, so callers must read Current once after Start returns.
             _ = query.ReadSnapshotsAsync(snapshots, cancellation.Token);
             return query;
         }
@@ -70,10 +70,6 @@ namespace HaloCreek.Services.Completions
                 {
                     ApplyUpdate(snapshot);
                 }
-                // todo 这里会在最后一个yield return 连续广播两次Changed 希望能改成
-                // 1. CompletionQuerySnapshot 不加pending 用stream结束表示结束
-                // 2. 内容变更和pending结束分别通知
-                CompletePendingSnapshot();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -81,7 +77,6 @@ namespace HaloCreek.Services.Completions
             catch (Exception ex)
             {
                 Log.Error(LogCategory, ex, "Completion query stream failed.");
-                CompletePendingSnapshot();
             }
         }
 
@@ -98,23 +93,6 @@ namespace HaloCreek.Services.Completions
                 }
 
                 _current = snapshot;
-                changed = Changed;
-            }
-
-            changed?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void CompletePendingSnapshot()
-        {
-            EventHandler? changed;
-            lock (_gate)
-            {
-                if (_isDisposed || !_current.IsPending)
-                {
-                    return;
-                }
-
-                _current = _current with { IsPending = false };
                 changed = Changed;
             }
 
@@ -139,6 +117,5 @@ namespace HaloCreek.Services.Completions
     }
 
     public sealed record CompletionQuerySnapshot(
-        IReadOnlyList<PromptCompletionItem> Items,
-        bool IsPending);
+        IReadOnlyList<PromptCompletionItem> Items);
 }

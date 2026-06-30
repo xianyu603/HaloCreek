@@ -34,7 +34,7 @@ namespace HaloCreek.Services.Completions
 
             var cancellation = new CancellationTokenSource();
             var snapshots = source.StartQuery(text, cancellation.Token);
-            return CompletionQuery.StartPending(snapshots, cancellation);
+            return CompletionQuery.Start(snapshots, cancellation);
         }
     }
 }

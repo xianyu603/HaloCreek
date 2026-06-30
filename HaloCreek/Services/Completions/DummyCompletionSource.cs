@@ -61,7 +61,7 @@ namespace HaloCreek.Services.Completions
                 .Where(item => MatchesQuery(item, text))
                 .ToArray();
 
-            yield return new CompletionQuerySnapshot(items, false);
+            yield return new CompletionQuerySnapshot(items);
             await System.Threading.Tasks.Task.CompletedTask;
         }
 

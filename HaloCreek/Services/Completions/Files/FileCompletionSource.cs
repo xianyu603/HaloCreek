@@ -42,7 +42,7 @@ namespace HaloCreek.Services.Completions.Files
             var query = text ?? string.Empty;
             if (string.IsNullOrEmpty(query))
             {
-                yield return new CompletionQuerySnapshot(BuildEmptyQueryItems(), false);
+                yield return new CompletionQuerySnapshot(BuildEmptyQueryItems());
                 yield break;
             }
 
@@ -108,9 +108,7 @@ namespace HaloCreek.Services.Completions.Files
                 yield break;
             }
 
-            yield return new CompletionQuerySnapshot(
-                items,
-                false);
+            yield return new CompletionQuerySnapshot(items);
         }
 
         private static IReadOnlyList<PromptCompletionItem> BuildSnapshotItems(

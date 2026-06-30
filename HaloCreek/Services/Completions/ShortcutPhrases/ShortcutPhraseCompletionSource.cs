@@ -42,7 +42,7 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
                 ? BuildCategoryItems()
                 : BuildQueriedItems(query);
 
-            yield return new CompletionQuerySnapshot(items, false);
+            yield return new CompletionQuerySnapshot(items);
             await System.Threading.Tasks.Task.CompletedTask;
         }
 
