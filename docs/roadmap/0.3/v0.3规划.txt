@@ -1,0 +1,23 @@
+目标: 进一步提高易用性，降低setup成本.
+易用性:
+	常用工作流尽量不要切到cli(发prompt 看回复, review...) 减少现在需要频繁在cli 应用切换, 复制体验也不好. tmux仍然作为后台, 并保留打开cli的能力, 偶尔有用.
+	前台session变'软', 切换前台只切换展示UI, 只有在打开cli时才进行比较重的切换操作, 并且应当低频(设计上是开一会就关了)
+	session状态, 消息之类的从jsonl读取. 读到完成发通知; prompt input view 里面新增一个只读文本框, 里面写上'当前session的最近汇报' 实时刷新
+	对应的基础能力: 文件系统监听, snapshot考虑也接一下(或者当前session扫描可以接到snapshot里面)
+	通知二选一, 快捷进review tab或快捷弹悬浮框, 如果做不到快捷弹悬浮框, 
+
+setup:
+	减少对wsl的依赖, 尝试使用win codex和win psmux 作为后台
+	提供一键依赖安装脚本.
+	解决登录/更新无法在应用内完成的问题
+
+明确暂不进行: 多session的正式并行体验, 仍然放到'并行'主题. send reply仍然智能发送给前台session.
+
+工作条目
+1. ongoing session file 监听 想办法匹配到on going session, 信息过滤, 日志打印, 状态探测, 可能抽象成snapshot, 可能接文件系统监听
+2. ongoing session 渲染, 设计下要不要做multi turn, 逐条翻log之类的
+3. 前台session 模型变更, 从和tmux状态绑定改为应用内部状态(需要有发送消息给任意指定ongoing的能力)
+4. 尝试接入应用通知
+5. psmux能力尝试 win codex能力尝试 **不支持热切,可以走config
+6. 如果5顺利 一键安装脚本
+7. 应用内codex登录, 更新设计
