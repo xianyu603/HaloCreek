@@ -122,8 +122,7 @@ namespace HaloCreek.Services
             }
 
             var gitChanges = _gitService.GetChanges();
-            var workspacePath = gitChanges.WorkspacePath;
-
+            var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
             Log.Info(
                 LogCategory,
                 $"Review clip locate scan started. clipboardLength={snapshot.Text.Length} workspace={QuoteForLog(workspacePath)}");

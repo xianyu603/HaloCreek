@@ -44,7 +44,6 @@ namespace HaloCreek.Services.Completions.Skills
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // TODO: If the workspace changes after a query starts, discard stale skill results at this layer.
             var sources = _catalogReader.ReadCatalog();
             var query = (text ?? string.Empty).Trim();
             var items = string.IsNullOrEmpty(query)

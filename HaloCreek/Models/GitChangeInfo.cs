@@ -39,6 +39,5 @@ namespace HaloCreek.Models
 
     public sealed record GitChangesResult(
         IReadOnlyList<GitChangeInfo> Changes,
-        string Message,
-        string WorkspacePath);
+        string Message);
 }

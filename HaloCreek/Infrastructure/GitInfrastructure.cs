@@ -29,7 +29,7 @@ namespace HaloCreek.Infrastructure
                     ? "Git status failed."
                     : commandResult.ErrorMessage.Trim();
 
-                return new GitChangesResult(Array.Empty<GitChangeInfo>(), message, workspacePath);
+                return new GitChangesResult(Array.Empty<GitChangeInfo>(), message);
             }
 
             var changes = ParsePorcelainStatus(commandResult.Output)
@@ -40,7 +40,7 @@ namespace HaloCreek.Infrastructure
                 ? "No Git changes for current workspace."
                 : $"Loaded {changes.Length} Git changes.";
 
-            return new GitChangesResult(changes, loadedMessage, workspacePath);
+            return new GitChangesResult(changes, loadedMessage);
         }
 
         public static string? GetHeadId(string workspacePath)
