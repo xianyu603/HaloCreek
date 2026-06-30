@@ -39,6 +39,11 @@ namespace HaloCreek.Services
             ReviewIndexSnapshot left,
             ReviewIndexSnapshot right)
         {
+            if (left.Entries.Count != right.Entries.Count)
+            {
+                return false;
+            }
+
             for (var index = 0; index < left.Entries.Count; index++)
             {
                 if (!EntryContentEquals(left.Entries[index], right.Entries[index]))
