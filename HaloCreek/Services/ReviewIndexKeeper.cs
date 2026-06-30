@@ -78,10 +78,6 @@ namespace HaloCreek.Services
 
             var reviewIndexSnapshot = _reviewIndexSnapshots.Current;
             var gitSnapshot = _gitSnapshots.Current;
-            if (!AreSnapshotsForCurrentWorkspace(reviewIndexSnapshot, gitSnapshot))
-            {
-                return;
-            }
 
             var omittedPaths = GetOmittedPaths(reviewIndexSnapshot, gitSnapshot);
             if (omittedPaths.Count == 0)
@@ -91,23 +87,11 @@ namespace HaloCreek.Services
 
             foreach (var relativePath in omittedPaths)
             {
-                ReviewIndexOperator.RemoveFile(reviewIndexSnapshot.GitRootPath, relativePath);
+                ReviewIndexOperator.RemoveFile(WorkspaceRuntime.Current.WorkspacePath, relativePath);
                 Log.Info("Review", $"ReviewIndexKeeper removed entry. File={relativePath}");
             }
 
             _reviewIndexSnapshots.RequestRefresh(SnapshotRefreshReason.Manual);
-        }
-
-        private static bool AreSnapshotsForCurrentWorkspace(
-            ReviewIndexSnapshot reviewIndexSnapshot,
-            GitSnapshot gitSnapshot)
-        {
-            return PlatformInfrastructure.AreWorkspacePathsEquivalent(
-                    reviewIndexSnapshot.GitRootPath,
-                    gitSnapshot.GitRootPath)
-                && PlatformInfrastructure.AreWorkspacePathsEquivalent(
-                    reviewIndexSnapshot.GitRootPath,
-                    WorkspaceRuntime.Current.GitRootPath);
         }
 
         private static bool IsOmittedEntry(

@@ -15,18 +15,27 @@ namespace HaloCreek.Services.WorkspacePaths
 
         private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
 
-        public static WorkspacePathIndexSnapshot CreateEmpty(WorkspaceContext workspace)
+        public static WorkspacePathIndexSnapshot CreateEmpty()
         {
-            ArgumentNullException.ThrowIfNull(workspace);
+            var root = new WorkspacePathIndexDirectoryNode
+            {
+                Name = string.Empty,
+                RelativePath = string.Empty,
+                Directories = Array.Empty<WorkspacePathIndexDirectoryNode>(),
+                Files = Array.Empty<WorkspacePathIndexFileNode>(),
+            };
 
-            return CreateEmpty(workspace.GitRootPath);
+            return new WorkspacePathIndexSnapshot
+            {
+                Root = root,
+                Files = Array.Empty<WorkspacePathIndexFileNode>(),
+                Directories = Array.Empty<WorkspacePathIndexDirectoryNode>(),
+            };
         }
 
-        public static WorkspacePathIndexSnapshot Read(WorkspaceContext workspace)
+        public static WorkspacePathIndexSnapshot Read()
         {
-            ArgumentNullException.ThrowIfNull(workspace);
-
-            return ReadAsync(workspace.GitRootPath, CancellationToken.None)
+            return ReadAsync(WorkspaceRuntime.Current.WorkspacePath, CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();
         }
@@ -35,14 +44,6 @@ namespace HaloCreek.Services.WorkspacePaths
             WorkspacePathIndexSnapshot left,
             WorkspacePathIndexSnapshot right)
         {
-            if (!string.Equals(
-                    left.WorkspacePath,
-                    right.WorkspacePath,
-                    StringComparison.Ordinal))
-            {
-                return false;
-            }
-
             if (left.Files.Count != right.Files.Count)
             {
                 return false;
@@ -145,7 +146,6 @@ namespace HaloCreek.Services.WorkspacePaths
 
             return new WorkspacePathIndexSnapshot
             {
-                WorkspacePath = workspacePath,
                 Root = root,
                 Files = flatFiles
                     .OrderBy(file => file.RelativePath, PathComparer)
@@ -187,25 +187,6 @@ namespace HaloCreek.Services.WorkspacePaths
             flatDirectories.Add(node);
 
             return node;
-        }
-
-        private static WorkspacePathIndexSnapshot CreateEmpty(string workspacePath)
-        {
-            var root = new WorkspacePathIndexDirectoryNode
-            {
-                Name = string.Empty,
-                RelativePath = string.Empty,
-                Directories = Array.Empty<WorkspacePathIndexDirectoryNode>(),
-                Files = Array.Empty<WorkspacePathIndexFileNode>(),
-            };
-
-            return new WorkspacePathIndexSnapshot
-            {
-                WorkspacePath = workspacePath,
-                Root = root,
-                Files = Array.Empty<WorkspacePathIndexFileNode>(),
-                Directories = Array.Empty<WorkspacePathIndexDirectoryNode>(),
-            };
         }
 
         private sealed class DirectoryBuilder

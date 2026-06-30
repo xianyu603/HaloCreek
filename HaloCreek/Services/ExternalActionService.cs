@@ -102,7 +102,7 @@ namespace HaloCreek.Services
             string? selectedRelativePath)
         {
             var actionName = action.Id;
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
 
             try
             {

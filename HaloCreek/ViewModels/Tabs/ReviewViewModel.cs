@@ -350,7 +350,7 @@ namespace HaloCreek.ViewModels.Tabs
                 var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(file.RelativePath);
                 var reviewedPath = CreateReviewedTempFile(gitRelativePath);
                 var workingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
-                    WorkspaceRuntime.Current.GitRootPath,
+                    WorkspaceRuntime.Current.WorkspacePath,
                     gitRelativePath);
                 _externalActionService.OpenDiff(
                     reviewedPath,
@@ -384,7 +384,7 @@ namespace HaloCreek.ViewModels.Tabs
                     ? CreateEmptyHeadTempFile(gitRelativePath)
                     : GitInfrastructure.CreateTempHeadFile(gitRelativePath);
                 var reviewedPath = ReviewIndexOperator.CreateTempReviewedFile(
-                    WorkspaceRuntime.Current.GitRootPath,
+                    WorkspaceRuntime.Current.WorkspacePath,
                     gitRelativePath);
                 _externalActionService.OpenDiff(
                     headPath,
@@ -426,7 +426,7 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             ReviewIndexOperator.AddWorkingTreeFile(
-                WorkspaceRuntime.Current.GitRootPath,
+                WorkspaceRuntime.Current.WorkspacePath,
                 gitRelativePath);
         }
 
@@ -442,7 +442,7 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             ReviewIndexOperator.RemoveFile(
-                WorkspaceRuntime.Current.GitRootPath,
+                WorkspaceRuntime.Current.WorkspacePath,
                 gitRelativePath);
         }
 
@@ -453,7 +453,7 @@ namespace HaloCreek.ViewModels.Tabs
             if (reviewEntry is not null)
             {
                 var absoluteWorkingTreePath = PlatformInfrastructure.CombinePathForCurrentPlatform(
-                    WorkspaceRuntime.Current.GitRootPath,
+                    WorkspaceRuntime.Current.WorkspacePath,
                     gitRelativePath);
                 var parentDirectory = Path.GetDirectoryName(absoluteWorkingTreePath);
                 if (!string.IsNullOrWhiteSpace(parentDirectory))
@@ -462,7 +462,7 @@ namespace HaloCreek.ViewModels.Tabs
                 }
 
                 ReviewIndexOperator.CheckoutFileToWorkingTree(
-                    WorkspaceRuntime.Current.GitRootPath,
+                    WorkspaceRuntime.Current.WorkspacePath,
                     gitRelativePath);
                 return;
             }
@@ -481,7 +481,7 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             File.Delete(PlatformInfrastructure.CombinePathForCurrentPlatform(
-                WorkspaceRuntime.Current.GitRootPath,
+                WorkspaceRuntime.Current.WorkspacePath,
                 gitRelativePath));
         }
 
@@ -491,7 +491,7 @@ namespace HaloCreek.ViewModels.Tabs
             if (GetActiveReviewEntry(gitRelativePath) is not null)
             {
                 return ReviewIndexOperator.CreateTempReviewedFile(
-                    WorkspaceRuntime.Current.GitRootPath,
+                    WorkspaceRuntime.Current.WorkspacePath,
                     gitRelativePath);
             }
 

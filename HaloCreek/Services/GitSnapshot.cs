@@ -8,7 +8,6 @@ using HaloCreek.Services.WorkspaceSnapshots;
 namespace HaloCreek.Services
 {
     public sealed record GitSnapshot(
-        string GitRootPath,
         string? HeadId,
         IReadOnlyList<GitSnapshotEntry> Entries,
         string Message)
@@ -18,22 +17,18 @@ namespace HaloCreek.Services
             .Select(entry => entry.ToChangeInfo())
             .ToArray();
 
-        public static GitSnapshot CreateEmpty(WorkspaceContext workspace)
+        public static GitSnapshot CreateEmpty()
         {
-            ArgumentNullException.ThrowIfNull(workspace);
-
             return new GitSnapshot(
-                workspace.GitRootPath,
                 null,
                 Array.Empty<GitSnapshotEntry>(),
                 "No Git changes for current workspace.");
         }
 
-        public static GitSnapshot ReadSnapshot(WorkspaceContext workspace)
+        public static GitSnapshot ReadSnapshot()
         {
-            ArgumentNullException.ThrowIfNull(workspace);
-
-            var result = GitInfrastructure.GetChanges(workspace.GitRootPath);
+            var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
+            var result = GitInfrastructure.GetChanges(WorkspaceRuntime.Current.WorkspacePath);
             var entries = result.Changes
                 .Select(change =>
                 {
@@ -46,22 +41,20 @@ namespace HaloCreek.Services
                         change.OriginalRelativePath is null
                             ? null
                             : PlatformInfrastructure.NormalizeGitRelativePath(change.OriginalRelativePath),
-                        GitInfrastructure.HashWorkingTreeFile(workspace.GitRootPath, gitRelativePath),
-                        GitInfrastructure.GetHeadBlobId(workspace.GitRootPath, gitRelativePath));
+                        GitInfrastructure.HashWorkingTreeFile(workspacePath, gitRelativePath),
+                        GitInfrastructure.GetHeadBlobId(workspacePath, gitRelativePath));
                 })
                 .ToArray();
 
             return new GitSnapshot(
-                workspace.GitRootPath,
-                GitInfrastructure.GetHeadId(workspace.GitRootPath),
+                GitInfrastructure.GetHeadId(workspacePath),
                 entries,
                 result.Message);
         }
 
         public static bool ContentEquals(GitSnapshot left, GitSnapshot right)
         {
-            if (!PlatformInfrastructure.AreWorkspacePathsEquivalent(left.GitRootPath, right.GitRootPath)
-                || !string.Equals(left.HeadId, right.HeadId, StringComparison.OrdinalIgnoreCase)
+            if (!string.Equals(left.HeadId, right.HeadId, StringComparison.OrdinalIgnoreCase)
                 || !string.Equals(left.Message, right.Message, StringComparison.Ordinal)
                 || left.Entries.Count != right.Entries.Count)
             {

@@ -7,22 +7,20 @@ namespace HaloCreek.Services.WorkspacePaths
     internal sealed class WorkspacePathIndexSnapshot :
         IWorkspaceSnapshot<WorkspacePathIndexSnapshot>
     {
-        public required string WorkspacePath { get; init; }
-
         public required WorkspacePathIndexDirectoryNode Root { get; init; }
 
         public required IReadOnlyList<WorkspacePathIndexFileNode> Files { get; init; }
 
         public required IReadOnlyList<WorkspacePathIndexDirectoryNode> Directories { get; init; }
 
-        public static WorkspacePathIndexSnapshot CreateEmpty(WorkspaceContext workspace)
+        public static WorkspacePathIndexSnapshot CreateEmpty()
         {
-            return WorkspacePathIndexSnapshotReader.CreateEmpty(workspace);
+            return WorkspacePathIndexSnapshotReader.CreateEmpty();
         }
 
-        public static WorkspacePathIndexSnapshot ReadSnapshot(WorkspaceContext workspace)
+        public static WorkspacePathIndexSnapshot ReadSnapshot()
         {
-            return WorkspacePathIndexSnapshotReader.Read(workspace);
+            return WorkspacePathIndexSnapshotReader.Read();
         }
 
         public static bool ContentEquals(

@@ -30,7 +30,7 @@ namespace HaloCreek.Services.Completions.Files
         {
             try
             {
-                var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+                var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
                 return _gitService.GetChanges().Changes
                     .Where(change => UncommittedChangeTypes.Contains(change.ChangeType))
                     .Select(change => NormalizePathOrNull(change.RelativePath, "status"))
@@ -52,7 +52,7 @@ namespace HaloCreek.Services.Completions.Files
         {
             try
             {
-                var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+                var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
                 return _gitService.GetRecentCommittedFilePaths(commitCount)
                     .Select(relativePath => NormalizePathOrNull(relativePath, "recent committed"))
                     .Where(relativePath => PlatformInfrastructure.IsExistingFileUnderDirectory(

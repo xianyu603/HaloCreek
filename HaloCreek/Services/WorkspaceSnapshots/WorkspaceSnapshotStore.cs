@@ -25,14 +25,14 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         public WorkspaceSnapshotStore()
         {
             var workspace = WorkspaceRuntime.Current;
-            _current = TSnapshot.CreateEmpty(workspace);
+            _current = TSnapshot.CreateEmpty();
             _refreshTimer = new Timer(
                 OnRefreshTimerTick,
                 state: null,
                 Timeout.InfiniteTimeSpan,
                 Timeout.InfiniteTimeSpan);
 
-            RequestRefresh(SnapshotRefreshReason.WorkspaceChanged);
+            RequestRefresh(SnapshotRefreshReason.Init);
             ScheduleNextTimerTick();
         }
 
@@ -127,7 +127,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
                 try
                 {
-                    var snapshot = TSnapshot.ReadSnapshot(workspace);
+                    var snapshot = TSnapshot.ReadSnapshot();
                     PublishRefreshResult(workspace, snapshot, reason);
                 }
                 catch (Exception ex)

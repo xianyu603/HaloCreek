@@ -69,7 +69,7 @@ namespace HaloCreek.Services
                     + $"Git root: {gitRootPath}");
             }
 
-            return new WorkspaceContext(normalizedPath, effectiveConfig, normalizedPath);
+            return new WorkspaceContext(normalizedPath, effectiveConfig);
         }
 
         private static string ResolveGitRoot(string normalizedPath)

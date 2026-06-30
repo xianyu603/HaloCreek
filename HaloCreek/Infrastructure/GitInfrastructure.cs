@@ -16,7 +16,7 @@ namespace HaloCreek.Infrastructure
 
         public static GitChangesResult GetChanges()
         {
-            return GetChanges(WorkspaceRuntime.Current.GitRootPath);
+            return GetChanges(WorkspaceRuntime.Current.WorkspacePath);
         }
 
         public static GitChangesResult GetChanges(string workspacePath)
@@ -71,7 +71,7 @@ namespace HaloCreek.Infrastructure
                 throw new ArgumentOutOfRangeException(nameof(commitCount), "Commit count must be positive.");
             }
 
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
             var commandResult = RunGit(
                 workspacePath,
                 new[] { "log", "-n", commitCount.ToString(), "--name-only", "--pretty=format:" });
@@ -90,7 +90,7 @@ namespace HaloCreek.Infrastructure
             [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             await foreach (var relativePath in StreamWorkspaceFilePaths(
-                WorkspaceRuntime.Current.GitRootPath,
+                WorkspaceRuntime.Current.WorkspacePath,
                 cancellationToken))
             {
                 yield return relativePath;
@@ -125,7 +125,7 @@ namespace HaloCreek.Infrastructure
 
         public static string? GetHeadBlobId(string? relativePath)
         {
-            return GetHeadBlobId(WorkspaceRuntime.Current.GitRootPath, relativePath);
+            return GetHeadBlobId(WorkspaceRuntime.Current.WorkspacePath, relativePath);
         }
 
         public static string? GetHeadBlobId(string workspacePath, string? relativePath)
@@ -152,7 +152,7 @@ namespace HaloCreek.Infrastructure
 
         public static string? HashWorkingTreeFile(string? relativePath)
         {
-            return HashWorkingTreeFile(WorkspaceRuntime.Current.GitRootPath, relativePath);
+            return HashWorkingTreeFile(WorkspaceRuntime.Current.WorkspacePath, relativePath);
         }
 
         public static string? HashWorkingTreeFile(string workspacePath, string? relativePath)
@@ -182,7 +182,7 @@ namespace HaloCreek.Infrastructure
 
         public static string CreateTempHeadFile(string? relativePath)
         {
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var commandResult = RunGit(
@@ -204,7 +204,7 @@ namespace HaloCreek.Infrastructure
 
         public static void RestoreFileFromHead(string? relativePath)
         {
-            var workspacePath = WorkspaceRuntime.Current.GitRootPath;
+            var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
             ArgumentException.ThrowIfNullOrWhiteSpace(relativePath);
             var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(relativePath);
             var commandResult = RunGit(

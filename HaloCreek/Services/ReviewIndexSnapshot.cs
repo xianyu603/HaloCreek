@@ -7,24 +7,19 @@ using HaloCreek.Services.WorkspaceSnapshots;
 namespace HaloCreek.Services
 {
     public sealed record ReviewIndexSnapshot(
-        string GitRootPath,
         IReadOnlyList<ReviewIndexSnapshotEntry> Entries)
         : IWorkspaceSnapshot<ReviewIndexSnapshot>
     {
-        public static ReviewIndexSnapshot CreateEmpty(WorkspaceContext workspace)
+        public static ReviewIndexSnapshot CreateEmpty()
         {
-            ArgumentNullException.ThrowIfNull(workspace);
-
             return new ReviewIndexSnapshot(
-                workspace.GitRootPath,
                 Array.Empty<ReviewIndexSnapshotEntry>());
         }
 
-        public static ReviewIndexSnapshot ReadSnapshot(WorkspaceContext workspace)
+        public static ReviewIndexSnapshot ReadSnapshot()
         {
-            ArgumentNullException.ThrowIfNull(workspace);
-
-            var entries = ReviewIndexOperator.ReadEntries(workspace.GitRootPath)
+            var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
+            var entries = ReviewIndexOperator.ReadEntries(workspacePath)
                 .Select(entry =>
                 {
                     var relativePath = PlatformInfrastructure.NormalizeGitRelativePath(
@@ -32,26 +27,18 @@ namespace HaloCreek.Services
                     return new ReviewIndexSnapshotEntry(
                         relativePath,
                         entry.BlobId,
-                        GitInfrastructure.GetHeadBlobId(workspace.GitRootPath, relativePath));
+                        GitInfrastructure.GetHeadBlobId(workspacePath, relativePath));
                 })
                 .OrderBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-            return new ReviewIndexSnapshot(
-                workspace.GitRootPath,
-                entries);
+            return new ReviewIndexSnapshot(entries);
         }
 
         public static bool ContentEquals(
             ReviewIndexSnapshot left,
             ReviewIndexSnapshot right)
         {
-            if (!PlatformInfrastructure.AreWorkspacePathsEquivalent(left.GitRootPath, right.GitRootPath)
-                || left.Entries.Count != right.Entries.Count)
-            {
-                return false;
-            }
-
             for (var index = 0; index < left.Entries.Count; index++)
             {
                 if (!EntryContentEquals(left.Entries[index], right.Entries[index]))
