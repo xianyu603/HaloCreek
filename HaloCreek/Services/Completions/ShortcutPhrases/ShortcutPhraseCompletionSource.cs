@@ -21,7 +21,7 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
         private readonly IReadOnlyDictionary<string, ShortcutPhraseCategory> _categoriesByExactToken;
 
         public ShortcutPhraseCompletionSource()
-            : this(ShortcutPhraseStaticConfig.Categories)
+            : this(WorkspaceRuntime.Current.EffectiveConfig.ShortcutPhraseCategories)
         {
         }
 

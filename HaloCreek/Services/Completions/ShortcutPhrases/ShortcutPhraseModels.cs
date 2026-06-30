@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace HaloCreek.Services.Completions.ShortcutPhrases
 {
-    internal sealed record ShortcutPhraseCategory(
+    public sealed record ShortcutPhraseCategory(
         string Name,
         // Category aliases are exact-match route tokens. When a query equals one of them,
         // completion shows this category's items directly.
@@ -11,7 +11,7 @@ namespace HaloCreek.Services.Completions.ShortcutPhrases
         string? Description,
         IReadOnlyList<ShortcutPhraseItem> Items);
 
-    internal sealed record ShortcutPhraseItem(
+    public sealed record ShortcutPhraseItem(
         string Title,
         // Item aliases are search keywords only. They participate in fuzzy item matching,
         // but are not exact-match route tokens and are never inserted.

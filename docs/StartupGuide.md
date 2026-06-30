@@ -194,7 +194,22 @@ workspace 配置：
 {
   "CodexExecutableName": "codex",
   "CodexLaunchArguments": [],
-  "MaxSessionHistoryFiles": 100
+  "MaxSessionHistoryFiles": 100,
+  "ShortcutPhraseCategories": [
+    {
+      "Name": "自定义",
+      "Aliases": ["custom"],
+      "Description": "自定义快捷语。",
+      "Items": [
+        {
+          "Title": "示例",
+          "Aliases": ["sample"],
+          "Description": "插入示例文本。",
+          "InsertText": "示例 prompt"
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -212,7 +227,7 @@ workspace 配置：
 }
 ```
 
-缺失字段会继承低优先级配置或默认值。`CodexExecutableName` 为空白时会被忽略；`MaxSessionHistoryFiles` 必须大于 0，否则会继承低优先级配置或默认值。
+另外内置默认配置包含一组 `ShortcutPhraseCategories`。缺失字段会继承低优先级配置或默认值。`CodexExecutableName` 为空白时会被忽略；`MaxSessionHistoryFiles` 必须大于 0，否则会继承低优先级配置或默认值。
 
 ### 3.3 Codex 启动配置
 
@@ -269,7 +284,25 @@ codex --model gpt-5-codex resume <sessionId>
 }
 ```
 
-### 3.5 当前不可配置项
+### 3.5 快捷语配置
+
+`ShortcutPhraseCategories` 控制 `#` 补全里的静态快捷语。全局配置或 workspace 配置只要提供该字段，就会整体替换低优先级的快捷语列表，不做按类别或条目的深度合并。
+
+类别字段：
+
+- `Name`：类别名称。
+- `Aliases`：类别别名，query 精确匹配时直接展示该类别下的条目。
+- `Description`：类别说明。
+- `Items`：类别下的快捷语条目。
+
+条目字段：
+
+- `Title`：条目展示名称。
+- `Aliases`：条目搜索关键字。
+- `Description`：条目说明。
+- `InsertText`：接受条目后插入 prompt 的文本。
+
+### 3.6 当前不可配置项
 
 以下行为当前是内置实现，不通过 `config.json` 配置：
 

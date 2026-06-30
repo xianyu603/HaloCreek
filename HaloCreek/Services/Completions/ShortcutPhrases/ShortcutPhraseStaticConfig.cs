@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace HaloCreek.Services.Completions.ShortcutPhrases
 {
-    internal static class ShortcutPhraseStaticConfig
+    public static class ShortcutPhraseStaticConfig
     {
         public static IReadOnlyList<ShortcutPhraseCategory> Categories { get; } =
         [

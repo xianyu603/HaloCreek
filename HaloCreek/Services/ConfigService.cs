@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using HaloCreek.Models;
+using HaloCreek.Services.Completions.ShortcutPhrases;
 
 namespace HaloCreek.Services
 {
@@ -106,7 +107,8 @@ namespace HaloCreek.Services
             return new AppConfig(
                 Coalesce(fileConfig.CodexExecutableName, baseConfig.CodexExecutableName),
                 Coalesce(fileConfig.CodexLaunchArguments, baseConfig.CodexLaunchArguments),
-                CoalescePositive(fileConfig.MaxSessionHistoryFiles, baseConfig.MaxSessionHistoryFiles));
+                CoalescePositive(fileConfig.MaxSessionHistoryFiles, baseConfig.MaxSessionHistoryFiles),
+                Coalesce(fileConfig.ShortcutPhraseCategories, baseConfig.ShortcutPhraseCategories));
         }
 
         private static string Coalesce(string? value, string fallback)
@@ -132,6 +134,13 @@ namespace HaloCreek.Services
                 : fallback;
         }
 
+        private static IReadOnlyList<ShortcutPhraseCategory> Coalesce(
+            IReadOnlyList<ShortcutPhraseCategory>? values,
+            IReadOnlyList<ShortcutPhraseCategory> fallback)
+        {
+            return values ?? fallback;
+        }
+
         private sealed class AppConfigFile
         {
             public string? CodexExecutableName { get; init; }
@@ -139,6 +148,8 @@ namespace HaloCreek.Services
             public List<string?>? CodexLaunchArguments { get; init; }
 
             public int? MaxSessionHistoryFiles { get; init; }
+
+            public List<ShortcutPhraseCategory>? ShortcutPhraseCategories { get; init; }
         }
     }
 }
