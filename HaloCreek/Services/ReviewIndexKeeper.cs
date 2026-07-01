@@ -102,8 +102,9 @@ namespace HaloCreek.Services
                 reviewEntry.RelativePath);
             gitEntriesByPath.TryGetValue(relativePath, out var gitEntry);
 
-            if (gitEntry?.WorkingTreeBlobId is null && reviewEntry.HeadBlobId is null)
+            if (gitEntry is null)
             {
+                // 由于reviewed视为git变更项的子集, 没有git变更项时直接裁剪
                 return true;
             }
 
