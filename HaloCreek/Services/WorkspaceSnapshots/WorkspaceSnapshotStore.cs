@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -7,6 +6,22 @@ using HaloCreek.Logging;
 
 namespace HaloCreek.Services.WorkspaceSnapshots
 {
+    public static class WorkspaceSnapshotStore
+    {
+        public static WorkspaceSnapshotStore<TSnapshot> Create<TSnapshot>()
+            where TSnapshot : IWorkspaceSnapshot<TSnapshot>
+        {
+            return new WorkspaceSnapshotStore<TSnapshot>(TSnapshot.ReadSnapshot);
+        }
+
+        public static WorkspaceSnapshotStore<TSnapshot> Create<TSnapshot>(string key)
+            where TSnapshot : IKeyedWorkspaceSnapshot<TSnapshot>
+        {
+            ArgumentNullException.ThrowIfNull(key);
+            return new WorkspaceSnapshotStore<TSnapshot>(() => TSnapshot.ReadSnapshot(key));
+        }
+    }
+
     public sealed class WorkspaceSnapshotStore<TSnapshot> :
         IWorkspaceSnapshotSource<TSnapshot>,
         IDisposable
@@ -24,17 +39,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         private SnapshotRefreshReason _pendingReason;// 调试信息 不讲究地只记录第一个pending请求的触发方
         private bool _hasSuccessfulRefresh;
 
-        public WorkspaceSnapshotStore()
-            : this(CreateDefaultReader())
-        {
-        }
-
-        public WorkspaceSnapshotStore(string key)
-            : this(CreateKeyedReader(key))
-        {
-        }
-
-        private WorkspaceSnapshotStore(Func<TSnapshot> readSnapshot)
+        internal WorkspaceSnapshotStore(Func<TSnapshot> readSnapshot)
         {
             var workspace = WorkspaceRuntime.Current;
             _readSnapshot = readSnapshot ?? throw new ArgumentNullException(nameof(readSnapshot));
@@ -244,50 +249,6 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             Refreshing,
             RefreshingWithPending,
             Disposed,
-        }
-
-        private static Func<TSnapshot> CreateDefaultReader()
-        {
-            if (IsKeyedSnapshotType())
-            {
-                throw new InvalidOperationException(
-                    $"{typeof(TSnapshot).Name} requires a key. Use WorkspaceSnapshotStore<{typeof(TSnapshot).Name}>(string key).");
-            }
-
-            return TSnapshot.ReadSnapshot;
-        }
-
-        private static Func<TSnapshot> CreateKeyedReader(string key)
-        {
-            ArgumentNullException.ThrowIfNull(key);
-
-            var snapshotType = typeof(TSnapshot);
-            if (!IsKeyedSnapshotType())
-            {
-                throw new InvalidOperationException(
-                    $"{snapshotType.Name} does not support keyed reads. Use the parameterless WorkspaceSnapshotStore<{snapshotType.Name}> constructor.");
-            }
-
-            var readSnapshot = snapshotType.GetMethod(
-                nameof(IWorkspaceSnapshot<TSnapshot>.ReadSnapshot),
-                BindingFlags.Public | BindingFlags.Static,
-                binder: null,
-                types: new[] { typeof(string) },
-                modifiers: null);
-            if (readSnapshot is null || readSnapshot.ReturnType != snapshotType)
-            {
-                throw new InvalidOperationException(
-                    $"{snapshotType.Name} must expose public static {snapshotType.Name} ReadSnapshot(string key).");
-            }
-
-            return () => (TSnapshot)readSnapshot.Invoke(null, new object[] { key })!;
-        }
-
-        private static bool IsKeyedSnapshotType()
-        {
-            var snapshotType = typeof(TSnapshot);
-            var keyedSnapshotType = typeof(IKeyedWorkspaceSnapshot<>).MakeGenericType(snapshotType);
-            return keyedSnapshotType.IsAssignableFrom(snapshotType);
         }
     }
 }

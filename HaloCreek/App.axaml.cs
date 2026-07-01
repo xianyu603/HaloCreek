@@ -96,13 +96,13 @@ namespace HaloCreek
                 appCommonRuntime);
             var gitService = new GitService();
             var workspacePathIndexSnapshots =
-                new WorkspaceSnapshotStore<WorkspacePathIndexSnapshot>();
+                WorkspaceSnapshotStore.Create<WorkspacePathIndexSnapshot>();
             var sessionHistorySnapshots =
-                new WorkspaceSnapshotStore<SessionHistorySnapshot>();
+                WorkspaceSnapshotStore.Create<SessionHistorySnapshot>();
             var gitSnapshots =
-                new WorkspaceSnapshotStore<GitSnapshot>();
+                WorkspaceSnapshotStore.Create<GitSnapshot>();
             var reviewIndexSnapshots =
-                new WorkspaceSnapshotStore<ReviewIndexSnapshot>();
+                WorkspaceSnapshotStore.Create<ReviewIndexSnapshot>();
             var reviewIndexKeeper = new ReviewIndexKeeper(
                 reviewIndexSnapshots,
                 gitSnapshots);
