@@ -1,0 +1,15 @@
+扩展 HaloCreek/Services/WorkspaceSnapshots/WorkspaceSnapshotStore.cs 允许它接收业务语义的字段, 实现成ReadSnapshot的参数, 暂定为FString. 本次会将session id 传进去 store在初始化时接受并透传. 不强制要求IWorkspaceSnapshot实现此接口
+
+数据源只收集'事实' 判断由上层service或vm进行
+model:
+StssionStateSnapshot
+State: TaskStarted, TaskAborted, TaskCompleted, Unknown, 最后一个特殊pay_load.type是啥
+	task_started, turn_aborted, task_completed, 以上都没有
+	TimeStamp: 最后一个特殊对象的timestamp, 用于区分两个不同的task completed, 发通知之类的
+Messages 顺序列举所有agent_message 和 user_message 对象 提取文本: 
+	TimeStamp
+	Sender(enum): User / Agent. 
+	Message(String)
+	Phase(enum): 对应agent reply的phase
+TokenInfo
+	对应最后一条token_count消息 的payload.info 需要记录context window, total token usage的total, last token usage的total(后者用于计算context percentage)

@@ -1,0 +1,16 @@
+session id 匹配使用文件名 虽然meta也有但是为了降低多数据源印证的问题采用单一数据源, 允许健壮性有所下降, 避免各种降级无法维护
+
+任务开始: event_msg, payload.type = task_started
+用户输入: event_msg, paload.type = user_message
+agent reasoning: event_msg, paload.type = agent_message, phase = commentary
+token_count: event_msg, payload.type = token_count
+aborted: event_msg, payload.type = turn_aborted
+修改文件: event_msg, payload.type = patch_apply_end
+agent reply: event_msg, paload.type = agent_message, phase = final_answer
+任务结束: event_msg, payload.type = task_completed 这个也有最终回复
+
+关于token
+last_token_usage 是单次大模型调用的token, 随着thread变长, 需要记录的东西越来越多, 所以也是单调的, compact是compact这部分, compact后会明显减少;
+total_token_usage更接近'额度统计', 是所有大模型调用的使用总和
+
+经测试: 任务未完成中断session会导致出现不闭合的task_started XXX
