@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using HaloCreek.Infrastructure;
-using HaloCreek.Logging;
 using HaloCreek.Models;
 
 namespace HaloCreek.Services.SessionHistory
@@ -12,9 +11,6 @@ namespace HaloCreek.Services.SessionHistory
     public static class CodexSessionHistoryReader
     {
         private const string JsonlSearchPattern = "*.jsonl";
-        private const string SessionsDirectoryName = "sessions";
-        private const string CodexDirectoryName = ".codex";
-        private const string LogCategory = "SessionHistory";
         private static readonly EnumerationOptions SessionFileEnumerationOptions = new()
         {
             IgnoreInaccessible = true,
@@ -32,7 +28,7 @@ namespace HaloCreek.Services.SessionHistory
                 return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
             }
 
-            var sessionHistoryRootPath = FindSessionHistoryRootPath();
+            var sessionHistoryRootPath = CodexSessionFileLocator.FindSessionRootPath();
             if (sessionHistoryRootPath is null)
             {
                 return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
@@ -71,28 +67,6 @@ namespace HaloCreek.Services.SessionHistory
             }
 
             return new SessionHistoryResult(sessions, skippedFileCount);
-        }
-
-        private static string? FindSessionHistoryRootPath()
-        {
-            if (!PlatformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath))
-            {
-                return null;
-            }
-
-            var sessionHistoryRootPath = Path.Combine(
-                homeDirectoryPath,
-                CodexDirectoryName,
-                SessionsDirectoryName);
-            if (!Directory.Exists(sessionHistoryRootPath))
-            {
-                Log.Warning(
-                    LogCategory,
-                    $"Codex session history directory does not exist. Path={sessionHistoryRootPath}");
-                return null;
-            }
-
-            return sessionHistoryRootPath;
         }
 
         private static IReadOnlyList<SessionFileMetadata> EnumerateLatestSessionFiles(
