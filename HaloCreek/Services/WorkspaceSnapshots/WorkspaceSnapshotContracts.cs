@@ -18,6 +18,17 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         static abstract bool ContentEquals(TSnapshot left, TSnapshot right);
     }
 
+    public interface IKeyedWorkspaceSnapshot<TSnapshot> :
+        IWorkspaceSnapshot<TSnapshot>
+        where TSnapshot : IWorkspaceSnapshot<TSnapshot>
+    {
+        // Keyed snapshots are expected to be read through WorkspaceSnapshotStore(string key).
+        // The inherited parameterless ReadSnapshot contract is not used by the store for keyed snapshots.
+        // Snapshots that support both keyed and keyless reads are not modeled yet.
+        // If that requirement appears, add an explicit hybrid contract instead of loosening keyed-only semantics.
+        static abstract TSnapshot ReadSnapshot(string key);
+    }
+
     public interface IWorkspaceSnapshotSource<TSnapshot>
     {
         TSnapshot Current { get; }

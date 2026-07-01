@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -16,6 +17,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         private static readonly TimeSpan RefreshJitter = TimeSpan.FromSeconds(2);
 
         private readonly object _lock = new();
+        private readonly Func<TSnapshot> _readSnapshot;
         private readonly Timer _refreshTimer;
         private TSnapshot _current;
         private RefreshState _state;
@@ -23,8 +25,19 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         private bool _hasSuccessfulRefresh;
 
         public WorkspaceSnapshotStore()
+            : this(CreateDefaultReader())
+        {
+        }
+
+        public WorkspaceSnapshotStore(string key)
+            : this(CreateKeyedReader(key))
+        {
+        }
+
+        private WorkspaceSnapshotStore(Func<TSnapshot> readSnapshot)
         {
             var workspace = WorkspaceRuntime.Current;
+            _readSnapshot = readSnapshot ?? throw new ArgumentNullException(nameof(readSnapshot));
             _current = TSnapshot.CreateEmpty();
             _refreshTimer = new Timer(
                 OnRefreshTimerTick,
@@ -127,7 +140,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
                 try
                 {
-                    var snapshot = TSnapshot.ReadSnapshot();
+                    var snapshot = _readSnapshot();
                     PublishRefreshResult(workspace, snapshot, reason);
                 }
                 catch (Exception ex)
@@ -231,6 +244,50 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             Refreshing,
             RefreshingWithPending,
             Disposed,
+        }
+
+        private static Func<TSnapshot> CreateDefaultReader()
+        {
+            if (IsKeyedSnapshotType())
+            {
+                throw new InvalidOperationException(
+                    $"{typeof(TSnapshot).Name} requires a key. Use WorkspaceSnapshotStore<{typeof(TSnapshot).Name}>(string key).");
+            }
+
+            return TSnapshot.ReadSnapshot;
+        }
+
+        private static Func<TSnapshot> CreateKeyedReader(string key)
+        {
+            ArgumentNullException.ThrowIfNull(key);
+
+            var snapshotType = typeof(TSnapshot);
+            if (!IsKeyedSnapshotType())
+            {
+                throw new InvalidOperationException(
+                    $"{snapshotType.Name} does not support keyed reads. Use the parameterless WorkspaceSnapshotStore<{snapshotType.Name}> constructor.");
+            }
+
+            var readSnapshot = snapshotType.GetMethod(
+                nameof(IWorkspaceSnapshot<TSnapshot>.ReadSnapshot),
+                BindingFlags.Public | BindingFlags.Static,
+                binder: null,
+                types: new[] { typeof(string) },
+                modifiers: null);
+            if (readSnapshot is null || readSnapshot.ReturnType != snapshotType)
+            {
+                throw new InvalidOperationException(
+                    $"{snapshotType.Name} must expose public static {snapshotType.Name} ReadSnapshot(string key).");
+            }
+
+            return () => (TSnapshot)readSnapshot.Invoke(null, new object[] { key })!;
+        }
+
+        private static bool IsKeyedSnapshotType()
+        {
+            var snapshotType = typeof(TSnapshot);
+            var keyedSnapshotType = typeof(IKeyedWorkspaceSnapshot<>).MakeGenericType(snapshotType);
+            return keyedSnapshotType.IsAssignableFrom(snapshotType);
         }
     }
 }
