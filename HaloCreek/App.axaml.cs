@@ -89,10 +89,8 @@ namespace HaloCreek
                 workspaceCacheService);
             await workspaceStartupSelector.SelectRequiredWorkspaceAsync(startupArgs);
             var tmuxService = new TmuxService(appCommonRuntime);
-            var terminalService = new TerminalService(appCommonRuntime);
             var sessionLifecycleService = new SessionLifecycleService(
                 tmuxService,
-                terminalService,
                 appCommonRuntime);
             var gitService = new GitService();
             var workspacePathIndexSnapshots =

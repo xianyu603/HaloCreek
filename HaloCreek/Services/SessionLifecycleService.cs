@@ -20,18 +20,15 @@ namespace HaloCreek.Services
         private readonly Dictionary<string, OngoingSessionInfo> _sessionsById = new(StringComparer.Ordinal);
         private readonly Dictionary<string, WorkspaceSnapshotStore<SessionStateSnapshot>> _sessionStateStoresById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
-        private readonly TerminalService _terminalService;
         private readonly TransientEventService _transientEventService;
         private string? _frontSessionId;
         private bool _isDisposed;
 
         public SessionLifecycleService(
             TmuxService tmuxService,
-            TerminalService terminalService,
             AppCommonRuntime appCommonRuntime)
         {
             _tmuxService = tmuxService ?? throw new ArgumentNullException(nameof(tmuxService));
-            _terminalService = terminalService ?? throw new ArgumentNullException(nameof(terminalService));
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             _transientEventService = appCommonRuntime.TransientEventService;
             _tmuxService.StateChanged += HandleTmuxStateChanged;
@@ -212,6 +209,7 @@ namespace HaloCreek.Services
                 };
                 _sessionsById[identifier] = session;
                 CreateSessionStateStore(session, launchResult.CodexSessionId);
+                _tmuxService.StartWatching(identifier);
                 SessionsChanged?.Invoke(this, EventArgs.Empty);
 
                 launchCompleted = true;
@@ -234,9 +232,6 @@ namespace HaloCreek.Services
                     RemoveSessionStateStore(identifier);
                 }
             }
-
-            // TODO 如果卡顿把这里的BringToFront也改成异步
-            BringToFront(identifier);
 
             return session;
         }
@@ -271,23 +266,6 @@ namespace HaloCreek.Services
             }
 
             _tmuxService.StopWatching(sessionId);
-
-            // 这里故意先由 SessionLifecycleService 编排 terminal 与 tmux：
-            // 当前只有 BringToFront 这一条调用路径需要同时处理 WT 窗口和 tmux 前台 client，
-            // 抽出独立“前台客户端”服务会增加一层暂时没有复用收益的间接调用。
-            // 如果后续出现多处复用、复杂失败恢复，或 terminal/tmux 开始互相持有对方状态，
-            // 再把这段收敛成独立的前台呈现服务。
-            if (_tmuxService.HasFrontClient())
-            {
-                _terminalService.ActivateFrontClient();
-                _tmuxService.SwitchFrontClient(sessionId);
-            }
-            else
-            {
-                var startupCommand = _tmuxService.GetFrontClientStartupCommand(sessionId);
-                _terminalService.LaunchFrontClient(startupCommand);
-                _tmuxService.MarkFrontClientAttachedToSession(sessionId);
-            }
 
             if (!_sessionsById.TryGetValue(sessionId, out var targetSession))
             {

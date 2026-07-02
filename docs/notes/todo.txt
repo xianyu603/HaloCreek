@@ -17,3 +17,4 @@ review加点提示信息，方便先捡软柿子review
 json parser有点零散  考虑集中infra
 view边框的问题, history尤其明显, 四个角感觉被啃了
 截图自动化迭代的skill
+completion中 recent committed文件应该按时间顺序排序
