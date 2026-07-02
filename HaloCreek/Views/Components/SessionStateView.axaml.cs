@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace HaloCreek.Views.Components
 {
-    public partial class PromptSessionHistoryPreviewView : UserControl
+    public partial class SessionStateView : UserControl
     {
-        public PromptSessionHistoryPreviewView()
+        public SessionStateView()
         {
             InitializeComponent();
         }

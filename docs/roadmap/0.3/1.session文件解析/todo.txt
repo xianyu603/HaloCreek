@@ -1,3 +1,4 @@
-切换front行为变更, 双击按钮只切换应用内部front, 拉起wt的时候再切tmux前台, 不再在session launch后自动拉起wt. 前台不同步tmux前台, 双击后切tmux前台
-监听文件能力, 现在太man了 
-tmux state也需要接到信息框 用于感知'agent卡住了'的状态(tmux idle时间过长) 此时应提示手动启动
+tmux service watch/unwatch 接入snapshotstore 变更消息暂时透传 允许暂时响应性变差
+修改ongoing session info的状态枚举, 只保留idle和active两态, 和tmux的探测结果相对应
+SessionStateView消费该信息, 提供两个维度的状态 active/idle 以及目前从session文件解析出来的task语义4态
+总体提高snapshotstore刷新的响应性, 文件系统消息订阅, 刷新周期可配置

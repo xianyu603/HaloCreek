@@ -35,8 +35,8 @@ namespace HaloCreek.ViewModels.Components
         ];
         private IWorkspaceSnapshotSource<SessionStateSnapshot>? _frontSessionStateSnapshots;
         private OngoingSessionInfo? _frontSession;
-        private PromptSessionHistoryPreviewViewModel _frontSessionHistory =
-            PromptSessionHistoryPreviewViewModel.CreateEmpty();
+        private SessionStateViewModel _frontSessionState =
+            SessionStateViewModel.CreateEmpty();
         private int _activeCompletionLevelIndex;
         private bool _hasFrontSession;
         private bool _isDisposed;
@@ -95,10 +95,10 @@ namespace HaloCreek.ViewModels.Components
 
         public PromptTemplatePickerViewModel TemplatePicker { get; }
 
-        public PromptSessionHistoryPreviewViewModel FrontSessionHistory
+        public SessionStateViewModel FrontSessionState
         {
-            get => _frontSessionHistory;
-            private set => SetProperty(ref _frontSessionHistory, value);
+            get => _frontSessionState;
+            private set => SetProperty(ref _frontSessionState, value);
         }
 
         public bool IsCompletionOpen
@@ -614,7 +614,7 @@ namespace HaloCreek.ViewModels.Components
 
             var frontSessionContext = _sessionLifecycleService.GetFrontSessionContext();
             SetFrontSessionStateSubscription(frontSessionContext);
-            ApplyFrontSessionHistory();
+            ApplyFrontSessionState();
         }
 
         private void SetFrontSessionStateSubscription(FrontSessionContext? frontSessionContext)
@@ -650,22 +650,22 @@ namespace HaloCreek.ViewModels.Components
         {
             if (!Dispatcher.UIThread.CheckAccess())
             {
-                Dispatcher.UIThread.Post(ApplyFrontSessionHistory);
+                Dispatcher.UIThread.Post(ApplyFrontSessionState);
                 return;
             }
 
-            ApplyFrontSessionHistory();
+            ApplyFrontSessionState();
         }
 
-        private void ApplyFrontSessionHistory()
+        private void ApplyFrontSessionState()
         {
             if (_frontSession is null || _frontSessionStateSnapshots is null)
             {
-                FrontSessionHistory = PromptSessionHistoryPreviewViewModel.CreateEmpty();
+                FrontSessionState = SessionStateViewModel.CreateEmpty();
                 return;
             }
 
-            FrontSessionHistory = PromptSessionHistoryPreviewViewModel.FromSnapshot(
+            FrontSessionState = SessionStateViewModel.FromSnapshot(
                 _frontSession.Title,
                 _frontSessionStateSnapshots.Current);
         }

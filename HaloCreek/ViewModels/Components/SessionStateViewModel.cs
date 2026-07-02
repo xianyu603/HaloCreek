@@ -5,12 +5,12 @@ using HaloCreek.Services.SessionState;
 
 namespace HaloCreek.ViewModels.Components
 {
-    public sealed class PromptSessionHistoryPreviewViewModel
+    public sealed class SessionStateViewModel
     {
-        private PromptSessionHistoryPreviewViewModel(
+        private SessionStateViewModel(
             string title,
             SessionStateSnapshot snapshot,
-            IReadOnlyList<PromptSessionHistoryMessageViewModel> messages)
+            IReadOnlyList<SessionStateMessageViewModel> messages)
         {
             Title = title;
             StateText = FormatState(snapshot.State);
@@ -29,35 +29,35 @@ namespace HaloCreek.ViewModels.Components
 
         public string TokenSummaryText { get; }
 
-        public IReadOnlyList<PromptSessionHistoryMessageViewModel> Messages { get; }
+        public IReadOnlyList<SessionStateMessageViewModel> Messages { get; }
 
-        public static PromptSessionHistoryPreviewViewModel CreateEmpty()
+        public static SessionStateViewModel CreateEmpty()
         {
-            return new PromptSessionHistoryPreviewViewModel(
+            return new SessionStateViewModel(
                 "No front session",
                 SessionStateSnapshot.CreateEmpty(),
-                Array.Empty<PromptSessionHistoryMessageViewModel>());
+                Array.Empty<SessionStateMessageViewModel>());
         }
 
-        public static PromptSessionHistoryPreviewViewModel FromSnapshot(
+        public static SessionStateViewModel FromSnapshot(
             string title,
             SessionStateSnapshot snapshot)
         {
             ArgumentNullException.ThrowIfNull(snapshot);
 
-            return new PromptSessionHistoryPreviewViewModel(
+            return new SessionStateViewModel(
                 string.IsNullOrWhiteSpace(title) ? "Front session" : title,
                 snapshot,
                 ConvertMessages(snapshot.Messages));
         }
 
-        private static IReadOnlyList<PromptSessionHistoryMessageViewModel> ConvertMessages(
+        private static IReadOnlyList<SessionStateMessageViewModel> ConvertMessages(
             IReadOnlyList<SessionMessage> messages)
         {
-            var convertedMessages = new PromptSessionHistoryMessageViewModel[messages.Count];
+            var convertedMessages = new SessionStateMessageViewModel[messages.Count];
             for (var index = 0; index < messages.Count; index++)
             {
-                convertedMessages[index] = new PromptSessionHistoryMessageViewModel(messages[index]);
+                convertedMessages[index] = new SessionStateMessageViewModel(messages[index]);
             }
 
             return convertedMessages;
@@ -92,7 +92,7 @@ namespace HaloCreek.ViewModels.Components
         }
     }
 
-    public sealed class PromptSessionHistoryMessageViewModel
+    public sealed class SessionStateMessageViewModel
     {
         private static readonly IBrush UserAccent = new SolidColorBrush(Color.Parse("#0284C7"));
         private static readonly IBrush AgentAccent = new SolidColorBrush(Color.Parse("#16A34A"));
@@ -101,7 +101,7 @@ namespace HaloCreek.ViewModels.Components
         private static readonly IBrush UserBorder = new SolidColorBrush(Color.Parse("#BFDBFE"));
         private static readonly IBrush AgentBorder = new SolidColorBrush(Color.Parse("#BBF7D0"));
 
-        public PromptSessionHistoryMessageViewModel(SessionMessage message)
+        public SessionStateMessageViewModel(SessionMessage message)
         {
             SenderText = message.Sender switch
             {

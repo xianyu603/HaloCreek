@@ -188,7 +188,7 @@
             </Border>
         </Grid>
 
-        <components:PromptSessionHistoryPreviewView Grid.Column="1"
-                                                    DataContext="{Binding FrontSessionHistory}"/>
+        <components:SessionStateView Grid.Column="1"
+                                     DataContext="{Binding FrontSessionState}"/>
     </Grid>
 </UserControl>
