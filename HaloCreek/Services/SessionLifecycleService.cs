@@ -49,6 +49,20 @@ namespace HaloCreek.Services
             }
         }
 
+        public FrontSessionContext? GetFrontSessionContext()
+        {
+            RequireUiThread();
+
+            if (!TryGetFrontSessionId(out var frontSessionId)
+                || !_sessionsById.TryGetValue(frontSessionId, out var session)
+                || !_sessionStateStoresById.TryGetValue(frontSessionId, out var stateSnapshots))
+            {
+                return null;
+            }
+
+            return new FrontSessionContext(session, stateSnapshots);
+        }
+
         public void Dispose()
         {
             if (_isDisposed)
@@ -470,4 +484,7 @@ namespace HaloCreek.Services
         }
     }
 
+    public sealed record FrontSessionContext(
+        OngoingSessionInfo Session,
+        IWorkspaceSnapshotSource<SessionStateSnapshot> StateSnapshots);
 }

@@ -11,6 +11,7 @@ using HaloCreek.Services;
 using HaloCreek.Services.Completions;
 using HaloCreek.Services.PromptTemplates;
 using HaloCreek.Services.SessionHistory;
+using HaloCreek.Services.SessionState;
 using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.ViewModels.Components
@@ -32,6 +33,10 @@ namespace HaloCreek.ViewModels.Components
         [
             new PromptCompletionMenuLevel(Array.Empty<PromptCompletionItem>()),
         ];
+        private IWorkspaceSnapshotSource<SessionStateSnapshot>? _frontSessionStateSnapshots;
+        private OngoingSessionInfo? _frontSession;
+        private PromptSessionHistoryPreviewViewModel _frontSessionHistory =
+            PromptSessionHistoryPreviewViewModel.CreateEmpty();
         private int _activeCompletionLevelIndex;
         private bool _hasFrontSession;
         private bool _isDisposed;
@@ -52,7 +57,6 @@ namespace HaloCreek.ViewModels.Components
             TemplatePicker = new PromptTemplatePickerViewModel(
                 PromptTemplateStaticConfig.Items,
                 historySnapshots);
-            FrontSessionHistory = PromptSessionHistoryPreviewViewModel.CreateDummy();
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
             SendToFrontCommand = new RelayCommand(SendToFront, CanSendToFront);
@@ -91,7 +95,11 @@ namespace HaloCreek.ViewModels.Components
 
         public PromptTemplatePickerViewModel TemplatePicker { get; }
 
-        public PromptSessionHistoryPreviewViewModel FrontSessionHistory { get; }
+        public PromptSessionHistoryPreviewViewModel FrontSessionHistory
+        {
+            get => _frontSessionHistory;
+            private set => SetProperty(ref _frontSessionHistory, value);
+        }
 
         public bool IsCompletionOpen
         {
@@ -281,6 +289,7 @@ namespace HaloCreek.ViewModels.Components
 
             _isDisposed = true;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
+            StopFrontSessionStateSubscription();
             StopActiveCompletionQuery();
         }
 
@@ -602,6 +611,63 @@ namespace HaloCreek.ViewModels.Components
                 _hasFrontSession = hasFrontSession;
                 SendToFrontCommand.NotifyCanExecuteChanged();
             }
+
+            var frontSessionContext = _sessionLifecycleService.GetFrontSessionContext();
+            SetFrontSessionStateSubscription(frontSessionContext);
+            ApplyFrontSessionHistory();
+        }
+
+        private void SetFrontSessionStateSubscription(FrontSessionContext? frontSessionContext)
+        {
+            var stateSnapshots = frontSessionContext?.StateSnapshots;
+            if (!ReferenceEquals(_frontSessionStateSnapshots, stateSnapshots))
+            {
+                StopFrontSessionStateSubscription();
+                if (stateSnapshots is not null)
+                {
+                    stateSnapshots.Changed += HandleFrontSessionStateChanged;
+                }
+
+                _frontSessionStateSnapshots = stateSnapshots;
+            }
+
+            _frontSession = frontSessionContext?.Session;
+        }
+
+        private void StopFrontSessionStateSubscription()
+        {
+            if (_frontSessionStateSnapshots is null)
+            {
+                return;
+            }
+
+            _frontSessionStateSnapshots.Changed -= HandleFrontSessionStateChanged;
+            _frontSessionStateSnapshots = null;
+            _frontSession = null;
+        }
+
+        private void HandleFrontSessionStateChanged(object? sender, EventArgs e)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(ApplyFrontSessionHistory);
+                return;
+            }
+
+            ApplyFrontSessionHistory();
+        }
+
+        private void ApplyFrontSessionHistory()
+        {
+            if (_frontSession is null || _frontSessionStateSnapshots is null)
+            {
+                FrontSessionHistory = PromptSessionHistoryPreviewViewModel.CreateEmpty();
+                return;
+            }
+
+            FrontSessionHistory = PromptSessionHistoryPreviewViewModel.FromSnapshot(
+                _frontSession.Title,
+                _frontSessionStateSnapshots.Current);
         }
 
         private readonly record struct CompletionTriggerState(
