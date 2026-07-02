@@ -10,21 +10,16 @@ namespace HaloCreek.Infrastructure
     {
         private static readonly TimeSpan RetryInterval = TimeSpan.FromSeconds(20);
 
-        // TODO 再多一个hotkey这里就需要抽一些数据结构了 现在这样好抽象
         private const int MainWindowHotkeyId = 1;
-        private const int FrontTerminalHotkeyId = 2;
         private const uint WmHotkey = 0x0312;
         private const uint ModAlt = 0x0001;
         private const uint ModControl = 0x0002;
         private const uint VirtualKeyH = 0x48;
-        private const uint VirtualKeyT = 0x54;
         private const string MainWindowHotkeyText = "Ctrl+Alt+H";
-        private const string FrontTerminalHotkeyText = "Ctrl+Alt+T";
 
         private NativeMessageWindow? _messageWindow;
         private readonly DispatcherTimer _retryTimer;
         private bool _mainWindowHotkeyRegistered;
-        private bool _frontTerminalHotkeyRegistered;
         private bool _isDisposed;
 
         public GlobalHotkeyRegistrar()
@@ -33,7 +28,6 @@ namespace HaloCreek.Infrastructure
         }
 
         public event EventHandler? MainWindowHotkeyPressed;
-        public event EventHandler? FrontTerminalHotkeyPressed;
 
         public void RegisterDefaultHotkeys()
         {
@@ -68,18 +62,6 @@ namespace HaloCreek.Infrastructure
             _retryTimer.Stop();
             _retryTimer.Tick -= OnRetryTimerTick;
 
-            if (_frontTerminalHotkeyRegistered && _messageWindow is not null)
-            {
-                if (!UnregisterHotKey(_messageWindow.Handle, FrontTerminalHotkeyId))
-                {
-                    Log.Warning(
-                        "GlobalHotkey",
-                        $"Failed to unregister front terminal hotkey. Hotkey={FrontTerminalHotkeyText}");
-                }
-
-                _frontTerminalHotkeyRegistered = false;
-            }
-
             if (_mainWindowHotkeyRegistered && _messageWindow is not null)
             {
                 if (!UnregisterHotKey(_messageWindow.Handle, MainWindowHotkeyId))
@@ -97,7 +79,7 @@ namespace HaloCreek.Infrastructure
         }
 
         private bool AreAllHotkeysRegistered =>
-            _mainWindowHotkeyRegistered && _frontTerminalHotkeyRegistered;
+            _mainWindowHotkeyRegistered;
 
         private void OnRetryTimerTick(object? sender, EventArgs e)
         {
@@ -137,16 +119,6 @@ namespace HaloCreek.Infrastructure
                     MainWindowHotkeyText,
                     "main window");
             }
-
-            if (!_frontTerminalHotkeyRegistered)
-            {
-                _frontTerminalHotkeyRegistered = TryRegisterHotkey(
-                    FrontTerminalHotkeyId,
-                    ModControl | ModAlt,
-                    VirtualKeyT,
-                    FrontTerminalHotkeyText,
-                    "front terminal");
-            }
         }
 
         private bool TryRegisterHotkey(
@@ -181,13 +153,6 @@ namespace HaloCreek.Infrastructure
             {
                 Log.Info("GlobalHotkey", $"Main window hotkey pressed. Hotkey={MainWindowHotkeyText}");
                 MainWindowHotkeyPressed?.Invoke(this, EventArgs.Empty);
-                return IntPtr.Zero;
-            }
-
-            if (message == WmHotkey && wParam.ToInt32() == FrontTerminalHotkeyId)
-            {
-                Log.Info("GlobalHotkey", $"Front terminal hotkey pressed. Hotkey={FrontTerminalHotkeyText}");
-                FrontTerminalHotkeyPressed?.Invoke(this, EventArgs.Empty);
                 return IntPtr.Zero;
             }
 

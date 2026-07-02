@@ -27,7 +27,7 @@ using HaloCreek.Models;
 | Probe finish | `Probing` with sessions left | Schedule next timer | `Scheduled` |
 | Probe finish | `Probing` with no sessions left | Keep timer stopped | `Idle` |
 | Probe finish | `Disposed` | Keep timer stopped | `Disposed` |
-| `Dispose` | Any state | Clear sessions, stop timer, wait pending session operation tasks, best effort kill keeper session | `Disposed` |
+| `Dispose` | Any state | Clear sessions, stop timer, wait pending session operation tasks | `Disposed` |
 */
 
 namespace HaloCreek.Services
@@ -44,7 +44,6 @@ namespace HaloCreek.Services
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly string _frontClientId;
         private readonly string _frontClientTtyMarkerPath;
-        private readonly string _keeperSessionId;
         private readonly object _watchStateLock = new();
         private readonly object _sessionOperationTasksLock = new();
         private readonly object _ownedSessionsLock = new();
@@ -61,21 +60,18 @@ namespace HaloCreek.Services
 
             _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             _frontClientId = Guid.NewGuid().ToString("N")[..8];
-            _keeperSessionId = "halocreek-keeper-" + _frontClientId;
             _frontClientTtyMarkerPath = HaloCreekTempDirectory
                 + "/front-client-"
                 + _frontClientId
                 + ".tty";
             _frontClientSwitcher = new FrontClientSwitcher(
                 _platformInfrastructure,
-                _frontClientTtyMarkerPath,
-                _keeperSessionId);
+                _frontClientTtyMarkerPath);
             _watchTimer = new Timer(
                 OnWatchTimerTick,
                 state: null,
                 Timeout.InfiniteTimeSpan,
                 Timeout.InfiniteTimeSpan);
-            EnsureKeeperSession();
         }
 
         public event EventHandler<TmuxSessionStateChangedEventArgs>? StateChanged;
@@ -131,7 +127,6 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
             QueueSessionOperation(identifier, () =>
             {
-                _frontClientSwitcher.SwitchOutIfFront(identifier);
                 TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
                 lock (_ownedSessionsLock)
                 {
@@ -223,7 +218,6 @@ namespace HaloCreek.Services
             }
 
             _frontClientSwitcher.Clear();
-            TryRunTmuxCommand(new[] { "kill-session", "-t", _keeperSessionId }, out _);
         }
 
         public void StartWatching(string identifier)
@@ -384,22 +378,18 @@ namespace HaloCreek.Services
         {
             private readonly PlatformInfrastructure _platformInfrastructure;
             private readonly string _frontClientTtyMarkerPath;
-            private readonly string _keeperSessionId;
             private readonly object _lock = new();
             private string? _frontSessionId;
 
             public FrontClientSwitcher(
                 PlatformInfrastructure platformInfrastructure,
-                string frontClientTtyMarkerPath,
-                string keeperSessionId)
+                string frontClientTtyMarkerPath)
             {
                 _platformInfrastructure = platformInfrastructure
                     ?? throw new ArgumentNullException(nameof(platformInfrastructure));
                 ArgumentException.ThrowIfNullOrWhiteSpace(frontClientTtyMarkerPath);
-                ArgumentException.ThrowIfNullOrWhiteSpace(keeperSessionId);
 
                 _frontClientTtyMarkerPath = frontClientTtyMarkerPath;
-                _keeperSessionId = keeperSessionId;
             }
 
             public void SwitchIn(string identifier)
@@ -413,42 +403,11 @@ namespace HaloCreek.Services
                 }
             }
 
-            public void SwitchOutIfFront(string identifier)
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-                lock (_lock)
-                {
-                    if (!string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
-                    {
-                        return;
-                    }
-
-                    SwitchClientCore(_keeperSessionId);
-                    _frontSessionId = null;
-                }
-            }
-
             public void Clear()
             {
                 lock (_lock)
                 {
                     _frontSessionId = null;
-                }
-            }
-
-            public bool TryGetFrontSessionId(out string frontSessionId)
-            {
-                lock (_lock)
-                {
-                    if (string.IsNullOrWhiteSpace(_frontSessionId))
-                    {
-                        frontSessionId = string.Empty;
-                        return false;
-                    }
-
-                    frontSessionId = _frontSessionId;
-                    return true;
                 }
             }
 
@@ -596,18 +555,6 @@ namespace HaloCreek.Services
             TryRunTmuxCommand(
                 new[] { "set-option", "-q", "-t", identifier, optionName, optionValue },
                 out _);
-        }
-
-        private void EnsureKeeperSession()
-        {
-            if (TryRunTmuxCommand(new[] { "has-session", "-t", _keeperSessionId }, out _))
-            {
-                return;
-            }
-
-            RunTmuxCommand(
-                new[] { "new-session", "-d", "-s", _keeperSessionId, "-c", "/", "--", "bash" },
-                "launch tmux keeper session");
         }
 
         private void SendMessageToSessionCore(
