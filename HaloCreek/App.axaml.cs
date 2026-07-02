@@ -89,6 +89,7 @@ namespace HaloCreek
                 workspaceCacheService);
             await workspaceStartupSelector.SelectRequiredWorkspaceAsync(startupArgs);
             var tmuxService = new TmuxService(appCommonRuntime);
+            var terminalService = new TerminalService(appCommonRuntime);
             var sessionLifecycleService = new SessionLifecycleService(
                 tmuxService,
                 appCommonRuntime);
@@ -124,6 +125,8 @@ namespace HaloCreek
 
             var promptEditor = new PromptEditorViewModel(
                 sessionLifecycleService,
+                tmuxService,
+                terminalService,
                 appCommonRuntime,
                 completionCoordinator,
                 sessionHistorySnapshots);

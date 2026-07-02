@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using HaloCreek.Logging;
@@ -16,12 +17,16 @@ namespace HaloCreek.ViewModels.Tabs
     public sealed class PromptEditorViewModel : ViewModelBase, IDisposable
     {
         private readonly SessionLifecycleService _sessionLifecycleService;
+        private readonly TmuxService _tmuxService;
+        private readonly TerminalService _terminalService;
         private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
         private OngoingSessionInfo? _selectedOngoingSession;
         private bool _isDisposed;
 
         public PromptEditorViewModel(
             SessionLifecycleService sessionLifecycleService,
+            TmuxService tmuxService,
+            TerminalService terminalService,
             AppCommonRuntime appCommonRuntime,
             CompletionCoordinator completionCoordinator,
             IWorkspaceSnapshotSource<SessionHistorySnapshot> historySnapshots)
@@ -31,6 +36,8 @@ namespace HaloCreek.ViewModels.Tabs
 
             _sessionLifecycleService = sessionLifecycleService
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
+            _tmuxService = tmuxService ?? throw new ArgumentNullException(nameof(tmuxService));
+            _terminalService = terminalService ?? throw new ArgumentNullException(nameof(terminalService));
             PromptInput = new PromptInputViewModel(
                 _sessionLifecycleService,
                 appCommonRuntime,
@@ -38,7 +45,7 @@ namespace HaloCreek.ViewModels.Tabs
                 historySnapshots);
 
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
-            OpenCliCommand = new RelayCommand<OngoingSessionInfo>(OpenCli, CanOpenCli);
+            OpenCliCommand = new AsyncRelayCommand<OngoingSessionInfo>(OpenCliAsync, CanOpenCli);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
             _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
@@ -75,7 +82,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IRelayCommand<OngoingSessionInfo> BringToFrontCommand { get; }
 
-        public IRelayCommand<OngoingSessionInfo> OpenCliCommand { get; }
+        public IAsyncRelayCommand<OngoingSessionInfo> OpenCliCommand { get; }
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
 
@@ -98,7 +105,7 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("PromptEditor", "Bring to front requested.");
         }
 
-        private void OpenCli(OngoingSessionInfo? session)
+        private async Task OpenCliAsync(OngoingSessionInfo? session)
         {
             if (session is null)
             {
@@ -106,6 +113,22 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             Log.Info("PromptEditor", "CLI entry requested.");
+
+            await Task.Run(() =>
+            {
+                if (_tmuxService.HasFrontClient())
+                {
+                    _tmuxService.SwitchFrontClient(session.Id);
+                    _terminalService.ActivateFrontClient();
+                }
+                else
+                {
+                    _terminalService.LaunchFrontClient(
+                        _tmuxService.GetFrontClientStartupCommand(session.Id));
+                }
+            });
+
+            Log.Info("PromptEditor", "CLI entry completed.");
         }
 
         private void ExitSession(OngoingSessionInfo? session)
