@@ -52,6 +52,7 @@ namespace HaloCreek.ViewModels.Components
             TemplatePicker = new PromptTemplatePickerViewModel(
                 PromptTemplateStaticConfig.Items,
                 historySnapshots);
+            FrontSessionHistory = PromptSessionHistoryPreviewViewModel.CreateDummy();
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
             SendToFrontCommand = new RelayCommand(SendToFront, CanSendToFront);
@@ -89,6 +90,8 @@ namespace HaloCreek.ViewModels.Components
         public string PlaceholderText => DefaultPlaceholderText;
 
         public PromptTemplatePickerViewModel TemplatePicker { get; }
+
+        public PromptSessionHistoryPreviewViewModel FrontSessionHistory { get; }
 
         public bool IsCompletionOpen
         {

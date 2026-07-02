@@ -1,11 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="using:HaloCreek.Behaviors"
+             xmlns:components="using:HaloCreek.Views.Components"
              xmlns:models="using:HaloCreek.Models"
              xmlns:vm="using:HaloCreek.ViewModels.Components"
              x:DataType="vm:PromptInputViewModel"
              x:Class="HaloCreek.Views.Components.PromptInputView">
-    <Grid>
+    <Grid ColumnDefinitions="*,320">
         <Grid.Styles>
             <Style Selector="ListBoxItem">
                 <Setter Property="MinHeight" Value="48"/>
@@ -24,163 +25,170 @@
             </Style>
         </Grid.Styles>
 
-        <TextBox x:Name="PromptTextBox"
-                 AcceptsReturn="True"
-                 behaviors:TextBoxDropPathBehavior.AppendFirstPath="True"
-                 Text="{Binding PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 CaretIndex="{Binding PromptCaretIndex, Mode=TwoWay}"
-                 TextWrapping="Wrap"
-                 PlaceholderText="{Binding PlaceholderText}"
-                 BorderThickness="0"
-                 Background="Transparent"
-                 Padding="10"
-                 VerticalContentAlignment="Top">
-            <TextBox.KeyBindings>
-                <KeyBinding Gesture="Alt+Enter"
-                            Command="{Binding SendToFrontCommand}"/>
-                <KeyBinding Gesture="Ctrl+Enter"
-                            Command="{Binding LaunchCommand}"/>
-            </TextBox.KeyBindings>
-            <TextBox.ContextMenu>
-                <ContextMenu Opened="PromptContextMenu_OnOpened"
-                             Closed="PromptContextMenu_OnClosed"/>
-            </TextBox.ContextMenu>
-        </TextBox>
+        <Grid Grid.Column="0"
+              MinWidth="0">
+            <TextBox x:Name="PromptTextBox"
+                     MinWidth="0"
+                     AcceptsReturn="True"
+                     behaviors:TextBoxDropPathBehavior.AppendFirstPath="True"
+                     Text="{Binding PromptText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     CaretIndex="{Binding PromptCaretIndex, Mode=TwoWay}"
+                     TextWrapping="Wrap"
+                     PlaceholderText="{Binding PlaceholderText}"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     Padding="10"
+                     VerticalContentAlignment="Top">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Alt+Enter"
+                                Command="{Binding SendToFrontCommand}"/>
+                    <KeyBinding Gesture="Ctrl+Enter"
+                                Command="{Binding LaunchCommand}"/>
+                </TextBox.KeyBindings>
+                <TextBox.ContextMenu>
+                    <ContextMenu Opened="PromptContextMenu_OnOpened"
+                                 Closed="PromptContextMenu_OnClosed"/>
+                </TextBox.ContextMenu>
+            </TextBox>
 
-        <StackPanel x:Name="CompletionPopup"
-                    IsVisible="{Binding IsCompletionOpen, FallbackValue=False}"
-                    IsHitTestVisible="False"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Top"
-                    Margin="10,0,10,0"
-                    Spacing="4">
-            <ItemsControl x:Name="CompletionMenu"
-                          HorizontalAlignment="Left"
-                          ItemsSource="{Binding CompletionMenuLevels}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="vm:PromptCompletionMenuLevel">
-                        <Border Background="#FFFFFF"
-                                BorderBrush="#CBD5E1"
-                                BorderThickness="1"
-                                CornerRadius="4"
-                                Padding="4"
-                                Margin="0,0,4,0">
-                            <Panel Width="280">
-                                <ListBox IsVisible="{Binding Items.Count}"
-                                         ItemsSource="{Binding Items}"
-                                         SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
-                                         SelectionMode="Single"
-                                         Background="Transparent"
-                                         BorderThickness="0"
-                                         Padding="0"
-                                         MaxHeight="176">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate DataType="models:PromptCompletionItem">
-                                            <Grid Height="48"
-                                                  ColumnDefinitions="3,*,Auto"
-                                                  ColumnSpacing="10">
-                                                <Border Classes="completionAccent"
-                                                        Width="3"
-                                                        CornerRadius="2"
-                                                        Margin="0,6,0,6"/>
-                                                <StackPanel Grid.Column="1"
-                                                            VerticalAlignment="Center"
-                                                            Spacing="1">
-                                                    <TextBlock Text="{Binding Title}"
-                                                               Foreground="#0F172A"
-                                                               FontSize="13"
-                                                               FontWeight="SemiBold"
-                                                               TextTrimming="CharacterEllipsis"/>
-                                                    <TextBlock Text="{Binding Description}"
+            <StackPanel x:Name="CompletionPopup"
+                        IsVisible="{Binding IsCompletionOpen, FallbackValue=False}"
+                        IsHitTestVisible="False"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Top"
+                        Margin="10,0,10,0"
+                        Spacing="4">
+                <ItemsControl x:Name="CompletionMenu"
+                              HorizontalAlignment="Left"
+                              ItemsSource="{Binding CompletionMenuLevels}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:PromptCompletionMenuLevel">
+                            <Border Background="#FFFFFF"
+                                    BorderBrush="#CBD5E1"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="4"
+                                    Margin="0,0,4,0">
+                                <Panel Width="280">
+                                    <ListBox IsVisible="{Binding Items.Count}"
+                                             ItemsSource="{Binding Items}"
+                                             SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                                             SelectionMode="Single"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Padding="0"
+                                             MaxHeight="176">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate DataType="models:PromptCompletionItem">
+                                                <Grid Height="48"
+                                                      ColumnDefinitions="3,*,Auto"
+                                                      ColumnSpacing="10">
+                                                    <Border Classes="completionAccent"
+                                                            Width="3"
+                                                            CornerRadius="2"
+                                                            Margin="0,6,0,6"/>
+                                                    <StackPanel Grid.Column="1"
+                                                                VerticalAlignment="Center"
+                                                                Spacing="1">
+                                                        <TextBlock Text="{Binding Title}"
+                                                                   Foreground="#0F172A"
+                                                                   FontSize="13"
+                                                                   FontWeight="SemiBold"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Description}"
+                                                                   Foreground="#64748B"
+                                                                   FontSize="12"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2"
+                                                               IsVisible="{Binding HasChildren}"
+                                                               Text=">"
                                                                Foreground="#64748B"
-                                                               FontSize="12"
-                                                               TextTrimming="CharacterEllipsis"/>
-                                                </StackPanel>
-                                                <TextBlock Grid.Column="2"
-                                                           IsVisible="{Binding HasChildren}"
-                                                           Text=">"
-                                                           Foreground="#64748B"
-                                                           FontSize="14"
-                                                           FontWeight="SemiBold"
-                                                           VerticalAlignment="Center"
-                                                           Margin="0,0,8,0"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                                <Grid IsVisible="{Binding !Items.Count}"
-                                      Height="48">
-                                    <TextBlock Text="No matching items"
-                                               Foreground="#94A3B8"
-                                               FontSize="13"
-                                               VerticalAlignment="Center"
-                                               HorizontalAlignment="Center"
-                                               Padding="12,0"
-                                               TextTrimming="CharacterEllipsis"/>
-                                </Grid>
-                            </Panel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                                                               FontSize="14"
+                                                               FontWeight="SemiBold"
+                                                               VerticalAlignment="Center"
+                                                               Margin="0,0,8,0"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <Grid IsVisible="{Binding !Items.Count}"
+                                          Height="48">
+                                        <TextBlock Text="No matching items"
+                                                   Foreground="#94A3B8"
+                                                   FontSize="13"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"
+                                                   Padding="12,0"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </Grid>
+                                </Panel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-            <Border IsVisible="{Binding IsCompletionPreviewVisible, FallbackValue=False}"
-                    HorizontalAlignment="Stretch"
+                <Border IsVisible="{Binding IsCompletionPreviewVisible, FallbackValue=False}"
+                        HorizontalAlignment="Stretch"
+                        Background="#FFFFFF"
+                        BorderBrush="#CBD5E1"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="10,8">
+                    <ScrollViewer MaxHeight="96"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock Text="{Binding CompletionPreviewText}"
+                                   Foreground="#334155"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
+
+            <Border x:Name="TemplatePreview"
+                    IsVisible="{Binding TemplatePicker.IsPreviewVisible, FallbackValue=False}"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Bottom"
+                    MaxWidth="520"
+                    Margin="10,0,10,10"
                     Background="#FFFFFF"
                     BorderBrush="#CBD5E1"
                     BorderThickness="1"
                     CornerRadius="4"
-                    Padding="10,8">
-                <ScrollViewer MaxHeight="96"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <TextBlock Text="{Binding CompletionPreviewText}"
-                               Foreground="#334155"
+                    Padding="12">
+                <Grid RowDefinitions="Auto,Auto,*"
+                      RowSpacing="6">
+                    <TextBlock Text="{Binding TemplatePicker.PreviewTitle}"
+                               Foreground="#0F172A"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding TemplatePicker.PreviewDescription}"
+                               Foreground="#64748B"
                                FontSize="12"
-                               TextWrapping="Wrap"/>
-                </ScrollViewer>
+                               TextWrapping="Wrap"
+                               TextTrimming="CharacterEllipsis"/>
+                    <ScrollViewer Grid.Row="2"
+                                  MaxHeight="220"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock Text="{Binding TemplatePicker.PreviewBody}"
+                                   Foreground="#334155"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                </Grid>
             </Border>
-        </StackPanel>
+        </Grid>
 
-        <Border x:Name="TemplatePreview"
-                IsVisible="{Binding TemplatePicker.IsPreviewVisible, FallbackValue=False}"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Bottom"
-                MaxWidth="520"
-                Margin="10,0,10,10"
-                Background="#FFFFFF"
-                BorderBrush="#CBD5E1"
-                BorderThickness="1"
-                CornerRadius="4"
-                Padding="12">
-            <Grid RowDefinitions="Auto,Auto,*"
-                  RowSpacing="6">
-                <TextBlock Text="{Binding TemplatePicker.PreviewTitle}"
-                           Foreground="#0F172A"
-                           FontSize="13"
-                           FontWeight="SemiBold"
-                           TextTrimming="CharacterEllipsis"/>
-                <TextBlock Grid.Row="1"
-                           Text="{Binding TemplatePicker.PreviewDescription}"
-                           Foreground="#64748B"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           TextTrimming="CharacterEllipsis"/>
-                <ScrollViewer Grid.Row="2"
-                              MaxHeight="220"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <TextBlock Text="{Binding TemplatePicker.PreviewBody}"
-                               Foreground="#334155"
-                               FontSize="12"
-                               TextWrapping="Wrap"/>
-                </ScrollViewer>
-            </Grid>
-        </Border>
+        <components:PromptSessionHistoryPreviewView Grid.Column="1"
+                                                    DataContext="{Binding FrontSessionHistory}"/>
     </Grid>
 </UserControl>
