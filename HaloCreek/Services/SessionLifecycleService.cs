@@ -1,6 +1,9 @@
 using Avalonia.Threading;
 using HaloCreek.Infrastructure;
+using HaloCreek.Logging;
 using HaloCreek.Models;
+using HaloCreek.Services.SessionState;
+using HaloCreek.Services.WorkspaceSnapshots;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,8 +14,11 @@ namespace HaloCreek.Services
 {
     public sealed class SessionLifecycleService : IDisposable
     {
+        private const string LogCategory = "SessionState";
+
         // 正确性前提是所有共享状态的直接操作都来自同一个 UI 线程。
         private readonly Dictionary<string, OngoingSessionInfo> _sessionsById = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, WorkspaceSnapshotStore<SessionStateSnapshot>> _sessionStateStoresById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
         private readonly TerminalService _terminalService;
         private readonly TransientEventService _transientEventService;
@@ -76,6 +82,7 @@ namespace HaloCreek.Services
                 }
             }
 
+            DisposeSessionStateStores();
             _sessionsById.Clear();
             _frontSessionId = null;
         }
@@ -91,7 +98,9 @@ namespace HaloCreek.Services
 
             return StartCodexSessionAsync(
                 new[] { promptText },
-                promptText);
+                promptText,
+                promptText,
+                knownCodexSessionId: null);
         }
 
         public Task<OngoingSessionInfo> ResumeAsync(HistorySessionInfo? session)
@@ -110,7 +119,9 @@ namespace HaloCreek.Services
 
             return StartCodexSessionAsync(
                 new[] { "resume", session.Id },
-                session.InitialPrompt);
+                session.InitialPrompt,
+                historyPromptText: null,
+                knownCodexSessionId: session.Id);
         }
 
         public IReadOnlyList<OngoingSessionInfo> GetOngoingSessionInfos()
@@ -122,7 +133,9 @@ namespace HaloCreek.Services
 
         private async Task<OngoingSessionInfo> StartCodexSessionAsync(
             IReadOnlyList<string> codexArguments,
-            string titleSource)
+            string titleSource,
+            string? historyPromptText,
+            string? knownCodexSessionId)
         {
             RequireUiThread();
             ArgumentNullException.ThrowIfNull(codexArguments);
@@ -146,7 +159,9 @@ namespace HaloCreek.Services
                 workspace.WorkspacePath,
                 config.CodexExecutableName,
                 config.CodexLaunchArguments.Concat(codexArguments).ToArray(),
-                title),
+                title,
+                historyPromptText,
+                knownCodexSessionId),
                 out var identifier);
 
             var now = DateTimeOffset.Now;
@@ -163,7 +178,7 @@ namespace HaloCreek.Services
             var launchCompleted = false;
             try
             {
-                await launchTask;
+                var launchResult = await launchTask;
 
                 if (_isDisposed)
                 {
@@ -182,6 +197,7 @@ namespace HaloCreek.Services
                     State = OngoingSessionState.BackgroundRunning
                 };
                 _sessionsById[identifier] = session;
+                CreateSessionStateStore(session, launchResult.CodexSessionId);
                 SessionsChanged?.Invoke(this, EventArgs.Empty);
 
                 launchCompleted = true;
@@ -197,6 +213,11 @@ namespace HaloCreek.Services
                     }
 
                     SessionsChanged?.Invoke(this, EventArgs.Empty);
+                }
+
+                if (!launchCompleted)
+                {
+                    RemoveSessionStateStore(identifier);
                 }
             }
 
@@ -316,6 +337,7 @@ namespace HaloCreek.Services
             _tmuxService.Exit(sessionId);
 
             _sessionsById.Remove(sessionId);
+            RemoveSessionStateStore(sessionId);
             if (string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal))
             {
                 _frontSessionId = null;
@@ -383,6 +405,59 @@ namespace HaloCreek.Services
                 "SessionLifecycle",
                 title,
                 message);
+        }
+
+        private void CreateSessionStateStore(
+            OngoingSessionInfo session,
+            string codexSessionId)
+        {
+            ArgumentNullException.ThrowIfNull(session);
+            ArgumentException.ThrowIfNullOrWhiteSpace(codexSessionId);
+
+            var store = WorkspaceSnapshotStore.Create<SessionStateSnapshot>(codexSessionId);
+            store.Changed += (_, _) => LogSessionStateSnapshotPublished(
+                session.Id,
+                codexSessionId,
+                store.Current);
+            _sessionStateStoresById.Add(session.Id, store);
+        }
+
+        private void RemoveSessionStateStore(string sessionId)
+        {
+            if (!_sessionStateStoresById.Remove(sessionId, out var store))
+            {
+                return;
+            }
+
+            store.Dispose();
+        }
+
+        private void DisposeSessionStateStores()
+        {
+            foreach (var store in _sessionStateStoresById.Values)
+            {
+                store.Dispose();
+            }
+
+            _sessionStateStoresById.Clear();
+        }
+
+        private static void LogSessionStateSnapshotPublished(
+            string tmuxSessionId,
+            string codexSessionId,
+            SessionStateSnapshot snapshot)
+        {
+            Log.Info(
+                LogCategory,
+                "Ongoing session state snapshot published. "
+                + $"TmuxSessionId={tmuxSessionId}, "
+                + $"CodexSessionId={codexSessionId}, "
+                + $"State={snapshot.State}, "
+                + $"StateTimestamp={snapshot.StateTimestamp:O}, "
+                + $"MessageCount={snapshot.Messages.Count}, "
+                + $"ContextWindow={snapshot.TokenInfo?.ContextWindow}, "
+                + $"TotalTokenUsageTotal={snapshot.TokenInfo?.TotalTokenUsageTotal}, "
+                + $"LastTokenUsageTotal={snapshot.TokenInfo?.LastTokenUsageTotal}");
         }
 
         private static void RequireUiThread()

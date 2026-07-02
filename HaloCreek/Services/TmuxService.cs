@@ -38,6 +38,8 @@ namespace HaloCreek.Services
         private const string HeartbeatDirectory = HaloCreekTempDirectory + "/heartbeats";
         private static readonly TimeSpan WatchPollInterval = TimeSpan.FromSeconds(1);
         private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(4);
+        private static readonly TimeSpan CodexHistoryMatchTimeout = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
 
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly string _frontClientId;
@@ -78,7 +80,7 @@ namespace HaloCreek.Services
 
         public event EventHandler<TmuxSessionStateChangedEventArgs>? StateChanged;
 
-        public Task LaunchAsync(TmuxLaunchRequest request, out string identifier)
+        public Task<TmuxLaunchResult> LaunchAsync(TmuxLaunchRequest request, out string identifier)
         {
             ArgumentNullException.ThrowIfNull(request);
             ArgumentException.ThrowIfNullOrWhiteSpace(request.WorkspacePath);
@@ -104,6 +106,9 @@ namespace HaloCreek.Services
 
             return QueueSessionOperation(sessionIdentifier, () =>
             {
+                var historySnapshot = string.IsNullOrWhiteSpace(request.KnownCodexSessionId)
+                    ? CodexSessionFileLocator.CaptureHistorySnapshot()
+                    : null;
                 RunTmuxCommand(arguments, "launch tmux session");
                 lock (_ownedSessionsLock)
                 {
@@ -113,6 +118,11 @@ namespace HaloCreek.Services
                 StartHeartbeatPipe(sessionIdentifier);
                 TryRunTmuxCommand(new[] { "set-option", "-t", sessionIdentifier, "mouse", "on" }, out _);
                 SetSessionMetadata(sessionIdentifier, wslWorkspacePath, request.Title);
+
+                var codexSessionId = !string.IsNullOrWhiteSpace(request.KnownCodexSessionId)
+                    ? request.KnownCodexSessionId.Trim()
+                    : WaitForCodexSessionId(historySnapshot!, request.HistoryPromptText);
+                return new TmuxLaunchResult(sessionIdentifier, codexSessionId);
             });
         }
 
@@ -634,6 +644,15 @@ namespace HaloCreek.Services
 
         private Task QueueSessionOperation(string identifier, Action operation)
         {
+            return QueueSessionOperation<object?>(identifier, () =>
+            {
+                operation();
+                return null;
+            });
+        }
+
+        private Task<TResult> QueueSessionOperation<TResult>(string identifier, Func<TResult> operation)
+        {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
             ArgumentNullException.ThrowIfNull(operation);
 
@@ -647,7 +666,7 @@ namespace HaloCreek.Services
                         WaitForTaskToComplete(previousTask);
                     }
 
-                    operation();
+                    return operation();
                 });
 
                 _sessionOperationTasks[identifier] = task;
@@ -656,6 +675,39 @@ namespace HaloCreek.Services
                     TaskScheduler.Default);
                 return task;
             }
+        }
+
+        private static string WaitForCodexSessionId(
+            CodexHistorySnapshot historySnapshot,
+            string? promptText)
+        {
+            if (string.IsNullOrWhiteSpace(promptText))
+            {
+                throw new InvalidOperationException(
+                    "Codex history prompt text is required to match the launched session.");
+            }
+
+            var deadline = DateTimeOffset.UtcNow + CodexHistoryMatchTimeout;
+            while (true)
+            {
+                var entry = CodexSessionFileLocator.FindNewHistoryEntry(
+                    historySnapshot,
+                    promptText);
+                if (entry is not null)
+                {
+                    return entry.SessionId;
+                }
+
+                if (DateTimeOffset.UtcNow >= deadline)
+                {
+                    break;
+                }
+
+                Thread.Sleep(CodexHistoryMatchPollInterval);
+            }
+
+            throw new InvalidOperationException(
+                "Timed out waiting for Codex history to record the launched session.");
         }
 
         private void RemoveCompletedSessionOperation(string identifier, Task completedTask)

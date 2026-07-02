@@ -188,7 +188,7 @@ namespace HaloCreek.Services.SessionState
                 return null;
             }
 
-            return TryGetInt64(usage, "total", out var total)
+            return TryGetInt64(usage, "total_tokens", out var total)
                 ? total
                 : null;
         }
