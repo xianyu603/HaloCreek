@@ -15,3 +15,5 @@ wt的检查 win 10默认没有wt 需要同步修改user guide
 
 review加点提示信息，方便先捡软柿子review
 json parser有点零散  考虑集中infra
+view边框的问题, history尤其明显, 四个角感觉被啃了
+截图自动化迭代的skill
