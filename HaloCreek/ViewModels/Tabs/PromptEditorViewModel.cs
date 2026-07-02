@@ -38,6 +38,7 @@ namespace HaloCreek.ViewModels.Tabs
                 historySnapshots);
 
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
+            OpenCliCommand = new RelayCommand<OngoingSessionInfo>(OpenCli, CanOpenCli);
             ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
 
             _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
@@ -56,6 +57,7 @@ namespace HaloCreek.ViewModels.Tabs
                     OnPropertyChanged(nameof(HasOngoingSessions));
                     OnPropertyChanged(nameof(IsOngoingSessionsEmpty));
                     BringToFrontCommand.NotifyCanExecuteChanged();
+                    OpenCliCommand.NotifyCanExecuteChanged();
                     ExitSessionCommand.NotifyCanExecuteChanged();
                 }
             }
@@ -72,6 +74,8 @@ namespace HaloCreek.ViewModels.Tabs
         public bool IsOngoingSessionsEmpty => !HasOngoingSessions;
 
         public IRelayCommand<OngoingSessionInfo> BringToFrontCommand { get; }
+
+        public IRelayCommand<OngoingSessionInfo> OpenCliCommand { get; }
 
         public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
 
@@ -94,6 +98,16 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("PromptEditor", "Bring to front requested.");
         }
 
+        private void OpenCli(OngoingSessionInfo? session)
+        {
+            if (session is null)
+            {
+                return;
+            }
+
+            Log.Info("PromptEditor", "CLI entry requested.");
+        }
+
         private void ExitSession(OngoingSessionInfo? session)
         {
             if (session is null)
@@ -111,6 +125,12 @@ namespace HaloCreek.ViewModels.Tabs
         }
 
         private static bool CanBringToFront(OngoingSessionInfo? session)
+        {
+            return session is not null
+                && session.State != OngoingSessionState.Launching;
+        }
+
+        private static bool CanOpenCli(OngoingSessionInfo? session)
         {
             return session is not null
                 && session.State != OngoingSessionState.Launching;
