@@ -153,6 +153,7 @@ namespace HaloCreek.Services.WorkspacePaths
                 Directories = flatDirectories
                     .OrderBy(directory => directory.RelativePath, PathComparer)
                     .ToArray(),
+                SnapshotListenPath = workspacePath,
             };
         }
 

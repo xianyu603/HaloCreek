@@ -12,6 +12,8 @@ namespace HaloCreek.Services.SessionHistory
         int SkippedFileCount)
         : IWorkspaceSnapshot<SessionHistorySnapshot>
     {
+        public string? SnapshotListenPath { get; init; }
+
         public static SessionHistorySnapshot CreateEmpty()
         {
             return new SessionHistorySnapshot(
@@ -30,7 +32,10 @@ namespace HaloCreek.Services.SessionHistory
                 result.Sessions
                     .OrderByDescending(session => session.LastUpdatedAt)
                     .ToArray(),
-                result.SkippedFileCount);
+                result.SkippedFileCount)
+            {
+                SnapshotListenPath = result.SessionHistoryRootPath,
+            };
         }
 
         public static bool ContentEquals(

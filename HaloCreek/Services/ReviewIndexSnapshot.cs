@@ -10,6 +10,8 @@ namespace HaloCreek.Services
         IReadOnlyList<ReviewIndexSnapshotEntry> Entries)
         : IWorkspaceSnapshot<ReviewIndexSnapshot>
     {
+        public string? SnapshotListenPath { get; init; }
+
         public static ReviewIndexSnapshot CreateEmpty()
         {
             return new ReviewIndexSnapshot(
@@ -26,13 +28,15 @@ namespace HaloCreek.Services
                         entry.RelativePath);
                     return new ReviewIndexSnapshotEntry(
                         relativePath,
-                        entry.BlobId,
-                        GitInfrastructure.GetHeadBlobId(workspacePath, relativePath));
+                        entry.BlobId);
                 })
                 .OrderBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-            return new ReviewIndexSnapshot(entries);
+            return new ReviewIndexSnapshot(entries)
+            {
+                SnapshotListenPath = ReviewIndexOperator.GetIndexPath(workspacePath),
+            };
         }
 
         public static bool ContentEquals(
@@ -63,16 +67,11 @@ namespace HaloCreek.Services
                 && string.Equals(
                     left.ReviewedBlobId,
                     right.ReviewedBlobId,
-                    StringComparison.OrdinalIgnoreCase)
-                && string.Equals(
-                    left.HeadBlobId,
-                    right.HeadBlobId,
                     StringComparison.OrdinalIgnoreCase);
         }
     }
 
     public sealed record ReviewIndexSnapshotEntry(
         string RelativePath,
-        string ReviewedBlobId,
-        string? HeadBlobId);
+        string ReviewedBlobId);
 }

@@ -17,6 +17,8 @@ namespace HaloCreek.Services
             .Select(entry => entry.ToChangeInfo())
             .ToArray();
 
+        public string? SnapshotListenPath { get; init; }
+
         public static GitSnapshot CreateEmpty()
         {
             return new GitSnapshot(
@@ -49,7 +51,10 @@ namespace HaloCreek.Services
             return new GitSnapshot(
                 GitInfrastructure.GetHeadId(workspacePath),
                 entries,
-                result.Message);
+                result.Message)
+            {
+                SnapshotListenPath = workspacePath,
+            };
         }
 
         public static bool ContentEquals(GitSnapshot left, GitSnapshot right)

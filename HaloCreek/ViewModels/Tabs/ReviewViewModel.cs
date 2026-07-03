@@ -378,9 +378,14 @@ namespace HaloCreek.ViewModels.Tabs
             {
                 Log.Info("Review", $"DiffReviewedAgainstHead invoked. File={file.RelativePath}");
                 var gitRelativePath = PlatformInfrastructure.NormalizeGitRelativePath(file.RelativePath);
-                var reviewEntry = GetActiveReviewEntry(gitRelativePath)
-                    ?? throw new InvalidOperationException("Reviewed file is no longer available.");
-                var headPath = reviewEntry.HeadBlobId is null
+                if (GetActiveReviewEntry(gitRelativePath) is null)
+                {
+                    throw new InvalidOperationException("Reviewed file is no longer available.");
+                }
+
+                var gitEntry = GetGitEntry(gitRelativePath)
+                    ?? throw new InvalidOperationException("File is no longer modified in the current snapshot.");
+                var headPath = gitEntry.HeadBlobId is null
                     ? CreateEmptyHeadTempFile(gitRelativePath)
                     : GitInfrastructure.CreateTempHeadFile(gitRelativePath);
                 var reviewedPath = ReviewIndexOperator.CreateTempReviewedFile(
@@ -569,11 +574,6 @@ namespace HaloCreek.ViewModels.Tabs
 
             var reviewedFiles = reviewIndexSnapshot.Entries
                 .Where(entry => !omittedPaths.Contains(entry.RelativePath))
-                .Where(entry => entry.HeadBlobId is null
-                    || !string.Equals(
-                        entry.ReviewedBlobId,
-                        entry.HeadBlobId,
-                        StringComparison.OrdinalIgnoreCase))
                 .Select(entry => new ReviewFilePath(entry.RelativePath))
                 .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
                 .ToArray();

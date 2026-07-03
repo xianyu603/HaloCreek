@@ -5,5 +5,6 @@ namespace HaloCreek.Services.SessionHistory
 {
     public sealed record SessionHistoryResult(
         IReadOnlyList<HistorySessionInfo> Sessions,
-        int SkippedFileCount);
+        int SkippedFileCount,
+        string? SessionHistoryRootPath);
 }

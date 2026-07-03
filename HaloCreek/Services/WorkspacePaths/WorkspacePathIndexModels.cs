@@ -13,6 +13,8 @@ namespace HaloCreek.Services.WorkspacePaths
 
         public required IReadOnlyList<WorkspacePathIndexDirectoryNode> Directories { get; init; }
 
+        public string? SnapshotListenPath { get; init; }
+
         public static WorkspacePathIndexSnapshot CreateEmpty()
         {
             return WorkspacePathIndexSnapshotReader.CreateEmpty();

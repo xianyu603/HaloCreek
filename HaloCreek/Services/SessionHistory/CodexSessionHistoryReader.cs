@@ -25,13 +25,13 @@ namespace HaloCreek.Services.SessionHistory
 
             if (maxSessionHistoryFiles <= 0)
             {
-                return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
+                return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0, null);
             }
 
             var sessionHistoryRootPath = CodexSessionFileLocator.FindSessionRootPath();
             if (sessionHistoryRootPath is null)
             {
-                return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0);
+                return new SessionHistoryResult(Array.Empty<HistorySessionInfo>(), 0, null);
             }
 
             var sessionFiles = EnumerateLatestSessionFiles(
@@ -66,7 +66,7 @@ namespace HaloCreek.Services.SessionHistory
                 }
             }
 
-            return new SessionHistoryResult(sessions, skippedFileCount);
+            return new SessionHistoryResult(sessions, skippedFileCount, sessionHistoryRootPath);
         }
 
         private static IReadOnlyList<SessionFileMetadata> EnumerateLatestSessionFiles(

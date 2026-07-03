@@ -108,10 +108,10 @@ namespace HaloCreek.Services
                 return true;
             }
 
-            return reviewEntry.HeadBlobId is not null
+            return gitEntry.HeadBlobId is not null
                 && string.Equals(
                     reviewEntry.ReviewedBlobId,
-                    reviewEntry.HeadBlobId,
+                    gitEntry.HeadBlobId,
                     StringComparison.OrdinalIgnoreCase);
         }
     }
