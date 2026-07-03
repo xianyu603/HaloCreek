@@ -93,7 +93,7 @@
                                                        FontSize="13"
                                                        TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding State}"
+                                            <TextBlock Text="{Binding StatusText}"
                                                        Foreground="#64748B"
                                                        FontSize="12"
                                                        TextWrapping="NoWrap"

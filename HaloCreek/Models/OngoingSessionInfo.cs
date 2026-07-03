@@ -7,14 +7,22 @@ namespace HaloCreek.Models
         string Title,
         string WorkspacePath,
         DateTimeOffset StartedAt,
-        OngoingSessionState State);
-
-    public enum OngoingSessionState
+        FrontSessionState FrontState,
+        TmuxHeartbeatState HeartbeatState,
+        bool IsInteractive)
     {
-        Launching,
+        public string StatusText => $"{FrontState} / {HeartbeatState}";
+    }
+
+    public enum FrontSessionState
+    {
         Front,
-        BackgroundRunning,
-        BackgroundIdle,
-        Unknown
+        Background
+    }
+
+    public enum TmuxHeartbeatState
+    {
+        Idle,
+        Active,
     }
 }

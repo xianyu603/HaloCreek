@@ -1,4 +1,2 @@
-tmux service watch/unwatch 接入snapshotstore 变更消息暂时透传 允许暂时响应性变差
-修改ongoing session info的状态枚举, 只保留idle和active两态, 和tmux的探测结果相对应
 SessionStateView消费该信息, 提供两个维度的状态 active/idle 以及目前从session文件解析出来的task语义4态
 总体提高snapshotstore刷新的响应性, 文件系统消息订阅, 刷新周期可配置

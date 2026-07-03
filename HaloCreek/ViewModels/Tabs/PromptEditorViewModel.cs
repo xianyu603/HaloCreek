@@ -46,7 +46,7 @@ namespace HaloCreek.ViewModels.Tabs
 
             BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
             OpenCliCommand = new AsyncRelayCommand<OngoingSessionInfo>(OpenCliAsync, CanOpenCli);
-            ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, HasOngoingSession);
+            ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, CanExitSession);
 
             _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
             RefreshOngoingSessions();
@@ -142,21 +142,22 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("PromptEditor", "Session exit requested.");
         }
 
-        private static bool HasOngoingSession(OngoingSessionInfo? session)
+        private static bool CanExitSession(OngoingSessionInfo? session)
         {
-            return session is not null;
+            return session is not null
+                && session.IsInteractive;
         }
 
         private static bool CanBringToFront(OngoingSessionInfo? session)
         {
             return session is not null
-                && session.State != OngoingSessionState.Launching;
+                && session.IsInteractive;
         }
 
         private static bool CanOpenCli(OngoingSessionInfo? session)
         {
             return session is not null
-                && session.State != OngoingSessionState.Launching;
+                && session.IsInteractive;
         }
 
         private void HandleSessionsChanged(object? sender, EventArgs e)

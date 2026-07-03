@@ -234,14 +234,7 @@ namespace HaloCreek.Services
                 return;
             }
 
-            var sessionState = snapshot.State switch
-            {
-                TmuxHeartbeatState.Active => OngoingSessionState.BackgroundRunning,
-                TmuxHeartbeatState.Idle => OngoingSessionState.BackgroundIdle,
-                _ => throw new InvalidOperationException("Unknown tmux heartbeat state: " + snapshot.State),
-            };
-
-            OnStateChanged(new TmuxSessionStateChangedEventArgs(identifier, sessionState));
+            OnStateChanged(new TmuxSessionStateChangedEventArgs(identifier, snapshot.State));
         }
 
         private void RemoveHeartbeatWatch(string identifier)

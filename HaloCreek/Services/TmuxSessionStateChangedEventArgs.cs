@@ -7,7 +7,7 @@ namespace HaloCreek.Services
     {
         public TmuxSessionStateChangedEventArgs(
             string identifier,
-            OngoingSessionState state)
+            TmuxHeartbeatState state)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
@@ -17,6 +17,6 @@ namespace HaloCreek.Services
 
         public string Identifier { get; }
 
-        public OngoingSessionState State { get; }
+        public TmuxHeartbeatState State { get; }
     }
 }

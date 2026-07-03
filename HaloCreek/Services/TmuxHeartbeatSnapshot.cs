@@ -1,4 +1,5 @@
 using System;
+using HaloCreek.Models;
 using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.Services
@@ -54,9 +55,4 @@ namespace HaloCreek.Services
         }
     }
 
-    public enum TmuxHeartbeatState
-    {
-        Idle,
-        Active,
-    }
 }

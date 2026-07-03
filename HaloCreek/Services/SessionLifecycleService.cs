@@ -8,7 +8,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using static System.Collections.Specialized.BitVector32;
 
 namespace HaloCreek.Services
 {
@@ -181,7 +180,9 @@ namespace HaloCreek.Services
                 title,
                 workspace.WorkspacePath,
                 now,
-                OngoingSessionState.Launching);
+                FrontSessionState.Background,
+                TmuxHeartbeatState.Idle,
+                IsInteractive: false);
 
             _sessionsById.Add(identifier, session);
             SessionsChanged?.Invoke(this, EventArgs.Empty);
@@ -205,7 +206,7 @@ namespace HaloCreek.Services
 
                 session = session with
                 {
-                    State = OngoingSessionState.BackgroundRunning
+                    IsInteractive = true
                 };
                 _sessionsById[identifier] = session;
                 CreateSessionStateStore(session, launchResult.CodexSessionId);
@@ -243,7 +244,7 @@ namespace HaloCreek.Services
 
             string? previousFrontSessionId = null;
             if (!_sessionsById.TryGetValue(sessionId, out var session)
-                || session.State == OngoingSessionState.Launching)
+                || !session.IsInteractive)
             {
                 return;
             }
@@ -255,17 +256,10 @@ namespace HaloCreek.Services
                 previousFrontSessionId = _frontSessionId;
                 _sessionsById[previousFrontSessionId] = previousFrontSession with
                 {
-                    State = OngoingSessionState.Unknown
+                    FrontState = FrontSessionState.Background
                 };
                 _frontSessionId = null;
             }
-
-            if (previousFrontSessionId is not null)
-            {
-                _tmuxService.StartWatching(previousFrontSessionId);
-            }
-
-            _tmuxService.StopWatching(sessionId);
 
             if (!_sessionsById.TryGetValue(sessionId, out var targetSession))
             {
@@ -274,7 +268,7 @@ namespace HaloCreek.Services
 
             _sessionsById[sessionId] = targetSession with
             {
-                State = OngoingSessionState.Front
+                FrontState = FrontSessionState.Front
             };
             _frontSessionId = sessionId;
 
@@ -335,24 +329,17 @@ namespace HaloCreek.Services
 
             RequireUiThread();
 
-            if (args.State == OngoingSessionState.Front)
-            {
-                return;
-            }
-
             var changed = false;
-            if (!_sessionsById.TryGetValue(args.Identifier, out var session)
-                || string.Equals(_frontSessionId, args.Identifier, StringComparison.Ordinal)
-                || session.State == OngoingSessionState.Front)
+            if (!_sessionsById.TryGetValue(args.Identifier, out var session))
             {
                 return;
             }
 
-            if (session.State != args.State)
+            if (session.HeartbeatState != args.State)
             {
                 _sessionsById[args.Identifier] = session with
                 {
-                    State = args.State
+                    HeartbeatState = args.State
                 };
                 changed = true;
             }
@@ -367,7 +354,7 @@ namespace HaloCreek.Services
         {
             if (!string.IsNullOrWhiteSpace(_frontSessionId)
                 && _sessionsById.TryGetValue(_frontSessionId, out var frontSession)
-                && frontSession.State == OngoingSessionState.Front)
+                && frontSession.FrontState == FrontSessionState.Front)
             {
                 frontSessionId = _frontSessionId;
                 return true;
