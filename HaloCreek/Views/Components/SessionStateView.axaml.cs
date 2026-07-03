@@ -46,7 +46,17 @@ namespace HaloCreek.Views.Components
 
             Log.Info(LogCategory, $"Markdown LinkClick received. HRef={args.HRef.OriginalString}");
 
-            // todo link消息能触发了再写打开link的平台层
+            try
+            {
+                PlatformInfrastructure.OpenMarkdownLink(args.HRef);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException
+                or System.ComponentModel.Win32Exception
+                or ArgumentException
+                or NotSupportedException)
+            {
+                Log.Error(LogCategory, ex, $"Failed to open markdown link. HRef={args.HRef.OriginalString}");
+            }
         }
 
         private sealed class MarkdownLinkCommand : ICommand

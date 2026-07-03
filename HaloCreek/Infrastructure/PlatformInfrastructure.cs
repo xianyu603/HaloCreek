@@ -563,6 +563,29 @@ namespace HaloCreek.Infrastructure
             return process.Id;
         }
 
+        public static void OpenMarkdownLink(Uri href)
+        {
+            ArgumentNullException.ThrowIfNull(href);
+
+            var target = href.OriginalString.Trim();
+            ArgumentException.ThrowIfNullOrWhiteSpace(target);
+
+            if (StartsWithProtocol(target))
+            {
+                using var process = Process.Start(new ProcessStartInfo
+                {
+                    FileName = target,
+                    UseShellExecute = true,
+                });
+                return;
+            }
+
+            StartProcess(
+                "explorer.exe",
+                new[] { NormalizeExternalShellPath(target) },
+                createNoWindow: true);
+        }
+
         public static int StartCurrentApplication(string workspacePath)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
@@ -597,6 +620,51 @@ namespace HaloCreek.Infrastructure
                 && char.IsAsciiLetter(path[0])
                 && path[1] == ':'
                 && path[2] == '/';
+        }
+
+        private static bool StartsWithProtocol(string target)
+        {
+            var separatorIndex = target.IndexOf("://", StringComparison.Ordinal);
+            if (separatorIndex <= 0 || !char.IsAsciiLetter(target[0]))
+            {
+                return false;
+            }
+
+            for (var index = 1; index < separatorIndex; index++)
+            {
+                var character = target[index];
+                if (!char.IsAsciiLetterOrDigit(character) && character is not '+' and not '-' and not '.')
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static string NormalizeExternalShellPath(string path)
+        {
+            var normalizedPath = Uri.UnescapeDataString(path.Trim());
+            if (!OperatingSystem.IsWindows())
+            {
+                return NormalizePathForCurrentPlatform(normalizedPath);
+            }
+
+            var slashPath = normalizedPath.Replace('\\', '/');
+            if (slashPath.StartsWith("mnt/", StringComparison.Ordinal))
+            {
+                slashPath = "/" + slashPath;
+            }
+
+            if (IsMountedWindowsDrivePath(slashPath))
+            {
+                var drive = char.ToUpperInvariant(slashPath[5]);
+                return slashPath.Length == 6
+                    ? drive + @":\"
+                    : drive + ":" + slashPath[6..].Replace('/', '\\');
+            }
+
+            return normalizedPath.Replace('/', '\\');
         }
 
         public static bool TryGetWslEnvironmentVariable(string name, out string value)
