@@ -6,7 +6,7 @@
              xmlns:vm="using:HaloCreek.ViewModels.Components"
              x:DataType="vm:PromptInputViewModel"
              x:Class="HaloCreek.Views.Components.PromptInputView">
-    <Grid ColumnDefinitions="*,320">
+    <Grid ColumnDefinitions="*,*">
         <Grid.Styles>
             <Style Selector="ListBoxItem">
                 <Setter Property="MinHeight" Value="48"/>

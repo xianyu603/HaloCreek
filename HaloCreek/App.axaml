@@ -11,5 +11,20 @@
 
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://LiveMarkdown.Avalonia/Styles.axaml"/>
     </Application.Styles>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://LiveMarkdown.Avalonia/Defaults.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <Color x:Key="BorderColor">#BBF7D0</Color>
+            <Color x:Key="ForegroundColor">#334155</Color>
+            <Color x:Key="CardBackgroundColor">#F0FDF4</Color>
+            <Color x:Key="SecondaryCardBackgroundColor">#DCFCE7</Color>
+            <Color x:Key="CodeInlineColor">#166534</Color>
+            <Color x:Key="QuoteBorderColor">#16A34A</Color>
+        </ResourceDictionary>
+    </Application.Resources>
 </Application>

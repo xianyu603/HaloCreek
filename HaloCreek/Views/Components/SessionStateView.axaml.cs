@@ -1,12 +1,65 @@
+using System;
+using System.Windows.Input;
 using Avalonia.Controls;
+using HaloCreek.Infrastructure;
+using HaloCreek.Logging;
+using LiveMarkdown.Avalonia;
 
 namespace HaloCreek.Views.Components
 {
     public partial class SessionStateView : UserControl
     {
+        private const string LogCategory = "SessionStateView";
+
+        public ICommand OpenMarkdownLinkCommand { get; } = new MarkdownLinkCommand();
+
         public SessionStateView()
         {
             InitializeComponent();
+        }
+
+        private void MessagesScrollViewer_SizeChanged(object? sender, SizeChangedEventArgs e)
+        {
+            var contentWidth = MessagesScrollViewer.Bounds.Width
+                - MessagesScrollViewer.Padding.Left
+                - MessagesScrollViewer.Padding.Right;
+
+            MessagesItemsControl.Width = Math.Max(0, contentWidth);
+        }
+
+        private static void HandleMarkdownLink(LinkClickedEventArgs args)
+        {
+            if (args.HRef is null)
+            {
+                Log.Warning(LogCategory, "Markdown link click ignored because href is empty.");
+                return;
+            }
+
+            Log.Info(LogCategory, $"Markdown LinkClick received. HRef={args.HRef.OriginalString}");
+
+            // todo link消息能触发了再写打开link的平台层
+        }
+
+        private sealed class MarkdownLinkCommand : ICommand
+        {
+            public event EventHandler? CanExecuteChanged
+            {
+                add { }
+                remove { }
+            }
+
+            public bool CanExecute(object? parameter)
+            {
+                return parameter is LinkClickedEventArgs;
+            }
+
+            public void Execute(object? parameter)
+            {
+                if (parameter is LinkClickedEventArgs args)
+                {
+                    HandleMarkdownLink(args);
+                }
+            }
         }
     }
 }

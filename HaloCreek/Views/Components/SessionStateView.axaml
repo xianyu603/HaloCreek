@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="clr-namespace:LiveMarkdown.Avalonia;assembly=LiveMarkdown.Avalonia"
+             xmlns:views="using:HaloCreek.Views.Components"
              xmlns:vm="using:HaloCreek.ViewModels.Components"
              x:DataType="vm:SessionStateViewModel"
              x:Class="HaloCreek.Views.Components.SessionStateView">
@@ -51,41 +53,41 @@
             <Border Grid.Row="1"
                     BorderBrush="#E2E8F0"
                     BorderThickness="0,1,0,1">
-                <ListBox ItemsSource="{Binding Messages}"
-                         SelectionMode="Single"
-                         BorderThickness="0"
-                         Background="Transparent"
-                         Padding="16,10,16,0"
-                         ScrollViewer.VerticalScrollBarVisibility="Hidden"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.Styles>
-                        <Style Selector="ListBoxItem">
-                            <Setter Property="Padding" Value="0"/>
-                            <Setter Property="Margin" Value="0,0,0,10"/>
-                            <Setter Property="MinHeight" Value="0"/>
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                            <Setter Property="Background" Value="Transparent"/>
-                        </Style>
-                        <Style Selector="ListBoxItem:selected">
-                            <Setter Property="Background" Value="Transparent"/>
-                        </Style>
-                    </ListBox.Styles>
-                    <ListBox.ItemTemplate>
+                <ScrollViewer x:Name="MessagesScrollViewer"
+                              SizeChanged="MessagesScrollViewer_SizeChanged"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="16,10,20,0">
+                    <ItemsControl x:Name="MessagesItemsControl"
+                                  ItemsSource="{Binding Messages}"
+                                  HorizontalAlignment="Stretch">
+                        <ItemsControl.Styles>
+                            <Style Selector="ContentPresenter">
+                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                <Setter Property="MinWidth" Value="0"/>
+                            </Style>
+                        </ItemsControl.Styles>
+                        <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="vm:SessionStateMessageViewModel">
                             <Border Background="{Binding BackgroundBrush}"
                                     BorderBrush="{Binding BorderBrush}"
                                     BorderThickness="1"
                                     CornerRadius="6"
                                     Padding="10,9"
+                                    Margin="0,0,0,10"
+                                    MinWidth="0"
                                     HorizontalAlignment="Stretch">
                                 <Grid RowDefinitions="Auto,Auto"
+                                      MinWidth="0"
                                       RowSpacing="6">
                                     <Grid ColumnDefinitions="4,*,Auto"
+                                          MinWidth="0"
                                           ColumnSpacing="8">
                                         <Border Background="{Binding AccentBrush}"
                                                 CornerRadius="2"
                                                 Margin="0,2,0,2"/>
                                         <StackPanel Grid.Column="1"
+                                                    MinWidth="0"
                                                     Orientation="Horizontal"
                                                     Spacing="7">
                                             <TextBlock Text="{Binding SenderText}"
@@ -104,17 +106,18 @@
                                                    FontSize="12"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </Grid>
-                                    <TextBlock Grid.Row="1"
-                                               Text="{Binding Message}"
-                                               Foreground="#334155"
-                                               FontSize="12"
-                                               LineHeight="18"
-                                               TextWrapping="Wrap"/>
+                                    <md:MarkdownRenderer Grid.Row="1"
+                                                         MarkdownBuilder="{Binding Message, Converter={x:Static md:ValueConverters.ToObservableStringBuilder}}"
+                                                         LinkCommand="{Binding OpenMarkdownLinkCommand, RelativeSource={RelativeSource AncestorType=views:SessionStateView}}"
+                                                         CodeBlockColorTheme="LightPlus"
+                                                         MinWidth="0"
+                                                         HorizontalAlignment="Stretch"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
             </Border>
 
             <TextBlock Grid.Row="2"
