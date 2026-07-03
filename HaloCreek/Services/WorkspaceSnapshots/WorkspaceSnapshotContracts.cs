@@ -17,6 +17,10 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
         static abstract bool ContentEquals(TSnapshot left, TSnapshot right);
 
+        static virtual TimeSpan SnapshotRefreshInterval { get { return TimeSpan.FromSeconds(10); } }
+
+        static virtual TimeSpan SnapshotRefreshJitter { get { return TimeSpan.FromSeconds(2); } }
+
         string? SnapshotListenPath { get { return null; } }
     }
 

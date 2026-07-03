@@ -29,8 +29,6 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         where TSnapshot : IWorkspaceSnapshot<TSnapshot>
     {
         private const string LogCategory = "WorkspaceSnapshot";
-        private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);
-        private static readonly TimeSpan RefreshJitter = TimeSpan.FromSeconds(2);
         private static readonly TimeSpan FileSystemChangeDebounce = TimeSpan.FromMilliseconds(500);
 
         private readonly object _lock = new();
@@ -140,8 +138,11 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
         private void ScheduleNextTimerTick()
         {
-            var dueTime = RefreshInterval + TimeSpan.FromMilliseconds(
-                Random.Shared.Next(0, (int)RefreshJitter.TotalMilliseconds + 1));
+            var refreshJitterMilliseconds = (int)TSnapshot.SnapshotRefreshJitter.TotalMilliseconds;
+            var dueTime = TSnapshot.SnapshotRefreshInterval + TimeSpan.FromMilliseconds(
+                refreshJitterMilliseconds > 0
+                    ? Random.Shared.Next(0, refreshJitterMilliseconds + 1)
+                    : 0);
 
             lock (_lock)
             {

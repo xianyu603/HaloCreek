@@ -11,6 +11,10 @@ namespace HaloCreek.Services
 
         private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(4);
 
+        public static TimeSpan SnapshotRefreshInterval { get { return TimeSpan.FromSeconds(1); } }
+
+        public static TimeSpan SnapshotRefreshJitter { get { return TimeSpan.Zero; } }
+
         public string? SnapshotListenPath { get; init; }
 
         public static TmuxHeartbeatSnapshot CreateEmpty()
