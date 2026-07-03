@@ -69,7 +69,10 @@ namespace HaloCreek.Services.SessionState
                 state,
                 stateTimestamp,
                 messages,
-                tokenInfo);
+                tokenInfo)
+            {
+                SnapshotListenPath = sessionFilePath,
+            };
         }
 
         private static bool TryReadMessage(

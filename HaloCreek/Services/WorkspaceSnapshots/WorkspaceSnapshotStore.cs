@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -30,22 +31,30 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         private const string LogCategory = "WorkspaceSnapshot";
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);
         private static readonly TimeSpan RefreshJitter = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan FileSystemChangeDebounce = TimeSpan.FromMilliseconds(500);
 
         private readonly object _lock = new();
         private readonly Func<TSnapshot> _readSnapshot;
         private readonly Timer _refreshTimer;
+        private readonly Timer _fileSystemWatcherDebounceTimer;
         private TSnapshot _current;
+        private FileSystemWatcher? _fileSystemWatcher;
+        private string? _fileSystemListenPath;
         private RefreshState _state;
         private SnapshotRefreshReason _pendingReason;// 调试信息 不讲究地只记录第一个pending请求的触发方
         private bool _hasSuccessfulRefresh;
 
         internal WorkspaceSnapshotStore(Func<TSnapshot> readSnapshot)
         {
-            var workspace = WorkspaceRuntime.Current;
             _readSnapshot = readSnapshot ?? throw new ArgumentNullException(nameof(readSnapshot));
             _current = TSnapshot.CreateEmpty();
             _refreshTimer = new Timer(
                 OnRefreshTimerTick,
+                state: null,
+                Timeout.InfiniteTimeSpan,
+                Timeout.InfiniteTimeSpan);
+            _fileSystemWatcherDebounceTimer = new Timer(
+                OnFileSystemChangeDebounceElapsed,
                 state: null,
                 Timeout.InfiniteTimeSpan,
                 Timeout.InfiniteTimeSpan);
@@ -111,14 +120,22 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
                 _state = RefreshState.Disposed;
                 _refreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                _fileSystemWatcherDebounceTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
 
+            RemoveFileSystemWatcher();
+            _fileSystemWatcherDebounceTimer.Dispose();
             _refreshTimer.Dispose();
         }
 
         private void OnRefreshTimerTick(object? state)
         {
             RequestRefresh(SnapshotRefreshReason.Timer);
+        }
+
+        private void OnFileSystemChangeDebounceElapsed(object? state)
+        {
+            RequestRefresh(SnapshotRefreshReason.FileSystemChanged);
         }
 
         private void ScheduleNextTimerTick()
@@ -145,7 +162,9 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
                 try
                 {
+                    RemoveFileSystemWatcher();
                     var snapshot = _readSnapshot();
+                    UpdateFileSystemWatcher(workspace, snapshot.SnapshotListenPath);
                     PublishRefreshResult(workspace, snapshot, reason);
                 }
                 catch (Exception ex)
@@ -218,6 +237,183 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                 reason = default;
                 return false;
             }
+        }
+
+        private void OnFileSystemWatcherChanged(object sender, FileSystemEventArgs e)
+        {
+            ScheduleFileSystemChangedRefresh();
+        }
+
+        private void OnFileSystemWatcherRenamed(object sender, RenamedEventArgs e)
+        {
+            ScheduleFileSystemChangedRefresh();
+        }
+
+        private void OnFileSystemWatcherError(object sender, ErrorEventArgs e)
+        {
+            Log.Warning(
+                LogCategory,
+                $"Snapshot file watcher failed. Snapshot={typeof(TSnapshot).Name}, Path={GetFileSystemListenPath()}, Error={e.GetException()}");
+            ScheduleFileSystemChangedRefresh();
+        }
+
+        private void ScheduleFileSystemChangedRefresh()
+        {
+            lock (_lock)
+            {
+                if (_state == RefreshState.Disposed)
+                {
+                    return;
+                }
+
+                _fileSystemWatcherDebounceTimer.Change(
+                    FileSystemChangeDebounce,
+                    Timeout.InfiniteTimeSpan);
+            }
+        }
+
+        private void UpdateFileSystemWatcher(
+            WorkspaceContext workspace,
+            string? listenPath)
+        {
+            if (string.IsNullOrWhiteSpace(listenPath))
+            {
+                return;
+            }
+
+            var trimmedListenPath = listenPath.Trim();
+            FileSystemWatcher? watcher = null;
+            try
+            {
+                watcher = CreateFileSystemWatcher(trimmedListenPath);
+                watcher.Changed += OnFileSystemWatcherChanged;
+                watcher.Created += OnFileSystemWatcherChanged;
+                watcher.Deleted += OnFileSystemWatcherChanged;
+                watcher.Renamed += OnFileSystemWatcherRenamed;
+                watcher.Error += OnFileSystemWatcherError;
+
+                var shouldDispose = false;
+                lock (_lock)
+                {
+                    if (_state == RefreshState.Disposed)
+                    {
+                        shouldDispose = true;
+                    }
+                    else
+                    {
+                        _fileSystemWatcher = watcher;
+                        _fileSystemListenPath = trimmedListenPath;
+                    }
+                }
+
+                if (shouldDispose)
+                {
+                    DisposeFileSystemWatcher(watcher);
+                    return;
+                }
+
+                watcher.EnableRaisingEvents = true;
+            }
+            catch (Exception ex) when (ex is IOException
+                or NotSupportedException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or InvalidOperationException
+                or PathTooLongException)
+            {
+                if (watcher is not null)
+                {
+                    lock (_lock)
+                    {
+                        if (ReferenceEquals(_fileSystemWatcher, watcher))
+                        {
+                            _fileSystemWatcher = null;
+                            _fileSystemListenPath = null;
+                        }
+                    }
+
+                    DisposeFileSystemWatcher(watcher);
+                }
+
+                Log.Warning(
+                    LogCategory,
+                    $"Snapshot file watcher could not start. Snapshot={typeof(TSnapshot).Name}, Path={trimmedListenPath}, Workspace={workspace.WorkspacePath}, Error={ex.Message}");
+                return;
+            }
+
+            Log.Debug(
+                LogCategory,
+                $"Snapshot file watcher started. Snapshot={typeof(TSnapshot).Name}, Path={trimmedListenPath}, Workspace={workspace.WorkspacePath}");
+        }
+
+        private FileSystemWatcher CreateFileSystemWatcher(string listenPath)
+        {
+            var normalizedPath = Path.GetFullPath(listenPath.Trim());
+            FileSystemWatcher watcher;
+            if (Directory.Exists(normalizedPath))
+            {
+                watcher = new FileSystemWatcher(normalizedPath)
+                {
+                    IncludeSubdirectories = true,
+                };
+            }
+            else
+            {
+                var directoryPath = Path.GetDirectoryName(normalizedPath);
+                if (string.IsNullOrWhiteSpace(directoryPath)
+                    || !Directory.Exists(directoryPath))
+                {
+                    throw new DirectoryNotFoundException(
+                        $"Snapshot listen directory does not exist. Path={normalizedPath}");
+                }
+
+                watcher = new FileSystemWatcher(
+                    directoryPath,
+                    Path.GetFileName(normalizedPath));
+            }
+
+            watcher.NotifyFilter = NotifyFilters.FileName
+                | NotifyFilters.DirectoryName
+                | NotifyFilters.LastWrite
+                | NotifyFilters.Size
+                | NotifyFilters.CreationTime;
+            return watcher;
+        }
+
+        private void RemoveFileSystemWatcher()
+        {
+            FileSystemWatcher? watcher;
+            lock (_lock)
+            {
+                watcher = _fileSystemWatcher;
+                _fileSystemWatcher = null;
+                _fileSystemListenPath = null;
+            }
+
+            if (watcher is null)
+            {
+                return;
+            }
+
+            DisposeFileSystemWatcher(watcher);
+        }
+
+        private string? GetFileSystemListenPath()
+        {
+            lock (_lock)
+            {
+                return _fileSystemListenPath;
+            }
+        }
+
+        private void DisposeFileSystemWatcher(FileSystemWatcher watcher)
+        {
+            watcher.Changed -= OnFileSystemWatcherChanged;
+            watcher.Created -= OnFileSystemWatcherChanged;
+            watcher.Deleted -= OnFileSystemWatcherChanged;
+            watcher.Renamed -= OnFileSystemWatcherRenamed;
+            watcher.Error -= OnFileSystemWatcherError;
+            watcher.Dispose();
         }
 
         private void PublishChanged()

@@ -11,6 +11,8 @@ namespace HaloCreek.Services
 
         private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(4);
 
+        public string? SnapshotListenPath { get; init; }
+
         public static TmuxHeartbeatSnapshot CreateEmpty()
         {
             return new TmuxHeartbeatSnapshot(TmuxHeartbeatState.Idle);
@@ -21,17 +23,24 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
             var heartbeatPath = GetHeartbeatPath(key);
+            var listenPath = GetReadableHeartbeatPath(heartbeatPath);
             if (!WorkspaceRuntime.PlatformInfrastructure.TryGetWslFileLastWriteTimeUtc(
                     heartbeatPath,
                     out var heartbeatLastWriteTimeUtc))
             {
-                return new TmuxHeartbeatSnapshot(TmuxHeartbeatState.Idle);
+                return new TmuxHeartbeatSnapshot(TmuxHeartbeatState.Idle)
+                {
+                    SnapshotListenPath = listenPath,
+                };
             }
 
             var state = DateTimeOffset.UtcNow - heartbeatLastWriteTimeUtc < BackgroundIdleThreshold
                 ? TmuxHeartbeatState.Active
                 : TmuxHeartbeatState.Idle;
-            return new TmuxHeartbeatSnapshot(state);
+            return new TmuxHeartbeatSnapshot(state)
+            {
+                SnapshotListenPath = listenPath,
+            };
         }
 
         static TmuxHeartbeatSnapshot IWorkspaceSnapshot<TmuxHeartbeatSnapshot>.ReadSnapshot()
@@ -52,6 +61,15 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
             return HeartbeatDirectory + "/" + identifier + ".heartbeat";
+        }
+
+        private static string? GetReadableHeartbeatPath(string heartbeatPath)
+        {
+            return HaloCreek.Infrastructure.PlatformInfrastructure.TryConvertWslPathToReadablePath(
+                heartbeatPath,
+                out var readablePath)
+                ? readablePath
+                : null;
         }
     }
 

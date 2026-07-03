@@ -12,6 +12,8 @@ namespace HaloCreek.Services.SessionState
         SessionTokenInfo? TokenInfo)
         : IKeyedWorkspaceSnapshot<SessionStateSnapshot>
     {
+        public string? SnapshotListenPath { get; init; }
+
         public static SessionStateSnapshot CreateEmpty()
         {
             return new SessionStateSnapshot(

@@ -16,6 +16,8 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         static abstract TSnapshot ReadSnapshot();
 
         static abstract bool ContentEquals(TSnapshot left, TSnapshot right);
+
+        string? SnapshotListenPath { get { return null; } }
     }
 
     public interface IKeyedWorkspaceSnapshot<TSnapshot> :
