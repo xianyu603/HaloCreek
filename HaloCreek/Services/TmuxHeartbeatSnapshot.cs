@@ -27,14 +27,14 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
             var heartbeatPath = GetHeartbeatPath(key);
-            var listenPath = GetReadableHeartbeatPath(heartbeatPath);
             if (!WorkspaceRuntime.PlatformInfrastructure.TryGetWslFileLastWriteTimeUtc(
                     heartbeatPath,
                     out var heartbeatLastWriteTimeUtc))
             {
                 return new TmuxHeartbeatSnapshot(TmuxHeartbeatState.Idle)
                 {
-                    SnapshotListenPath = listenPath,
+                    // WSL file watching is temporarily disabled. Timer polling still refreshes heartbeat state.
+                    // SnapshotListenPath = GetReadableHeartbeatPath(heartbeatPath),
                 };
             }
 
@@ -43,7 +43,8 @@ namespace HaloCreek.Services
                 : TmuxHeartbeatState.Idle;
             return new TmuxHeartbeatSnapshot(state)
             {
-                SnapshotListenPath = listenPath,
+                // WSL file watching is temporarily disabled. Timer polling still refreshes heartbeat state.
+                // SnapshotListenPath = GetReadableHeartbeatPath(heartbeatPath),
             };
         }
 

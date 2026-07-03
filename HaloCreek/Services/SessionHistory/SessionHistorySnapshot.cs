@@ -34,7 +34,8 @@ namespace HaloCreek.Services.SessionHistory
                     .ToArray(),
                 result.SkippedFileCount)
             {
-                SnapshotListenPath = result.SessionHistoryRootPath,
+                // WSL file watching is temporarily disabled. Timer polling still refreshes history.
+                // SnapshotListenPath = result.SessionHistoryRootPath,
             };
         }
 

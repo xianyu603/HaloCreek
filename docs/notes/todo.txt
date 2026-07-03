@@ -21,3 +21,5 @@ completion中 recent committed文件应该按时间顺序排序
 考虑给tmux添加alive 判别 tmux display-message -p -t '<session>:0.0' '#{pane_dead} #{pane_pid} #{pane_current_command}'
 tmux -> session lifecycle -> promptinput -> session state vm 的消息通知有点绕, 最后一个还会每次重新构建, 考虑精简一下, 尽可能干掉中间商赚差价 现在session lifecycle -> promptinput这一条是全量刷新不太舒服
 $补全卡顿问题 考虑新增一个workspaceskillsnapshot
+wsl内文件监听暂时关闭, 后续如果能迁移到windows内的codex cli再考虑接回来
+

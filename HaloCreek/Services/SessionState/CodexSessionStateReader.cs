@@ -71,7 +71,8 @@ namespace HaloCreek.Services.SessionState
                 messages,
                 tokenInfo)
             {
-                SnapshotListenPath = sessionFilePath,
+                // WSL file watching is temporarily disabled. Timer polling still refreshes session state.
+                // SnapshotListenPath = sessionFilePath,
             };
         }
 
