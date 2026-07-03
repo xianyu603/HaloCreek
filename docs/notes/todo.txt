@@ -18,3 +18,4 @@ json parser有点零散  考虑集中infra
 view边框的问题, history尤其明显, 四个角感觉被啃了
 截图自动化迭代的skill
 completion中 recent committed文件应该按时间顺序排序
+考虑给tmux添加alive 判别 tmux display-message -p -t '<session>:0.0' '#{pane_dead} #{pane_pid} #{pane_current_command}'

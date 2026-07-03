@@ -7,52 +7,26 @@ using System.Threading;
 using System.Threading.Tasks;
 using HaloCreek.Infrastructure;
 using HaloCreek.Models;
-
-
-/*
- * 用显示状态机维护状态 避免boolean组合状态的问题
-| Trigger | Current State | Action | Next State |
-| --- | --- | --- | --- |
-| `StartWatching` | `Idle` | Add session heartbeat path, schedule immediate timer | `Scheduled` |
-| `StartWatching` | `Scheduled` | Add or reset session heartbeat path, keep timer scheduled | `Scheduled` |
-| `StartWatching` | `Probing` | Add or reset session heartbeat path, let next probe cycle include it | `Probing` |
-| `StartWatching` | `Disposed` | Throw `ObjectDisposedException` | `Disposed` |
-| `StopWatching` | `Idle` | No-op after remove attempt | `Idle` |
-| `StopWatching` | `Scheduled` with sessions left | Remove session, keep timer scheduled | `Scheduled` |
-| `StopWatching` | `Scheduled` with no sessions left | Remove session, stop timer | `Idle` |
-| `StopWatching` | `Probing` | Remove session; in-flight result for it will be ignored | `Probing` |
-| `StopWatching` | `Disposed` | No-op | `Disposed` |
-| Timer tick | `Scheduled` | Copy identifiers, enter probe cycle | `Probing` |
-| Timer tick | `Idle` / `Probing` / `Disposed` | Ignore | Unchanged |
-| Probe finish | `Probing` with sessions left | Schedule next timer | `Scheduled` |
-| Probe finish | `Probing` with no sessions left | Keep timer stopped | `Idle` |
-| Probe finish | `Disposed` | Keep timer stopped | `Disposed` |
-| `Dispose` | Any state | Clear sessions, stop timer, wait pending session operation tasks | `Disposed` |
-*/
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.Services
 {
     public sealed class TmuxService : IDisposable
     {
         private const string HaloCreekTempDirectory = "/tmp/halocreek";
-        private const string HeartbeatDirectory = HaloCreekTempDirectory + "/heartbeats";
-        private static readonly TimeSpan WatchPollInterval = TimeSpan.FromSeconds(1);
-        private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(4);
         private static readonly TimeSpan CodexHistoryMatchTimeout = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
 
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly string _frontClientId;
         private readonly string _frontClientTtyMarkerPath;
-        private readonly object _watchStateLock = new();
         private readonly object _sessionOperationTasksLock = new();
         private readonly object _ownedSessionsLock = new();
-        private readonly Dictionary<string, WatchedSessionState> _watchedSessions = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, TmuxHeartbeatWatch> _heartbeatWatchesById = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Task> _sessionOperationTasks = new(StringComparer.Ordinal);
         private readonly HashSet<string> _ownedSessionIds = new(StringComparer.Ordinal);
-        private readonly Timer _watchTimer;
         private readonly FrontClientSwitcher _frontClientSwitcher;
-        private WatchState _watchState;
+        private bool _isDisposed;
 
         public TmuxService(AppCommonRuntime appCommonRuntime)
         {
@@ -67,11 +41,6 @@ namespace HaloCreek.Services
             _frontClientSwitcher = new FrontClientSwitcher(
                 _platformInfrastructure,
                 _frontClientTtyMarkerPath);
-            _watchTimer = new Timer(
-                OnWatchTimerTick,
-                state: null,
-                Timeout.InfiniteTimeSpan,
-                Timeout.InfiniteTimeSpan);
         }
 
         public event EventHandler<TmuxSessionStateChangedEventArgs>? StateChanged;
@@ -191,19 +160,13 @@ namespace HaloCreek.Services
 
         public void Dispose()
         {
-            lock (_watchStateLock)
+            if (_isDisposed)
             {
-                if (_watchState == WatchState.Disposed)
-                {
-                    return;
-                }
-
-                _watchState = WatchState.Disposed;
-                _watchedSessions.Clear();
-                _watchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                return;
             }
 
-            _watchTimer.Dispose();
+            _isDisposed = true;
+            DisposeHeartbeatWatches();
             WaitForSessionOperationsToComplete();
             string[] ownedSessionIds;
             lock (_ownedSessionsLock)
@@ -224,42 +187,37 @@ namespace HaloCreek.Services
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
-            lock (_watchStateLock)
+            if (_isDisposed)
             {
-                if (_watchState == WatchState.Disposed)
-                {
-                    throw new ObjectDisposedException(nameof(TmuxService));
-                }
-
-                _watchedSessions[identifier] = new WatchedSessionState(
-                    GetHeartbeatPath(identifier));
-                if (_watchState == WatchState.Idle)
-                {
-                    _watchState = WatchState.Scheduled;
-                    _watchTimer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
-                }
+                throw new ObjectDisposedException(nameof(TmuxService));
             }
+
+            if (_heartbeatWatchesById.TryGetValue(identifier, out var existingWatch))
+            {
+                existingWatch.Store.RequestRefresh(SnapshotRefreshReason.Manual);
+                return;
+            }
+
+            var store = WorkspaceSnapshotStore.Create<TmuxHeartbeatSnapshot>(identifier);
+            var watch = new TmuxHeartbeatWatch(
+                identifier,
+                store,
+                (_, _) => OnHeartbeatSnapshotChanged(identifier, store.Current));
+            store.Changed += watch.ChangedHandler;
+            _heartbeatWatchesById.Add(identifier, watch);
+            OnHeartbeatSnapshotChanged(identifier, store.Current);// empty store正常都是异步读取的
         }
 
         public void StopWatching(string identifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
 
-            lock (_watchStateLock)
+            if (_isDisposed)
             {
-                if (_watchState == WatchState.Disposed)
-                {
-                    return;
-                }
-
-                _watchedSessions.Remove(identifier);
-                if (_watchedSessions.Count == 0
-                    && _watchState == WatchState.Scheduled)
-                {
-                    _watchState = WatchState.Idle;
-                    _watchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-                }
+                return;
             }
+
+            RemoveHeartbeatWatch(identifier);
         }
 
         private void OnStateChanged(TmuxSessionStateChangedEventArgs args)
@@ -267,111 +225,67 @@ namespace HaloCreek.Services
             StateChanged?.Invoke(this, args);
         }
 
-        private void OnWatchTimerTick(object? state)
+        private void OnHeartbeatSnapshotChanged(
+            string identifier,
+            TmuxHeartbeatSnapshot snapshot)
         {
-            string[] identifiers;
-            lock (_watchStateLock)
+            if (_isDisposed)
             {
-                if (_watchState != WatchState.Scheduled)
-                {
-                    return;
-                }
-
-                _watchState = WatchState.Probing;
-                identifiers = _watchedSessions.Keys.ToArray();
+                return;
             }
 
-            try
+            var sessionState = snapshot.State switch
             {
-                foreach (var identifier in identifiers)
-                {
-                    ProbeAndPublishWatchedState(identifier);
-                }
-            }
-            finally
-            {
-                lock (_watchStateLock)
-                {
-                    if (_watchState == WatchState.Probing
-                        && _watchedSessions.Count > 0)
-                    {
-                        _watchState = WatchState.Scheduled;
-                        _watchTimer.Change(WatchPollInterval, Timeout.InfiniteTimeSpan);
-                    }
-                    else if (_watchState == WatchState.Probing)
-                    {
-                        _watchState = WatchState.Idle;
-                    }
-                }
-            }
+                TmuxHeartbeatState.Active => OngoingSessionState.BackgroundRunning,
+                TmuxHeartbeatState.Idle => OngoingSessionState.BackgroundIdle,
+                _ => throw new InvalidOperationException("Unknown tmux heartbeat state: " + snapshot.State),
+            };
+
+            OnStateChanged(new TmuxSessionStateChangedEventArgs(identifier, sessionState));
         }
 
-        private void ProbeAndPublishWatchedState(string identifier)
+        private void RemoveHeartbeatWatch(string identifier)
         {
-            string heartbeatPath;
-            lock (_watchStateLock)
+            if (!_heartbeatWatchesById.Remove(identifier, out var watch))
             {
-                if (_watchState == WatchState.Disposed
-                    || !_watchedSessions.TryGetValue(identifier, out var watchedSession))
-                {
-                    return;
-                }
-
-                heartbeatPath = watchedSession.HeartbeatPath;
+                return;
             }
 
-            var now = DateTimeOffset.UtcNow;
-            var heartbeatExists = _platformInfrastructure.TryGetWslFileLastWriteTimeUtc(
-                heartbeatPath,
-                out var heartbeatLastWriteTimeUtc);
-            var newState = heartbeatExists
-                ? now - heartbeatLastWriteTimeUtc < BackgroundIdleThreshold
-                    ? OngoingSessionState.BackgroundRunning
-                    : OngoingSessionState.BackgroundIdle
-                : OngoingSessionState.Unknown;
-            var shouldNotify = false;
-
-            lock (_watchStateLock)
-            {
-                if (_watchState == WatchState.Disposed
-                    || !_watchedSessions.TryGetValue(identifier, out var watchedSession))
-                {
-                    return;
-                }
-
-                if (watchedSession.State != newState)
-                {
-                    watchedSession.State = newState;
-                    shouldNotify = true;
-                }
-            }
-
-            if (shouldNotify)
-            {
-                OnStateChanged(new TmuxSessionStateChangedEventArgs(identifier, newState));
-            }
+            watch.Dispose();
         }
 
-        private enum WatchState
+        private void DisposeHeartbeatWatches()
         {
-            Idle,
-            Scheduled,
-            Probing,
-            Disposed
-        }
-
-        private sealed class WatchedSessionState
-        {
-            public WatchedSessionState(string heartbeatPath)
+            foreach (var watch in _heartbeatWatchesById.Values)
             {
-                ArgumentException.ThrowIfNullOrWhiteSpace(heartbeatPath);
-
-                HeartbeatPath = heartbeatPath;
+                watch.Dispose();
             }
 
-            public OngoingSessionState State { get; set; } = OngoingSessionState.Unknown;
+            _heartbeatWatchesById.Clear();
+        }
 
-            public string HeartbeatPath { get; }
+        private sealed class TmuxHeartbeatWatch : IDisposable
+        {
+            public TmuxHeartbeatWatch(
+                string identifier,
+                WorkspaceSnapshotStore<TmuxHeartbeatSnapshot> store,
+                EventHandler changedHandler)
+            {
+                ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+                Store = store ?? throw new ArgumentNullException(nameof(store));
+                ChangedHandler = changedHandler ?? throw new ArgumentNullException(nameof(changedHandler));
+            }
+
+            public WorkspaceSnapshotStore<TmuxHeartbeatSnapshot> Store { get; }
+
+            public EventHandler ChangedHandler { get; }
+
+            public void Dispose()
+            {
+                Store.Changed -= ChangedHandler;
+                Store.Dispose();
+            }
         }
 
         private sealed class FrontClientSwitcher
@@ -484,10 +398,10 @@ namespace HaloCreek.Services
 
         private void StartHeartbeatPipe(string identifier)
         {
-            var heartbeatPath = GetHeartbeatPath(identifier);
+            var heartbeatPath = TmuxHeartbeatSnapshot.GetHeartbeatPath(identifier);
             _platformInfrastructure.TryRunWslCommand(
                 "mkdir",
-                new[] { "-p", HeartbeatDirectory },
+                new[] { "-p", TmuxHeartbeatSnapshot.HeartbeatDirectory },
                 out _);
             _platformInfrastructure.TryRunWslCommand(
                 "touch",
@@ -525,13 +439,6 @@ namespace HaloCreek.Services
             RunTmuxCommand(
                 new[] { "pipe-pane", "-o", "-t", identifier + ":0.0", helperCommand },
                 "start heartbeat pipe");
-        }
-
-        private static string GetHeartbeatPath(string identifier)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-            return HeartbeatDirectory + "/" + identifier + ".heartbeat";
         }
 
         private void SetSessionMetadata(

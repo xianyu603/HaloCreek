@@ -16,6 +16,10 @@ namespace HaloCreek.Services
         public static WorkspaceContext Current =>
             _current ?? throw new InvalidOperationException("Workspace is not valid.");
 
+        public static PlatformInfrastructure PlatformInfrastructure =>
+            _platformInfrastructure
+            ?? throw new InvalidOperationException("Workspace runtime has not been initialized.");
+
         public static void Initialize(
             AppCommonRuntime appCommonRuntime,
             WorkspaceCacheService workspaceCacheService,

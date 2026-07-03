@@ -1,0 +1,62 @@
+using System;
+using HaloCreek.Services.WorkspaceSnapshots;
+
+namespace HaloCreek.Services
+{
+    public sealed record TmuxHeartbeatSnapshot(TmuxHeartbeatState State)
+        : IKeyedWorkspaceSnapshot<TmuxHeartbeatSnapshot>
+    {
+        public const string HeartbeatDirectory = "/tmp/halocreek/heartbeats";
+
+        private static readonly TimeSpan BackgroundIdleThreshold = TimeSpan.FromSeconds(4);
+
+        public static TmuxHeartbeatSnapshot CreateEmpty()
+        {
+            return new TmuxHeartbeatSnapshot(TmuxHeartbeatState.Idle);
+        }
+
+        public static TmuxHeartbeatSnapshot ReadSnapshot(string key)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+            var heartbeatPath = GetHeartbeatPath(key);
+            if (!WorkspaceRuntime.PlatformInfrastructure.TryGetWslFileLastWriteTimeUtc(
+                    heartbeatPath,
+                    out var heartbeatLastWriteTimeUtc))
+            {
+                return new TmuxHeartbeatSnapshot(TmuxHeartbeatState.Idle);
+            }
+
+            var state = DateTimeOffset.UtcNow - heartbeatLastWriteTimeUtc < BackgroundIdleThreshold
+                ? TmuxHeartbeatState.Active
+                : TmuxHeartbeatState.Idle;
+            return new TmuxHeartbeatSnapshot(state);
+        }
+
+        static TmuxHeartbeatSnapshot IWorkspaceSnapshot<TmuxHeartbeatSnapshot>.ReadSnapshot()
+        {
+            throw new NotSupportedException(
+                "TmuxHeartbeatSnapshot requires a tmux session identifier. Use WorkspaceSnapshotStore.Create<TmuxHeartbeatSnapshot>(identifier).");
+        }
+
+        public static bool ContentEquals(
+            TmuxHeartbeatSnapshot left,
+            TmuxHeartbeatSnapshot right)
+        {
+            return left.State == right.State;
+        }
+
+        public static string GetHeartbeatPath(string identifier)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+            return HeartbeatDirectory + "/" + identifier + ".heartbeat";
+        }
+    }
+
+    public enum TmuxHeartbeatState
+    {
+        Idle,
+        Active,
+    }
+}
