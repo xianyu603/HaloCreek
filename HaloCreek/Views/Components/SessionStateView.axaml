@@ -11,7 +11,7 @@
                   RowDefinitions="Auto,Auto"
                   RowSpacing="6"
                   Margin="14,12,14,10">
-                <Grid ColumnDefinitions="*,Auto"
+                <Grid ColumnDefinitions="*,Auto,Auto"
                       ColumnSpacing="10">
                     <TextBlock Text="{Binding Title}"
                                Foreground="#0F172A"
@@ -19,6 +19,17 @@
                                FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis"/>
                     <Border Grid.Column="1"
+                            Background="#DCFCE7"
+                            CornerRadius="5"
+                            Padding="8,2"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ActivityText}"
+                                   Foreground="#166534"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </Border>
+                    <Border Grid.Column="2"
                             Background="#DCFCE7"
                             CornerRadius="5"
                             Padding="8,2"

@@ -666,7 +666,7 @@ namespace HaloCreek.ViewModels.Components
             }
 
             FrontSessionState = SessionStateViewModel.FromSnapshot(
-                _frontSession.Title,
+                _frontSession,
                 _frontSessionStateSnapshots.Current);
         }
 

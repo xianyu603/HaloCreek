@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Avalonia.Media;
+using HaloCreek.Models;
 using HaloCreek.Services.SessionState;
 
 namespace HaloCreek.ViewModels.Components
@@ -9,10 +10,12 @@ namespace HaloCreek.ViewModels.Components
     {
         private SessionStateViewModel(
             string title,
+            string activityText,
             SessionStateSnapshot snapshot,
             IReadOnlyList<SessionStateMessageViewModel> messages)
         {
             Title = title;
+            ActivityText = activityText;
             StateText = FormatState(snapshot.State);
             StateTimestampText = snapshot.StateTimestamp is null
                 ? "No state timestamp"
@@ -22,6 +25,8 @@ namespace HaloCreek.ViewModels.Components
         }
 
         public string Title { get; }
+
+        public string ActivityText { get; }
 
         public string StateText { get; }
 
@@ -35,18 +40,21 @@ namespace HaloCreek.ViewModels.Components
         {
             return new SessionStateViewModel(
                 "No front session",
+                "No session",
                 SessionStateSnapshot.CreateEmpty(),
                 Array.Empty<SessionStateMessageViewModel>());
         }
 
         public static SessionStateViewModel FromSnapshot(
-            string title,
+            OngoingSessionInfo session,
             SessionStateSnapshot snapshot)
         {
+            ArgumentNullException.ThrowIfNull(session);
             ArgumentNullException.ThrowIfNull(snapshot);
 
             return new SessionStateViewModel(
-                string.IsNullOrWhiteSpace(title) ? "Front session" : title,
+                string.IsNullOrWhiteSpace(session.Title) ? "Front session" : session.Title,
+                FormatActivity(session),
                 snapshot,
                 ConvertMessages(snapshot.Messages));
         }
@@ -70,6 +78,16 @@ namespace HaloCreek.ViewModels.Components
                 SessionTaskState.TaskStarted => "Started",
                 SessionTaskState.TaskAborted => "Aborted",
                 SessionTaskState.TaskCompleted => "Completed",
+                _ => "Unknown",
+            };
+        }
+
+        private static string FormatActivity(OngoingSessionInfo session)
+        {
+            return session.HeartbeatState switch
+            {
+                TmuxHeartbeatState.Active => "Active",
+                TmuxHeartbeatState.Idle => "Idle",
                 _ => "Unknown",
             };
         }
