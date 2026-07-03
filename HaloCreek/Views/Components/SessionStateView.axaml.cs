@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Input;
+using Avalonia;
 using Avalonia.Controls;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
@@ -25,6 +26,14 @@ namespace HaloCreek.Views.Components
                 - MessagesScrollViewer.Padding.Right;
 
             MessagesItemsControl.Width = Math.Max(0, contentWidth);
+        }
+
+        private void MarkdownRenderer_AttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
+        {
+            if (sender is MarkdownRenderer renderer)
+            {
+                MarkdownRendererLinkClickWorkaround.Attach(renderer);
+            }
         }
 
         private static void HandleMarkdownLink(LinkClickedEventArgs args)

@@ -110,6 +110,7 @@
                                                          MarkdownBuilder="{Binding Message, Converter={x:Static md:ValueConverters.ToObservableStringBuilder}}"
                                                          LinkCommand="{Binding OpenMarkdownLinkCommand, RelativeSource={RelativeSource AncestorType=views:SessionStateView}}"
                                                          CodeBlockColorTheme="LightPlus"
+                                                         AttachedToVisualTree="MarkdownRenderer_AttachedToVisualTree"
                                                          MinWidth="0"
                                                          HorizontalAlignment="Stretch"/>
                                 </Grid>
