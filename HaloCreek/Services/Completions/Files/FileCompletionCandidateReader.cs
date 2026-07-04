@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
@@ -31,15 +32,11 @@ namespace HaloCreek.Services.Completions.Files
             try
             {
                 var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
-                return _gitService.GetChanges().Changes
+                var relativePaths = _gitService.GetChanges().Changes
                     .Where(change => UncommittedChangeTypes.Contains(change.ChangeType))
-                    .Select(change => NormalizePathOrNull(change.RelativePath, "status"))
-                    .Where(relativePath => PlatformInfrastructure.IsExistingFileUnderDirectory(
-                        workspacePath,
-                        relativePath))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(relativePath => relativePath, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()!;
+                    .Select(change => change.RelativePath);
+
+                return GetExistingFilesByLastWriteTimeUtc(workspacePath, relativePaths, "status");
             }
             catch (Exception ex)
             {
@@ -53,20 +50,39 @@ namespace HaloCreek.Services.Completions.Files
             try
             {
                 var workspacePath = WorkspaceRuntime.Current.WorkspacePath;
-                return _gitService.GetRecentCommittedFilePaths(commitCount)
-                    .Select(relativePath => NormalizePathOrNull(relativePath, "recent committed"))
-                    .Where(relativePath => PlatformInfrastructure.IsExistingFileUnderDirectory(
-                        workspacePath,
-                        relativePath))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(relativePath => relativePath, StringComparer.OrdinalIgnoreCase)
-                    .ToArray()!;
+                return GetExistingFilesByLastWriteTimeUtc(
+                    workspacePath,
+                    _gitService.GetRecentCommittedFilePaths(commitCount),
+                    "recent committed");
             }
             catch (Exception ex)
             {
                 Log.Warning(LogCategory, $"Failed to read recent committed file completions. {ex}");
                 return Array.Empty<string>();
             }
+        }
+
+        private static IReadOnlyList<string> GetExistingFilesByLastWriteTimeUtc(
+            string workspacePath,
+            IEnumerable<string> relativePaths,
+            string source)
+        {
+            return relativePaths
+                .Select(relativePath => NormalizePathOrNull(relativePath, source))
+                .Where(relativePath => PlatformInfrastructure.IsExistingFileUnderDirectory(
+                    workspacePath,
+                    relativePath))
+                .Select(relativePath => relativePath!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(relativePath => new FileCompletionCandidate(
+                    relativePath,
+                    File.GetLastWriteTimeUtc(PlatformInfrastructure.CombinePathForCurrentPlatform(
+                        workspacePath,
+                        relativePath))))
+                .OrderByDescending(candidate => candidate.LastWriteTimeUtc)
+                .ThenBy(candidate => candidate.RelativePath, StringComparer.OrdinalIgnoreCase)
+                .Select(candidate => candidate.RelativePath)
+                .ToArray();
         }
 
         private static string? NormalizePathOrNull(string relativePath, string source)
@@ -83,5 +99,9 @@ namespace HaloCreek.Services.Completions.Files
                 return null;
             }
         }
+
+        private sealed record FileCompletionCandidate(
+            string RelativePath,
+            DateTime LastWriteTimeUtc);
     }
 }
