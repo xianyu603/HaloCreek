@@ -58,15 +58,10 @@
                         VerticalAlignment="Top"
                         Margin="10,0,10,0"
                         Spacing="4">
-                <ItemsControl x:Name="CompletionMenu"
-                              HorizontalAlignment="Left"
-                              ItemsSource="{Binding CompletionMenuLevels}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
+                <ContentControl x:Name="CompletionMenu"
+                                HorizontalAlignment="Left"
+                                Content="{Binding ActiveCompletionLevel}">
+                    <ContentControl.ContentTemplate>
                         <DataTemplate DataType="vm:PromptCompletionMenuLevel">
                             <Border Background="#FFFFFF"
                                     BorderBrush="#CBD5E1"
@@ -130,8 +125,8 @@
                                 </Panel>
                             </Border>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
 
                 <Border IsVisible="{Binding IsCompletionPreviewVisible, FallbackValue=False}"
                         HorizontalAlignment="Stretch"
