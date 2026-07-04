@@ -185,7 +185,7 @@ namespace HaloCreek.Services
                 IsInteractive: false);
 
             _sessionsById.Add(identifier, session);
-            SessionsChanged?.Invoke(this, EventArgs.Empty);
+            BringToFront(identifier);
 
             var launchCompleted = false;
             try
@@ -243,8 +243,7 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
             string? previousFrontSessionId = null;
-            if (!_sessionsById.TryGetValue(sessionId, out var session)
-                || !session.IsInteractive)
+            if (!_sessionsById.ContainsKey(sessionId))
             {
                 return;
             }
@@ -289,6 +288,13 @@ namespace HaloCreek.Services
             if (!TryGetFrontSessionId(out var frontSessionId))
             {
                 ReportFrontSessionFailure("Send to front failed", "No front session is available.");
+                return;
+            }
+
+            if (!_sessionsById.TryGetValue(frontSessionId, out var frontSession)
+                || !frontSession.IsInteractive)
+            {
+                ReportFrontSessionFailure("Send to front failed", "Front session is still starting.");
                 return;
             }
 
@@ -437,5 +443,5 @@ namespace HaloCreek.Services
 
     public sealed record FrontSessionContext(
         OngoingSessionInfo Session,
-        IWorkspaceSnapshotSource<SessionStateSnapshot> StateSnapshots);
+        IWorkspaceSnapshotSource<SessionStateSnapshot>? StateSnapshots);
 }

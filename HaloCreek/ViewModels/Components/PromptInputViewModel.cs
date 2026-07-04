@@ -639,7 +639,7 @@ namespace HaloCreek.ViewModels.Components
 
         private void ApplyFrontSessionState()
         {
-            if (_frontSession is null || _frontSessionStateSnapshots is null)
+            if (_frontSession is null)
             {
                 FrontSessionState = SessionStateViewModel.CreateEmpty();
                 return;
@@ -647,7 +647,7 @@ namespace HaloCreek.ViewModels.Components
 
             FrontSessionState = SessionStateViewModel.FromSnapshot(
                 _frontSession,
-                _frontSessionStateSnapshots.Current);
+                _frontSessionStateSnapshots?.Current ?? SessionStateSnapshot.CreateEmpty());
         }
 
         private readonly record struct CompletionTriggerState(
