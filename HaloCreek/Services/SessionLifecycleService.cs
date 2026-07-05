@@ -30,7 +30,6 @@ namespace HaloCreek.Services
             _tmuxService = tmuxService ?? throw new ArgumentNullException(nameof(tmuxService));
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             _transientEventService = appCommonRuntime.TransientEventService;
-            _tmuxService.StateChanged += HandleTmuxStateChanged;
         }
 
         // 只向外部汇报session或其状态发生了变化 先不实现复杂的消息通知 卡了再优化
@@ -45,18 +44,17 @@ namespace HaloCreek.Services
             }
         }
 
-        public FrontSessionContext? GetFrontSessionContext()
+        public OngoingSessionInfo? GetFrontSessionInfo()
         {
             RequireUiThread();
 
             if (!TryGetFrontSessionId(out var frontSessionId)
-                || !_sessionsById.TryGetValue(frontSessionId, out var session)
-                || !_sessionStateStoresById.TryGetValue(frontSessionId, out var stateSnapshots))
+                || !_sessionsById.TryGetValue(frontSessionId, out var session))
             {
                 return null;
             }
 
-            return new FrontSessionContext(session, stateSnapshots);
+            return session;
         }
 
         public void Dispose()
@@ -67,21 +65,11 @@ namespace HaloCreek.Services
             }
 
             _isDisposed = true;
-            _tmuxService.StateChanged -= HandleTmuxStateChanged;
 
             var sessionIds = _sessionsById.Keys.ToArray();
 
             foreach (var sessionId in sessionIds)
             {
-                try
-                {
-                    _tmuxService.StopWatching(sessionId);
-                }
-                catch (Exception)
-                {
-                    // Application shutdown must continue even if tmux cleanup fails.
-                }
-
                 try
                 {
                     _tmuxService.Exit(sessionId);
@@ -181,7 +169,7 @@ namespace HaloCreek.Services
                 workspace.WorkspacePath,
                 now,
                 FrontSessionState.Background,
-                TmuxHeartbeatState.Idle,
+                StateSnapshots: null,
                 IsInteractive: false);
 
             _sessionsById.Add(identifier, session);
@@ -204,13 +192,13 @@ namespace HaloCreek.Services
                     throw new InvalidOperationException("Session closed before launch completed.");
                 }
 
+                var stateSnapshots = CreateSessionStateStore(session, launchResult.CodexSessionId);
                 session = session with
                 {
+                    StateSnapshots = stateSnapshots,
                     IsInteractive = true
                 };
                 _sessionsById[identifier] = session;
-                CreateSessionStateStore(session, launchResult.CodexSessionId);
-                _tmuxService.StartWatching(identifier);
                 SessionsChanged?.Invoke(this, EventArgs.Empty);
 
                 launchCompleted = true;
@@ -311,7 +299,6 @@ namespace HaloCreek.Services
                 return;
             }
 
-            _tmuxService.StopWatching(sessionId);
             _tmuxService.Exit(sessionId);
 
             _sessionsById.Remove(sessionId);
@@ -322,38 +309,6 @@ namespace HaloCreek.Services
             }
 
             SessionsChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void HandleTmuxStateChanged(object? sender, TmuxSessionStateChangedEventArgs args)
-        {
-            if (!Dispatcher.UIThread.CheckAccess())
-            {
-                // 当前唯一允许的异步入口是 tmux 状态回调；修改 session 状态前必须先投递回 UI 线程。
-                Dispatcher.UIThread.Post(() => HandleTmuxStateChanged(sender, args));
-                return;
-            }
-
-            RequireUiThread();
-
-            var changed = false;
-            if (!_sessionsById.TryGetValue(args.Identifier, out var session))
-            {
-                return;
-            }
-
-            if (session.HeartbeatState != args.State)
-            {
-                _sessionsById[args.Identifier] = session with
-                {
-                    HeartbeatState = args.State
-                };
-                changed = true;
-            }
-
-            if (changed)
-            {
-                SessionsChanged?.Invoke(this, EventArgs.Empty);
-            }
         }
 
         private bool TryGetFrontSessionId(out string frontSessionId)
@@ -378,7 +333,7 @@ namespace HaloCreek.Services
                 message);
         }
 
-        private void CreateSessionStateStore(
+        private WorkspaceSnapshotStore<SessionStateSnapshot> CreateSessionStateStore(
             OngoingSessionInfo session,
             string codexSessionId)
         {
@@ -386,11 +341,32 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(codexSessionId);
 
             var store = WorkspaceSnapshotStore.Create<SessionStateSnapshot>(codexSessionId);
-            store.Changed += (_, _) => LogSessionStateSnapshotPublished(
-                session.Id,
-                codexSessionId,
-                store.Current);
+            store.Changed += (_, _) =>
+            {
+                LogSessionStateSnapshotPublished(
+                    session.Id,
+                    codexSessionId,
+                    store.Current);
+                PublishSessionsChanged();
+            };
             _sessionStateStoresById.Add(session.Id, store);
+            return store;
+        }
+
+        private void PublishSessionsChanged()
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(PublishSessionsChanged);
+                return;
+            }
+
+            if (_isDisposed)
+            {
+                return;
+            }
+
+            SessionsChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void RemoveSessionStateStore(string sessionId)
@@ -441,7 +417,4 @@ namespace HaloCreek.Services
         }
     }
 
-    public sealed record FrontSessionContext(
-        OngoingSessionInfo Session,
-        IWorkspaceSnapshotSource<SessionStateSnapshot>? StateSnapshots);
 }

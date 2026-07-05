@@ -54,7 +54,7 @@ namespace HaloCreek.ViewModels.Components
 
             return new SessionStateViewModel(
                 string.IsNullOrWhiteSpace(session.Title) ? "Front session" : session.Title,
-                FormatActivity(session),
+                FormatActivity(snapshot.LastActiveTime),
                 snapshot,
                 ConvertMessages(snapshot.Messages));
         }
@@ -82,12 +82,12 @@ namespace HaloCreek.ViewModels.Components
             };
         }
 
-        private static string FormatActivity(OngoingSessionInfo session)
+        private static string FormatActivity(DateTimeOffset? lastActiveTime)
         {
-            return session.HeartbeatState switch
+            return SessionStateSnapshot.IsActive(lastActiveTime) switch
             {
-                TmuxHeartbeatState.Active => "Active",
-                TmuxHeartbeatState.Idle => "Idle",
+                true => "Active",
+                false => "Idle",
                 _ => "Unknown",
             };
         }

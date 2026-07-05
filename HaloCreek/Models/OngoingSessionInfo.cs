@@ -1,4 +1,6 @@
 using System;
+using HaloCreek.Services.SessionState;
+using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.Models
 {
@@ -8,21 +10,25 @@ namespace HaloCreek.Models
         string WorkspacePath,
         DateTimeOffset StartedAt,
         FrontSessionState FrontState,
-        TmuxHeartbeatState HeartbeatState,
+        IWorkspaceSnapshotSource<SessionStateSnapshot>? StateSnapshots,
         bool IsInteractive)
     {
-        public string StatusText => $"{FrontState} / {HeartbeatState}";
+        public string StatusText => $"{FrontState} / {FormatActivity()}";
+
+        private string FormatActivity()
+        {
+            return SessionStateSnapshot.IsActive(StateSnapshots?.Current.LastActiveTime) switch
+            {
+                true => "Active",
+                false => "Idle",
+                _ => "Unknown",
+            };
+        }
     }
 
     public enum FrontSessionState
     {
         Front,
         Background
-    }
-
-    public enum TmuxHeartbeatState
-    {
-        Idle,
-        Active,
     }
 }

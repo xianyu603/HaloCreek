@@ -13,6 +13,8 @@ namespace HaloCreek.Services.SessionState
         SessionTokenInfo? TokenInfo)
         : IKeyedWorkspaceSnapshot<SessionStateSnapshot>
     {
+        public static readonly TimeSpan ActiveThreshold = TimeSpan.FromSeconds(4);
+
         public string? SnapshotListenPath { get; init; }
 
         public static SessionStateSnapshot CreateEmpty()
@@ -45,6 +47,16 @@ namespace HaloCreek.Services.SessionState
                 && left.LastActiveTime == right.LastActiveTime
                 && Equals(left.TokenInfo, right.TokenInfo)
                 && left.Messages.SequenceEqual(right.Messages);
+        }
+
+        public static bool? IsActive(DateTimeOffset? lastActiveTime)
+        {
+            if (lastActiveTime is null)
+            {
+                return null;
+            }
+
+            return DateTimeOffset.UtcNow - lastActiveTime.Value.ToUniversalTime() < ActiveThreshold;
         }
     }
 

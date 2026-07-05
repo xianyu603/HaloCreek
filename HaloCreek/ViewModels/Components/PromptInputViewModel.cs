@@ -32,7 +32,6 @@ namespace HaloCreek.ViewModels.Components
         [
             new PromptCompletionMenuLevel(Array.Empty<PromptCompletionItem>()),
         ];
-        private IWorkspaceSnapshotSource<SessionStateSnapshot>? _frontSessionStateSnapshots;
         private OngoingSessionInfo? _frontSession;
         private SessionStateViewModel _frontSessionState =
             SessionStateViewModel.CreateEmpty();
@@ -140,6 +139,9 @@ namespace HaloCreek.ViewModels.Components
 
         // 在真正干活之前触发 消息处理抛异常会导致发送失败 不过目前风险可控
         public event EventHandler? PromptSubmitted;
+
+        private IWorkspaceSnapshotSource<SessionStateSnapshot>? FrontSessionStateSnapshots
+            => _frontSession?.StateSnapshots;
 
         private void RefreshCompletionTrigger()
         {
@@ -592,37 +594,34 @@ namespace HaloCreek.ViewModels.Components
                 SendToFrontCommand.NotifyCanExecuteChanged();
             }
 
-            var frontSessionContext = _sessionLifecycleService.GetFrontSessionContext();
-            SetFrontSessionStateSubscription(frontSessionContext);
+            SetFrontSession(_sessionLifecycleService.GetFrontSessionInfo());
             ApplyFrontSessionState();
         }
 
-        private void SetFrontSessionStateSubscription(FrontSessionContext? frontSessionContext)
+        private void SetFrontSession(OngoingSessionInfo? frontSession)
         {
-            var stateSnapshots = frontSessionContext?.StateSnapshots;
-            if (!ReferenceEquals(_frontSessionStateSnapshots, stateSnapshots))
+            if (!ReferenceEquals(FrontSessionStateSnapshots, frontSession?.StateSnapshots))
             {
                 StopFrontSessionStateSubscription();
-                if (stateSnapshots is not null)
+                _frontSession = frontSession;
+                if (FrontSessionStateSnapshots is not null)
                 {
-                    stateSnapshots.Changed += HandleFrontSessionStateChanged;
+                    FrontSessionStateSnapshots.Changed += HandleFrontSessionStateChanged;
                 }
-
-                _frontSessionStateSnapshots = stateSnapshots;
+                return;
             }
 
-            _frontSession = frontSessionContext?.Session;
+            _frontSession = frontSession;
         }
 
         private void StopFrontSessionStateSubscription()
         {
-            if (_frontSessionStateSnapshots is null)
+            if (FrontSessionStateSnapshots is null)
             {
                 return;
             }
 
-            _frontSessionStateSnapshots.Changed -= HandleFrontSessionStateChanged;
-            _frontSessionStateSnapshots = null;
+            FrontSessionStateSnapshots.Changed -= HandleFrontSessionStateChanged;
             _frontSession = null;
         }
 
@@ -647,7 +646,7 @@ namespace HaloCreek.ViewModels.Components
 
             FrontSessionState = SessionStateViewModel.FromSnapshot(
                 _frontSession,
-                _frontSessionStateSnapshots?.Current ?? SessionStateSnapshot.CreateEmpty());
+                _frontSession.StateSnapshots?.Current ?? SessionStateSnapshot.CreateEmpty());
         }
 
         private readonly record struct CompletionTriggerState(

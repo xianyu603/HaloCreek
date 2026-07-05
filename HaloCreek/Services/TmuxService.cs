@@ -6,8 +6,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using HaloCreek.Infrastructure;
-using HaloCreek.Models;
-using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.Services
 {
@@ -22,7 +20,6 @@ namespace HaloCreek.Services
         private readonly string _frontClientTtyMarkerPath;
         private readonly object _sessionOperationTasksLock = new();
         private readonly object _ownedSessionsLock = new();
-        private readonly Dictionary<string, TmuxHeartbeatWatch> _heartbeatWatchesById = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Task> _sessionOperationTasks = new(StringComparer.Ordinal);
         private readonly HashSet<string> _ownedSessionIds = new(StringComparer.Ordinal);
         private readonly FrontClientSwitcher _frontClientSwitcher;
@@ -42,8 +39,6 @@ namespace HaloCreek.Services
                 _platformInfrastructure,
                 _frontClientTtyMarkerPath);
         }
-
-        public event EventHandler<TmuxSessionStateChangedEventArgs>? StateChanged;
 
         public Task<TmuxLaunchResult> LaunchAsync(TmuxLaunchRequest request, out string identifier)
         {
@@ -80,7 +75,6 @@ namespace HaloCreek.Services
                     _ownedSessionIds.Add(sessionIdentifier);
                 }
 
-                StartHeartbeatPipe(sessionIdentifier);
                 TryRunTmuxCommand(new[] { "set-option", "-t", sessionIdentifier, "mouse", "on" }, out _);
                 SetSessionMetadata(sessionIdentifier, wslWorkspacePath, request.Title);
 
@@ -166,7 +160,6 @@ namespace HaloCreek.Services
             }
 
             _isDisposed = true;
-            DisposeHeartbeatWatches();
             WaitForSessionOperationsToComplete();
             string[] ownedSessionIds;
             lock (_ownedSessionsLock)
@@ -181,104 +174,6 @@ namespace HaloCreek.Services
             }
 
             _frontClientSwitcher.Clear();
-        }
-
-        public void StartWatching(string identifier)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-            if (_isDisposed)
-            {
-                throw new ObjectDisposedException(nameof(TmuxService));
-            }
-
-            if (_heartbeatWatchesById.TryGetValue(identifier, out var existingWatch))
-            {
-                existingWatch.Store.RequestRefresh(SnapshotRefreshReason.Manual);
-                return;
-            }
-
-            var store = WorkspaceSnapshotStore.Create<TmuxHeartbeatSnapshot>(identifier);
-            var watch = new TmuxHeartbeatWatch(
-                identifier,
-                store,
-                (_, _) => OnHeartbeatSnapshotChanged(identifier, store.Current));
-            store.Changed += watch.ChangedHandler;
-            _heartbeatWatchesById.Add(identifier, watch);
-            OnHeartbeatSnapshotChanged(identifier, store.Current);// empty store正常都是异步读取的
-        }
-
-        public void StopWatching(string identifier)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            RemoveHeartbeatWatch(identifier);
-        }
-
-        private void OnStateChanged(TmuxSessionStateChangedEventArgs args)
-        {
-            StateChanged?.Invoke(this, args);
-        }
-
-        private void OnHeartbeatSnapshotChanged(
-            string identifier,
-            TmuxHeartbeatSnapshot snapshot)
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
-
-            OnStateChanged(new TmuxSessionStateChangedEventArgs(identifier, snapshot.State));
-        }
-
-        private void RemoveHeartbeatWatch(string identifier)
-        {
-            if (!_heartbeatWatchesById.Remove(identifier, out var watch))
-            {
-                return;
-            }
-
-            watch.Dispose();
-        }
-
-        private void DisposeHeartbeatWatches()
-        {
-            foreach (var watch in _heartbeatWatchesById.Values)
-            {
-                watch.Dispose();
-            }
-
-            _heartbeatWatchesById.Clear();
-        }
-
-        private sealed class TmuxHeartbeatWatch : IDisposable
-        {
-            public TmuxHeartbeatWatch(
-                string identifier,
-                WorkspaceSnapshotStore<TmuxHeartbeatSnapshot> store,
-                EventHandler changedHandler)
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-                Store = store ?? throw new ArgumentNullException(nameof(store));
-                ChangedHandler = changedHandler ?? throw new ArgumentNullException(nameof(changedHandler));
-            }
-
-            public WorkspaceSnapshotStore<TmuxHeartbeatSnapshot> Store { get; }
-
-            public EventHandler ChangedHandler { get; }
-
-            public void Dispose()
-            {
-                Store.Changed -= ChangedHandler;
-                Store.Dispose();
-            }
         }
 
         private sealed class FrontClientSwitcher
@@ -387,51 +282,6 @@ namespace HaloCreek.Services
                 tty = SplitProcessOutputLines(output).FirstOrDefault() ?? string.Empty;
                 return !string.IsNullOrWhiteSpace(tty);
             }
-        }
-
-        private void StartHeartbeatPipe(string identifier)
-        {
-            var heartbeatPath = TmuxHeartbeatSnapshot.GetHeartbeatPath(identifier);
-            _platformInfrastructure.TryRunWslCommand(
-                "mkdir",
-                new[] { "-p", TmuxHeartbeatSnapshot.HeartbeatDirectory },
-                out _);
-            _platformInfrastructure.TryRunWslCommand(
-                "touch",
-                new[] { heartbeatPath },
-                out _);
-
-            // The helper consumes pane output without storing it. It treats Codex's
-            // repeated OSC title updates as the background activity signal, so tmux
-            // redraws and ordinary pane output do not move an idle session back to
-            // running after it is switched to the front client.
-            var helperScript = string.Join(
-                " ",
-                "heartbeat=$1;",
-                "last_touch=0;",
-                "esc=$(printf '\\033');",
-                "previous=;",
-                "while IFS= read -r -n 1 char; do",
-                "if [ \"$previous\" = \"$esc\" ] && [ \"$char\" = \"]\" ]; then",
-                "now=${EPOCHSECONDS:-$(date +%s)};", // 输出以sec为单位的整数时间 以实现最多1s touch一次
-                "if [ \"$now\" != \"$last_touch\" ]; then",
-                ": > \"$heartbeat\";",
-                "last_touch=$now;",
-                "fi;",
-                "fi;",
-                "previous=$char;",
-                "done");
-
-            var helperCommand = _platformInfrastructure.BuildWslShellCommand(
-                "bash",
-                new[] { "-c", helperScript, "--", heartbeatPath });
-
-            // MVP boundary: HaloCreek-created sessions are single-window/single-pane.
-            // If the user manually changes panes or kills tmux outside HaloCreek, the
-            // heartbeat may age into idle instead of representing that external change.
-            RunTmuxCommand(
-                new[] { "pipe-pane", "-o", "-t", identifier + ":0.0", helperCommand },
-                "start heartbeat pipe");
         }
 
         private void SetSessionMetadata(
