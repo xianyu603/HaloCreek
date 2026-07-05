@@ -857,11 +857,7 @@ namespace HaloCreek.Infrastructure
                 command.Executable,
                 command.Arguments);
 
-            var windowIdentity = request.WindowMode == TerminalWindowMode.ReuseOrCreateNamedWindow
-                ? request.WindowIdentity
-                : null;
-
-            return StartWindowsTerminal(windowIdentity, wslWorkspacePath, shellCommand);
+            return StartWindowsTerminal(request.WindowIdentity, wslWorkspacePath, shellCommand);
         }
 
         private static TerminalExecutableCommandSpec MaterializeTerminalCommand(TerminalCommandSpec command)
@@ -900,18 +896,10 @@ namespace HaloCreek.Infrastructure
                 new[] { ConvertToWslPath(scriptPath) });
         }
 
-        public Process? ActivateTerminalWindow(string windowIdentity)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(windowIdentity);
-
-            return StartWindowsTerminal(windowIdentity, null, null, focusExistingTab: true);
-        }
-
         private static Process? StartWindowsTerminal(
             string? windowIdentity,
             string? wslWorkspacePath,
-            string? shellCommand,
-            bool focusExistingTab = false)
+            string? shellCommand)
         {
             var startInfo = new ProcessStartInfo
             {
@@ -923,11 +911,6 @@ namespace HaloCreek.Infrastructure
             {
                 startInfo.ArgumentList.Add("--window");
                 startInfo.ArgumentList.Add(windowIdentity);
-            }
-
-            if (focusExistingTab)
-            {
-                startInfo.ArgumentList.Add("ft");
             }
 
             if (!string.IsNullOrWhiteSpace(wslWorkspacePath)

@@ -11,18 +11,15 @@ namespace HaloCreek.Services
 {
     public sealed class TmuxService : IDisposable
     {
-        private const string HaloCreekTempDirectory = "/tmp/halocreek";
         private static readonly TimeSpan CodexHistoryMatchTimeout = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
 
         private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly string _frontClientId;
-        private readonly string _frontClientTtyMarkerPath;
         private readonly object _sessionOperationTasksLock = new();
         private readonly object _ownedSessionsLock = new();
         private readonly Dictionary<string, Task> _sessionOperationTasks = new(StringComparer.Ordinal);
         private readonly HashSet<string> _ownedSessionIds = new(StringComparer.Ordinal);
-        private readonly FrontClientSwitcher _frontClientSwitcher;
         private bool _isDisposed;
 
         public TmuxService(AppCommonRuntime appCommonRuntime)
@@ -31,13 +28,6 @@ namespace HaloCreek.Services
 
             _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             _frontClientId = Guid.NewGuid().ToString("N")[..8];
-            _frontClientTtyMarkerPath = HaloCreekTempDirectory
-                + "/front-client-"
-                + _frontClientId
-                + ".tty";
-            _frontClientSwitcher = new FrontClientSwitcher(
-                _platformInfrastructure,
-                _frontClientTtyMarkerPath);
         }
 
         public Task<TmuxLaunchResult> LaunchAsync(TmuxLaunchRequest request, out string identifier)
@@ -98,6 +88,7 @@ namespace HaloCreek.Services
             });
         }
 
+        // TODO Open CLI now always launches a wt tab; FrontClient naming should be revisited separately.
         public TerminalCommandSpec GetFrontClientStartupCommand(string initialIdentifier)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(initialIdentifier);
@@ -106,8 +97,6 @@ namespace HaloCreek.Services
                 "\n",
                 "#!/usr/bin/env bash",
                 "set -e",
-                "mkdir -p " + _platformInfrastructure.QuoteWslShellArgument(HaloCreekTempDirectory),
-                "tty > " + _platformInfrastructure.QuoteWslShellArgument(_frontClientTtyMarkerPath),
                 "exec " + _platformInfrastructure.BuildWslShellCommand(
                     "tmux",
                     new[] { "attach-session", "-t", initialIdentifier }),
@@ -117,23 +106,6 @@ namespace HaloCreek.Services
                 "/",
                 "halocreek-front-client-" + _frontClientId + "-" + initialIdentifier,
                 script);
-        }
-
-        public void SwitchFrontClient(string identifier)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-            _frontClientSwitcher.SwitchIn(identifier);
-        }
-
-        public bool HasFrontClient()
-        {
-            return _frontClientSwitcher.HasClient();
-        }
-
-        public void MarkFrontClientAttachedToSession(string identifier)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-            _frontClientSwitcher.MarkAttachedToSession(identifier);
         }
 
         public void SendMessageToSession(
@@ -171,116 +143,6 @@ namespace HaloCreek.Services
             foreach (var ownedSessionId in ownedSessionIds)
             {
                 TryRunTmuxCommand(new[] { "kill-session", "-t", ownedSessionId }, out _);
-            }
-
-            _frontClientSwitcher.Clear();
-        }
-
-        private sealed class FrontClientSwitcher
-        {
-            private readonly PlatformInfrastructure _platformInfrastructure;
-            private readonly string _frontClientTtyMarkerPath;
-            private readonly object _lock = new();
-            private string? _frontSessionId;
-
-            public FrontClientSwitcher(
-                PlatformInfrastructure platformInfrastructure,
-                string frontClientTtyMarkerPath)
-            {
-                _platformInfrastructure = platformInfrastructure
-                    ?? throw new ArgumentNullException(nameof(platformInfrastructure));
-                ArgumentException.ThrowIfNullOrWhiteSpace(frontClientTtyMarkerPath);
-
-                _frontClientTtyMarkerPath = frontClientTtyMarkerPath;
-            }
-
-            public void SwitchIn(string identifier)
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-                lock (_lock)
-                {
-                    SwitchClientCore(identifier);
-                    _frontSessionId = identifier;
-                }
-            }
-
-            public void Clear()
-            {
-                lock (_lock)
-                {
-                    _frontSessionId = null;
-                }
-            }
-
-            public void MarkAttachedToSession(string identifier)
-            {
-                ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
-
-                lock (_lock)
-                {
-                    _frontSessionId = identifier;
-                }
-            }
-
-            private void SwitchClientCore(string identifier)
-            {
-                if (!TryGetFrontClientTty(out var tty))
-                {
-                    throw new InvalidOperationException("Front tmux client is not available.");
-                }
-
-                if (!_platformInfrastructure.TryRunWslCommand(
-                        "tmux",
-                        new[] { "switch-client", "-c", tty, "-t", identifier },
-                        out var output))
-                {
-                    var message = NormalizeProcessOutput(output);
-                    if (string.IsNullOrWhiteSpace(message))
-                    {
-                        message = "tmux switch-client failed.";
-                    }
-
-                    throw new InvalidOperationException(
-                        "Failed to switch front tmux client: " + message);
-                }
-            }
-
-            public bool HasClient()
-            {
-                lock (_lock)
-                {
-                    if (!TryGetFrontClientTty(out var tty))
-                    {
-                        return false;
-                    }
-
-                    if (!_platformInfrastructure.TryRunWslCommand(
-                            "tmux",
-                            new[] { "list-clients", "-F", "#{client_tty}" },
-                            out var output))
-                    {
-                        return false;
-                    }
-
-                    return SplitProcessOutputLines(output)
-                        .Any(clientTty => string.Equals(clientTty, tty, StringComparison.Ordinal));
-                }
-            }
-
-            private bool TryGetFrontClientTty(out string tty)
-            {
-                if (!_platformInfrastructure.TryRunWslCommand(
-                        "cat",
-                        new[] { _frontClientTtyMarkerPath },
-                        out var output))
-                {
-                    tty = string.Empty;
-                    return false;
-                }
-
-                tty = SplitProcessOutputLines(output).FirstOrDefault() ?? string.Empty;
-                return !string.IsNullOrWhiteSpace(tty);
             }
         }
 

@@ -22,20 +22,10 @@ namespace HaloCreek.Services
 
             var process = _platformInfrastructure.LaunchTerminal(new TerminalLaunchRequest(
                 startupCommand,
-                _frontWindowIdentity,
-                TerminalWindowMode.ReuseOrCreateNamedWindow));
+                _frontWindowIdentity));
             if (process is null)
             {
                 throw new InvalidOperationException("Failed to launch front terminal.");
-            }
-        }
-
-        public void ActivateFrontClient()
-        {
-            var process = _platformInfrastructure.ActivateTerminalWindow(_frontWindowIdentity);
-            if (process is null)
-            {
-                throw new InvalidOperationException("Failed to activate front terminal.");
             }
         }
     }
