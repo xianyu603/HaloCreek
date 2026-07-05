@@ -29,7 +29,7 @@ namespace HaloCreek.Services.SessionState
             var messages = new List<SessionMessage>();
             SessionTokenInfo? tokenInfo = null;
 
-            foreach (var line in File.ReadLines(sessionFilePath))
+            foreach (var line in PlatformInfrastructure.ReadTextFileLinesWithWriteSharing(sessionFilePath))
             {
                 if (string.IsNullOrWhiteSpace(line))
                 {
@@ -301,5 +301,6 @@ namespace HaloCreek.Services.SessionState
                 && property.ValueKind == JsonValueKind.Number
                 && property.TryGetInt64(out value);
         }
+
     }
 }

@@ -347,6 +347,30 @@ namespace HaloCreek.Infrastructure
             return tempPath;
         }
 
+        public static IEnumerable<string> ReadTextFileLinesWithWriteSharing(string filePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+            using var stream = OpenFileForReadWithWriteSharing(filePath);
+            using var reader = new StreamReader(stream);
+            string? line;
+            while ((line = reader.ReadLine()) is not null)
+            {
+                yield return line;
+            }
+        }
+
+        public static FileStream OpenFileForReadWithWriteSharing(string filePath)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+            return new FileStream(
+                filePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+        }
+
         public static PlatformProcessResult RunProcessWithCapturedOutput(
             string fileName,
             IEnumerable<string> arguments,
@@ -530,6 +554,24 @@ namespace HaloCreek.Infrastructure
                     "where.exe",
                     new[] { executableName })
                 .Succeeded;
+        }
+
+        public static bool TryRunWindowsCommand(
+            string executableName,
+            IEnumerable<string> arguments,
+            out string output)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            return TryRunWindowsProcess(executableName, arguments.ToArray(), out output);
+        }
+
+        public static string ConvertPathToWindows(string path)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+            return NormalizeExternalShellPath(path);
         }
 
         public static int StartProcess(
@@ -723,6 +765,42 @@ namespace HaloCreek.Infrastructure
             return true;
         }
 
+        public static bool TryGetCodexDirectoryPath(out string codexDirectoryPath)
+        {
+            codexDirectoryPath = string.Empty;
+
+            var configuredCodexHome = Environment.GetEnvironmentVariable("CODEX_HOME");
+            if (!string.IsNullOrWhiteSpace(configuredCodexHome))
+            {
+                try
+                {
+                    codexDirectoryPath = Path.GetFullPath(configuredCodexHome.Trim());
+                    return true;
+                }
+                catch (Exception ex) when (ex is ArgumentException
+                    or IOException
+                    or NotSupportedException
+                    or PathTooLongException
+                    or UnauthorizedAccessException)
+                {
+                    Log.Warning(
+                        LogCategory,
+                        $"CODEX_HOME could not be read. Path={configuredCodexHome}, Error={ex.Message}");
+                    return false;
+                }
+            }
+
+            var userProfilePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (string.IsNullOrWhiteSpace(userProfilePath))
+            {
+                Log.Warning(LogCategory, "Windows user profile directory could not be resolved.");
+                return false;
+            }
+
+            codexDirectoryPath = Path.Combine(userProfilePath, ".codex");
+            return true;
+        }
+
         public static bool TryConvertWslPathToReadablePath(string wslPath, out string readablePath)
         {
             readablePath = string.Empty;
@@ -803,7 +881,7 @@ namespace HaloCreek.Infrastructure
             var wslWorkspacePath = ConvertToWslPath(workspacePath);
             var shellCommand = BuildShellCommand(executableName, arguments);
 
-            return StartWindowsTerminal(null, wslWorkspacePath, shellCommand);
+            return StartWindowsTerminalWsl(null, wslWorkspacePath, shellCommand);
         }
 
         public string ConvertPathToWsl(string path)
@@ -848,19 +926,27 @@ namespace HaloCreek.Infrastructure
         {
             ArgumentNullException.ThrowIfNull(request);
             ArgumentNullException.ThrowIfNull(request.Command);
-            var command = MaterializeTerminalCommand(request.Command);
+
+            if (request.Command is TerminalWindowsCommandSpec windowsCommand)
+            {
+                return StartWindowsTerminal(
+                    request.WindowIdentity,
+                    ConvertPathToWindows(windowsCommand.WorkingDirectory),
+                    windowsCommand.Executable,
+                    windowsCommand.Arguments);
+            }
+
+            var command = MaterializeWslTerminalCommand(request.Command);
             ArgumentException.ThrowIfNullOrWhiteSpace(command.WorkingDirectory);
             ArgumentException.ThrowIfNullOrWhiteSpace(command.Executable);
 
-            var wslWorkspacePath = ConvertToWslPath(command.WorkingDirectory);
-            var shellCommand = BuildShellCommand(
-                command.Executable,
-                command.Arguments);
-
-            return StartWindowsTerminal(request.WindowIdentity, wslWorkspacePath, shellCommand);
+            return StartWindowsTerminalWsl(
+                request.WindowIdentity,
+                ConvertToWslPath(command.WorkingDirectory),
+                BuildShellCommand(command.Executable, command.Arguments));
         }
 
-        private static TerminalExecutableCommandSpec MaterializeTerminalCommand(TerminalCommandSpec command)
+        private static TerminalExecutableCommandSpec MaterializeWslTerminalCommand(TerminalCommandSpec command)
         {
             return command switch
             {
@@ -896,7 +982,7 @@ namespace HaloCreek.Infrastructure
                 new[] { ConvertToWslPath(scriptPath) });
         }
 
-        private static Process? StartWindowsTerminal(
+        private static Process? StartWindowsTerminalWsl(
             string? windowIdentity,
             string? wslWorkspacePath,
             string? shellCommand)
@@ -923,6 +1009,39 @@ namespace HaloCreek.Infrastructure
                 startInfo.ArgumentList.Add("bash");
                 startInfo.ArgumentList.Add("-ic");
                 startInfo.ArgumentList.Add(shellCommand);
+            }
+
+            return Process.Start(startInfo);
+        }
+
+        private static Process? StartWindowsTerminal(
+            string? windowIdentity,
+            string workingDirectory,
+            string executable,
+            IEnumerable<string> arguments)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
+            ArgumentException.ThrowIfNullOrWhiteSpace(executable);
+            ArgumentNullException.ThrowIfNull(arguments);
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "wt.exe",
+                UseShellExecute = false
+            };
+
+            if (!string.IsNullOrWhiteSpace(windowIdentity))
+            {
+                startInfo.ArgumentList.Add("--window");
+                startInfo.ArgumentList.Add(windowIdentity);
+            }
+
+            startInfo.ArgumentList.Add("--startingDirectory");
+            startInfo.ArgumentList.Add(workingDirectory);
+            startInfo.ArgumentList.Add(executable);
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
             }
 
             return Process.Start(startInfo);

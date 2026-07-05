@@ -157,7 +157,7 @@ namespace HaloCreek.Services.SessionHistory
             var lastReply = string.Empty;
             var foundSessionMeta = false;
 
-            foreach (var line in File.ReadLines(sessionFilePath))
+            foreach (var line in PlatformInfrastructure.ReadTextFileLinesWithWriteSharing(sessionFilePath))
             {
                 if (string.IsNullOrWhiteSpace(line))
                 {

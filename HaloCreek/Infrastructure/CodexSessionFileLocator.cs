@@ -11,7 +11,6 @@ namespace HaloCreek.Infrastructure
         private const string LogCategory = "CodexSessions";
         private const string JsonlSearchPattern = "*.jsonl";
         private const string SessionsDirectoryName = "sessions";
-        private const string CodexDirectoryName = ".codex";
         private const string HistoryFileName = "history.jsonl";
         private static readonly EnumerationOptions SessionFileEnumerationOptions = new()
         {
@@ -79,14 +78,13 @@ namespace HaloCreek.Infrastructure
 
         public static string? FindSessionRootPath()
         {
-            if (!PlatformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath))
+            if (!PlatformInfrastructure.TryGetCodexDirectoryPath(out var codexDirectoryPath))
             {
                 return null;
             }
 
             var sessionRootPath = Path.Combine(
-                homeDirectoryPath,
-                CodexDirectoryName,
+                codexDirectoryPath,
                 SessionsDirectoryName);
             if (!Directory.Exists(sessionRootPath))
             {
@@ -126,23 +124,19 @@ namespace HaloCreek.Infrastructure
 
         private static string? FindHistoryFilePath()
         {
-            if (!PlatformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath))
+            if (!PlatformInfrastructure.TryGetCodexDirectoryPath(out var codexDirectoryPath))
             {
                 return null;
             }
 
-            return Path.Combine(homeDirectoryPath, CodexDirectoryName, HistoryFileName);
+            return Path.Combine(codexDirectoryPath, HistoryFileName);
         }
 
         private static string[] ReadNewHistoryLines(CodexHistorySnapshot snapshot)
         {
             try
             {
-                using var stream = new FileStream(
-                    snapshot.FilePath!,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete);
+                using var stream = PlatformInfrastructure.OpenFileForReadWithWriteSharing(snapshot.FilePath!);
                 if (snapshot.Length > 0 && stream.Length >= snapshot.Length)
                 {
                     stream.Seek(snapshot.Length, SeekOrigin.Begin);

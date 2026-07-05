@@ -15,21 +15,21 @@ namespace HaloCreek.Services.Completions.Skills
         private const string SkillsDirectoryName = "skills";
         private const string SystemSkillsDirectoryName = ".system";
 
-        private readonly string? _homeDirectoryPath;
+        private readonly string? _codexDirectoryPath;
 
         public SkillCatalogReader()
             : this(
-                PlatformInfrastructure.TryGetReadableWslHomeDirectoryPath(out var homeDirectoryPath)
-                    ? homeDirectoryPath
+                PlatformInfrastructure.TryGetCodexDirectoryPath(out var codexDirectoryPath)
+                    ? codexDirectoryPath
                     : null)
         {
         }
 
-        internal SkillCatalogReader(string? homeDirectoryPath)
+        internal SkillCatalogReader(string? codexDirectoryPath)
         {
-            _homeDirectoryPath = string.IsNullOrWhiteSpace(homeDirectoryPath)
+            _codexDirectoryPath = string.IsNullOrWhiteSpace(codexDirectoryPath)
                 ? null
-                : homeDirectoryPath;
+                : codexDirectoryPath;
         }
 
         public IReadOnlyList<SkillCatalogSource> ReadCatalog()
@@ -213,15 +213,14 @@ namespace HaloCreek.Services.Completions.Skills
                     projectSkillsPath),
             };
 
-            if (_homeDirectoryPath is null)
+            if (_codexDirectoryPath is null)
             {
-                Log.Warning(LogCategory, "Home directory is unavailable; System and User skill sources are skipped.");
+                Log.Warning(LogCategory, "Codex directory is unavailable; System and User skill sources are skipped.");
                 return directories;
             }
 
             var userSkillsPath = Path.Combine(
-                _homeDirectoryPath,
-                CodexDirectoryName,
+                _codexDirectoryPath,
                 SkillsDirectoryName);
 
             directories.Add(new SkillSourceDirectory(

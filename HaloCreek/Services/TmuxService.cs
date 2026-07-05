@@ -13,20 +13,20 @@ namespace HaloCreek.Services
     {
         private static readonly TimeSpan CodexHistoryMatchTimeout = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
+        private const string PsmuxExecutableName = "psmux";
 
-        private readonly PlatformInfrastructure _platformInfrastructure;
         private readonly string _frontClientId;
         private readonly object _sessionOperationTasksLock = new();
         private readonly object _ownedSessionsLock = new();
         private readonly Dictionary<string, Task> _sessionOperationTasks = new(StringComparer.Ordinal);
         private readonly HashSet<string> _ownedSessionIds = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _sessionWorkspacePaths = new(StringComparer.Ordinal);
         private bool _isDisposed;
 
         public TmuxService(AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
 
-            _platformInfrastructure = appCommonRuntime.PlatformInfrastructure;
             _frontClientId = Guid.NewGuid().ToString("N")[..8];
         }
 
@@ -37,8 +37,8 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(request.ExecutableName);
             ArgumentNullException.ThrowIfNull(request.Arguments);
 
-            var wslWorkspacePath = _platformInfrastructure.ConvertPathToWsl(request.WorkspacePath);
-            var sessionIdentifier = CreateSessionIdentifier(wslWorkspacePath);
+            var windowsWorkspacePath = PlatformInfrastructure.ConvertPathToWindows(request.WorkspacePath);
+            var sessionIdentifier = CreateSessionIdentifier(windowsWorkspacePath);
             identifier = sessionIdentifier;
             var arguments = new[]
                 {
@@ -47,7 +47,7 @@ namespace HaloCreek.Services
                     "-s",
                     sessionIdentifier,
                     "-c",
-                    wslWorkspacePath,
+                    windowsWorkspacePath,
                     "--",
                     request.ExecutableName
                 }
@@ -59,14 +59,15 @@ namespace HaloCreek.Services
                 var historySnapshot = string.IsNullOrWhiteSpace(request.KnownCodexSessionId)
                     ? CodexSessionFileLocator.CaptureHistorySnapshot()
                     : null;
-                RunTmuxCommand(arguments, "launch tmux session");
+                RunMuxCommand(arguments, "launch psmux session");
                 lock (_ownedSessionsLock)
                 {
                     _ownedSessionIds.Add(sessionIdentifier);
+                    _sessionWorkspacePaths[sessionIdentifier] = windowsWorkspacePath;
                 }
 
-                TryRunTmuxCommand(new[] { "set-option", "-t", sessionIdentifier, "mouse", "on" }, out _);
-                SetSessionMetadata(sessionIdentifier, wslWorkspacePath, request.Title);
+                TryRunMuxCommand(new[] { "set-option", "-t", sessionIdentifier, "mouse", "on" }, out _);
+                SetSessionMetadata(sessionIdentifier, windowsWorkspacePath, request.Title);
 
                 var codexSessionId = !string.IsNullOrWhiteSpace(request.KnownCodexSessionId)
                     ? request.KnownCodexSessionId.Trim()
@@ -80,10 +81,11 @@ namespace HaloCreek.Services
             ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
             QueueSessionOperation(identifier, () =>
             {
-                TryRunTmuxCommand(new[] { "kill-session", "-t", identifier }, out _);
+                TryRunMuxCommand(new[] { "kill-session", "-t", identifier }, out _);
                 lock (_ownedSessionsLock)
                 {
                     _ownedSessionIds.Remove(identifier);
+                    _sessionWorkspacePaths.Remove(identifier);
                 }
             });
         }
@@ -93,19 +95,19 @@ namespace HaloCreek.Services
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(initialIdentifier);
 
-            var script = string.Join(
-                "\n",
-                "#!/usr/bin/env bash",
-                "set -e",
-                "exec " + _platformInfrastructure.BuildWslShellCommand(
-                    "tmux",
-                    new[] { "attach-session", "-t", initialIdentifier }),
-                string.Empty);
+            string workspacePath;
+            lock (_ownedSessionsLock)
+            {
+                if (!_sessionWorkspacePaths.TryGetValue(initialIdentifier, out workspacePath!))
+                {
+                    throw new InvalidOperationException("Session workspace is unavailable.");
+                }
+            }
 
-            return new TerminalWslScriptCommandSpec(
-                "/",
-                "halocreek-front-client-" + _frontClientId + "-" + initialIdentifier,
-                script);
+            return new TerminalWindowsCommandSpec(
+                workspacePath,
+                PsmuxExecutableName,
+                new[] { "attach-session", "-t", initialIdentifier });
         }
 
         public void SendMessageToSession(
@@ -142,16 +144,16 @@ namespace HaloCreek.Services
 
             foreach (var ownedSessionId in ownedSessionIds)
             {
-                TryRunTmuxCommand(new[] { "kill-session", "-t", ownedSessionId }, out _);
+                TryRunMuxCommand(new[] { "kill-session", "-t", ownedSessionId }, out _);
             }
         }
 
         private void SetSessionMetadata(
             string identifier,
-            string wslWorkspacePath,
+            string workspacePath,
             string title)
         {
-            TrySetSessionOption(identifier, "@halocreek.workspace", wslWorkspacePath);
+            TrySetSessionOption(identifier, "@halocreek.workspace", workspacePath);
             TrySetSessionOption(identifier, "@halocreek.startedAt", DateTimeOffset.Now.ToString("O"));
             if (!string.IsNullOrWhiteSpace(title))
             {
@@ -164,7 +166,7 @@ namespace HaloCreek.Services
             string optionName,
             string optionValue)
         {
-            TryRunTmuxCommand(
+            TryRunMuxCommand(
                 new[] { "set-option", "-q", "-t", identifier, optionName, optionValue },
                 out _);
         }
@@ -179,21 +181,21 @@ namespace HaloCreek.Services
                 + "-"
                 + Guid.NewGuid().ToString("N")[..8];
 
-            if (!TryRunTmuxCommand(
+            if (!TryRunMuxCommand(
                     new[] { "set-buffer", "-b", bufferName, message },
                     out _))
             {
                 return;
             }
 
-            if (!TryRunTmuxCommand(
+            if (!TryRunMuxCommand(
                     new[] { "paste-buffer", "-d", "-b", bufferName, "-t", targetPane },
                     out _))
             {
                 return;
             }
 
-            if (!TryRunTmuxCommand(
+            if (!TryRunMuxCommand(
                     new[] { "send-keys", "-t", targetPane, "Enter" },
                     out _))
             {
@@ -304,15 +306,15 @@ namespace HaloCreek.Services
             }
             catch (AggregateException)
             {
-                // Tmux cleanup is best effort; callers continue after observing task failures.
+                // Mux cleanup is best effort; callers continue after observing task failures.
             }
         }
 
-        private void RunTmuxCommand(
+        private void RunMuxCommand(
             IReadOnlyList<string> arguments,
             string operationName)
         {
-            if (TryRunTmuxCommand(arguments, out var output))
+            if (TryRunMuxCommand(arguments, out var output))
             {
                 return;
             }
@@ -320,23 +322,23 @@ namespace HaloCreek.Services
             var message = NormalizeProcessOutput(output);
             if (string.IsNullOrWhiteSpace(message))
             {
-                message = "tmux command failed.";
+                message = "psmux command failed.";
             }
 
             throw new InvalidOperationException(
                 "Failed to " + operationName + ": " + message);
         }
 
-        private bool TryRunTmuxCommand(
+        private static bool TryRunMuxCommand(
             IReadOnlyList<string> arguments,
             out string output)
         {
-            return _platformInfrastructure.TryRunWslCommand("tmux", arguments, out output);
+            return PlatformInfrastructure.TryRunWindowsCommand(PsmuxExecutableName, arguments, out output);
         }
 
-        private static string CreateSessionIdentifier(string wslWorkspacePath)
+        private static string CreateSessionIdentifier(string workspacePath)
         {
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(wslWorkspacePath.Trim()));
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(workspacePath.Trim()));
             var workspaceHash = Convert.ToHexString(hash)[..12].ToLowerInvariant();
             var shortId = Guid.NewGuid().ToString("N")[..8];
             return "halocreek-" + workspaceHash + "-" + shortId;
