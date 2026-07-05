@@ -8,6 +8,7 @@ namespace HaloCreek.Services.SessionState
     public sealed record SessionStateSnapshot(
         SessionTaskState State,
         DateTimeOffset? StateTimestamp,
+        DateTimeOffset? LastActiveTime,
         IReadOnlyList<SessionMessage> Messages,
         SessionTokenInfo? TokenInfo)
         : IKeyedWorkspaceSnapshot<SessionStateSnapshot>
@@ -18,6 +19,7 @@ namespace HaloCreek.Services.SessionState
         {
             return new SessionStateSnapshot(
                 SessionTaskState.Unknown,
+                null,
                 null,
                 Array.Empty<SessionMessage>(),
                 null);
@@ -40,6 +42,7 @@ namespace HaloCreek.Services.SessionState
         {
             return left.State == right.State
                 && left.StateTimestamp == right.StateTimestamp
+                && left.LastActiveTime == right.LastActiveTime
                 && Equals(left.TokenInfo, right.TokenInfo)
                 && left.Messages.SequenceEqual(right.Messages);
         }

@@ -23,6 +23,7 @@ namespace HaloCreek.Services.SessionState
 
         private static SessionStateSnapshot ReadSessionFile(string sessionFilePath)
         {
+            var lastActiveTime = new DateTimeOffset(File.GetLastWriteTimeUtc(sessionFilePath));
             var state = SessionTaskState.Unknown;
             DateTimeOffset? stateTimestamp = null;
             var messages = new List<SessionMessage>();
@@ -68,6 +69,7 @@ namespace HaloCreek.Services.SessionState
             return new SessionStateSnapshot(
                 state,
                 stateTimestamp,
+                lastActiveTime,
                 messages,
                 tokenInfo)
             {
