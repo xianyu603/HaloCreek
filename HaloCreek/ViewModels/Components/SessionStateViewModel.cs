@@ -1,74 +1,115 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Avalonia.Media;
 using HaloCreek.Models;
 using HaloCreek.Services.SessionState;
 
 namespace HaloCreek.ViewModels.Components
 {
-    public sealed class SessionStateViewModel
+    public sealed class SessionStateViewModel : ViewModelBase
     {
-        private SessionStateViewModel(
-            string title,
-            string activityText,
-            SessionStateSnapshot snapshot,
-            IReadOnlyList<SessionStateMessageViewModel> messages)
+        private string _title = string.Empty;
+        private string _activityText = string.Empty;
+        private string _stateText = string.Empty;
+        private string _stateTimestampText = string.Empty;
+        private string _tokenSummaryText = string.Empty;
+
+        private SessionStateViewModel()
         {
-            Title = title;
-            ActivityText = activityText;
-            StateText = FormatState(snapshot.State);
-            StateTimestampText = snapshot.StateTimestamp is null
-                ? "No state timestamp"
-                : $"Updated {snapshot.StateTimestamp.Value.ToLocalTime():HH:mm:ss}";
-            TokenSummaryText = FormatTokenSummary(snapshot.TokenInfo);
-            Messages = messages;
         }
 
-        public string Title { get; }
+        public string Title => _title;
 
-        public string ActivityText { get; }
+        public string ActivityText => _activityText;
 
-        public string StateText { get; }
+        public string StateText => _stateText;
 
-        public string StateTimestampText { get; }
+        public string StateTimestampText => _stateTimestampText;
 
-        public string TokenSummaryText { get; }
+        public string TokenSummaryText => _tokenSummaryText;
 
-        public IReadOnlyList<SessionStateMessageViewModel> Messages { get; }
+        public ObservableCollection<SessionStateMessageViewModel> Messages { get; } = [];
 
         public static SessionStateViewModel CreateEmpty()
         {
-            return new SessionStateViewModel(
+            var viewModel = new SessionStateViewModel();
+            viewModel.UpdateEmpty();
+            return viewModel;
+        }
+
+        public void UpdateEmpty()
+        {
+            Update(
                 "No front session",
                 "No session",
                 SessionStateSnapshot.CreateEmpty(),
-                Array.Empty<SessionStateMessageViewModel>());
+                Array.Empty<SessionMessage>());
         }
 
-        public static SessionStateViewModel FromSnapshot(
+        public void UpdateFromSnapshot(
             OngoingSessionInfo session,
             SessionStateSnapshot snapshot)
         {
             ArgumentNullException.ThrowIfNull(session);
             ArgumentNullException.ThrowIfNull(snapshot);
 
-            return new SessionStateViewModel(
+            Update(
                 string.IsNullOrWhiteSpace(session.Title) ? "Front session" : session.Title,
                 FormatActivity(snapshot.LastActiveTime),
                 snapshot,
-                ConvertMessages(snapshot.Messages));
+                snapshot.Messages);
         }
 
-        private static IReadOnlyList<SessionStateMessageViewModel> ConvertMessages(
+        private void Update(
+            string title,
+            string activityText,
+            SessionStateSnapshot snapshot,
             IReadOnlyList<SessionMessage> messages)
         {
-            var convertedMessages = new SessionStateMessageViewModel[messages.Count];
-            for (var index = 0; index < messages.Count; index++)
+            SetProperty(ref _title, title, nameof(Title));
+            SetProperty(ref _activityText, activityText, nameof(ActivityText));
+            SetProperty(ref _stateText, FormatState(snapshot.State), nameof(StateText));
+            SetProperty(
+                ref _stateTimestampText,
+                snapshot.StateTimestamp is null
+                    ? "No state timestamp"
+                    : $"Updated {snapshot.StateTimestamp.Value.ToLocalTime():HH:mm:ss}",
+                nameof(StateTimestampText));
+            SetProperty(ref _tokenSummaryText, FormatTokenSummary(snapshot.TokenInfo), nameof(TokenSummaryText));
+            UpdateMessages(messages);
+        }
+
+        private void UpdateMessages(IReadOnlyList<SessionMessage> messages)
+        {
+            var commonCount = Math.Min(Messages.Count, messages.Count);
+            for (var index = 0; index < commonCount; index++)
             {
-                convertedMessages[index] = new SessionStateMessageViewModel(messages[index]);
+                if (!Equals(Messages[index].Source, messages[index]))
+                {
+                    ReplaceMessages(messages);
+                    return;
+                }
             }
 
-            return convertedMessages;
+            while (Messages.Count > messages.Count)
+            {
+                Messages.RemoveAt(Messages.Count - 1);
+            }
+
+            for (var index = Messages.Count; index < messages.Count; index++)
+            {
+                Messages.Add(new SessionStateMessageViewModel(messages[index]));
+            }
+        }
+
+        private void ReplaceMessages(IReadOnlyList<SessionMessage> messages)
+        {
+            Messages.Clear();
+            for (var index = 0; index < messages.Count; index++)
+            {
+                Messages.Add(new SessionStateMessageViewModel(messages[index]));
+            }
         }
 
         private static string FormatState(SessionTaskState state)
@@ -94,7 +135,6 @@ namespace HaloCreek.ViewModels.Components
 
         private static string FormatTokenSummary(SessionTokenInfo? tokenInfo)
         {
-            // TODO 这里需要改成precentage total XX, context XX% usaged(拿last/context算)
             if (tokenInfo is null)
             {
                 return "Token usage unavailable";
@@ -121,6 +161,7 @@ namespace HaloCreek.ViewModels.Components
 
         public SessionStateMessageViewModel(SessionMessage message)
         {
+            Source = message;
             SenderText = message.Sender switch
             {
                 SessionMessageSender.User => "User",
@@ -139,6 +180,8 @@ namespace HaloCreek.ViewModels.Components
             BackgroundBrush = message.Sender == SessionMessageSender.User ? UserBackground : AgentBackground;
             BorderBrush = message.Sender == SessionMessageSender.User ? UserBorder : AgentBorder;
         }
+
+        internal SessionMessage Source { get; }
 
         public string SenderText { get; }
 

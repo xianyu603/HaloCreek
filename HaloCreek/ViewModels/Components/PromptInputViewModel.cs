@@ -640,11 +640,11 @@ namespace HaloCreek.ViewModels.Components
         {
             if (_frontSession is null)
             {
-                FrontSessionState = SessionStateViewModel.CreateEmpty();
+                FrontSessionState.UpdateEmpty();
                 return;
             }
 
-            FrontSessionState = SessionStateViewModel.FromSnapshot(
+            FrontSessionState.UpdateFromSnapshot(
                 _frontSession,
                 _frontSession.StateSnapshots?.Current ?? SessionStateSnapshot.CreateEmpty());
         }

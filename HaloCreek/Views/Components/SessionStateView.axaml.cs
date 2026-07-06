@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Specialized;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
+using HaloCreek.ViewModels.Components;
 using LiveMarkdown.Avalonia;
 
 namespace HaloCreek.Views.Components
@@ -11,12 +14,31 @@ namespace HaloCreek.Views.Components
     public partial class SessionStateView : UserControl
     {
         private const string LogCategory = "SessionStateView";
+        private INotifyCollectionChanged? _messagesCollection;
+        private bool _scrollToEndQueued;
 
         public ICommand OpenMarkdownLinkCommand { get; } = new MarkdownLinkCommand();
 
         public SessionStateView()
         {
             InitializeComponent();
+        }
+
+        protected override void OnDataContextChanged(EventArgs e)
+        {
+            base.OnDataContextChanged(e);
+
+            if (_messagesCollection is not null)
+            {
+                _messagesCollection.CollectionChanged -= Messages_CollectionChanged;
+            }
+
+            _messagesCollection = (DataContext as SessionStateViewModel)?.Messages;
+            if (_messagesCollection is not null)
+            {
+                _messagesCollection.CollectionChanged += Messages_CollectionChanged;
+                QueueScrollToEnd();
+            }
         }
 
         private void MessagesScrollViewer_SizeChanged(object? sender, SizeChangedEventArgs e)
@@ -26,6 +48,33 @@ namespace HaloCreek.Views.Components
                 - MessagesScrollViewer.Padding.Right;
 
             MessagesItemsControl.Width = Math.Max(0, contentWidth);
+        }
+
+        private void Messages_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action is NotifyCollectionChangedAction.Add
+                or NotifyCollectionChangedAction.Replace
+                or NotifyCollectionChangedAction.Reset)
+            {
+                QueueScrollToEnd();
+            }
+        }
+
+        private void QueueScrollToEnd()
+        {
+            if (_scrollToEndQueued)
+            {
+                return;
+            }
+
+            _scrollToEndQueued = true;
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    _scrollToEndQueued = false;
+                    MessagesScrollViewer.ScrollToEnd();
+                },
+                DispatcherPriority.Loaded);
         }
 
         private void MarkdownRenderer_AttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
