@@ -262,7 +262,7 @@ namespace HaloCreek.Services
             SessionsChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        public void SendMessageToFrontSession(string message)
+        public async Task SendMessageToFrontSessionAsync(string message)
         {
             RequireUiThread();
             ArgumentNullException.ThrowIfNull(message);
@@ -286,7 +286,14 @@ namespace HaloCreek.Services
                 return;
             }
 
-            _tmuxService.SendMessageToSession(frontSessionId, message);
+            try
+            {
+                await _tmuxService.SendMessageToSessionAsync(frontSessionId, message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                ReportFrontSessionFailure("Send to front failed", ex.Message, ex);
+            }
         }
 
         public void Exit(string sessionId)
@@ -325,12 +332,16 @@ namespace HaloCreek.Services
             return false;
         }
 
-        private void ReportFrontSessionFailure(string title, string message)
+        private void ReportFrontSessionFailure(
+            string title,
+            string message,
+            Exception? exception = null)
         {
             _transientEventService.ReportUserActionFailure(
                 "SessionLifecycle",
                 title,
-                message);
+                message,
+                exception);
         }
 
         private WorkspaceSnapshotStore<SessionStateSnapshot> CreateSessionStateStore(

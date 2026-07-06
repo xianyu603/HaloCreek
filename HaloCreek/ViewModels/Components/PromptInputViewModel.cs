@@ -56,7 +56,7 @@ namespace HaloCreek.ViewModels.Components
                 historySnapshots);
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
-            SendToFrontCommand = new RelayCommand(SendToFront, CanSendToFront);
+            SendToFrontCommand = new AsyncRelayCommand(SendToFrontAsync, CanSendToFront);
 
             _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
             RefreshFrontSessionState();
@@ -135,7 +135,7 @@ namespace HaloCreek.ViewModels.Components
 
         public IAsyncRelayCommand LaunchCommand { get; }
 
-        public IRelayCommand SendToFrontCommand { get; }
+        public IAsyncRelayCommand SendToFrontCommand { get; }
 
         // 在真正干活之前触发 消息处理抛异常会导致发送失败 不过目前风险可控
         public event EventHandler? PromptSubmitted;
@@ -558,10 +558,10 @@ namespace HaloCreek.ViewModels.Components
             }
         }
 
-        private void SendToFront()
+        private async Task SendToFrontAsync()
         {
             PromptSubmitted?.Invoke(this, EventArgs.Empty);
-            _sessionLifecycleService.SendMessageToFrontSession(PromptText);
+            await _sessionLifecycleService.SendMessageToFrontSessionAsync(PromptText);
         }
 
         private bool HasPromptText()

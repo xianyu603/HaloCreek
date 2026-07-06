@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using HaloCreek.Infrastructure;
+using HaloCreek.Logging;
 
 namespace HaloCreek.Services
 {
@@ -14,10 +15,11 @@ namespace HaloCreek.Services
     {
         private static readonly TimeSpan CodexHistoryMatchTimeout = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
+        private const string LogCategory = "Tmux";
         private const string PsmuxExecutableName = "psmux";
         private const string PsmuxAttachScriptRelativePath = @"scripts\psmux_attach.bat";
+        private const int SendKeysChunkLength = 4000;
 
-        private readonly string _frontClientId;
         private readonly object _sessionOperationTasksLock = new();
         private readonly object _ownedSessionsLock = new();
         private readonly Dictionary<string, Task> _sessionOperationTasks = new(StringComparer.Ordinal);
@@ -28,8 +30,6 @@ namespace HaloCreek.Services
         public TmuxService(AppCommonRuntime appCommonRuntime)
         {
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
-
-            _frontClientId = Guid.NewGuid().ToString("N")[..8];
         }
 
         public Task<TmuxLaunchResult> LaunchAsync(TmuxLaunchRequest request, out string identifier)
@@ -122,7 +122,7 @@ namespace HaloCreek.Services
                 new[] { "/d", "/c", "call", attachScriptPath, "-t", initialIdentifier });
         }
 
-        public void SendMessageToSession(
+        public Task SendMessageToSessionAsync(
             string identifier,
             string message)
         {
@@ -131,10 +131,10 @@ namespace HaloCreek.Services
 
             if (string.IsNullOrWhiteSpace(message))
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            QueueSessionOperation(identifier, () =>
+            return QueueSessionOperation(identifier, () =>
                 SendMessageToSessionCore(identifier, message));
         }
 
@@ -188,31 +188,22 @@ namespace HaloCreek.Services
             string message)
         {
             var targetPane = identifier + ":0.0";
-            var bufferName = "halocreek-send-"
-                + _frontClientId
-                + "-"
-                + Guid.NewGuid().ToString("N")[..8];
 
-            if (!TryRunMuxCommand(
-                    new[] { "set-buffer", "-b", bufferName, message },
-                    out _))
+            for (var offset = 0; offset < message.Length; offset += SendKeysChunkLength)
             {
-                return;
+                var chunkLength = Math.Min(SendKeysChunkLength, message.Length - offset);
+                RunMuxCommand(
+                    new[] { "send-keys", "-l", "-t", targetPane, message.Substring(offset, chunkLength) },
+                    "send literal keys to psmux session");
             }
 
-            if (!TryRunMuxCommand(
-                    new[] { "paste-buffer", "-d", "-b", bufferName, "-t", targetPane },
-                    out _))
-            {
-                return;
-            }
+            RunMuxCommand(
+                new[] { "send-keys", "-t", targetPane, "Enter" },
+                "send enter key to psmux session");
 
-            if (!TryRunMuxCommand(
-                    new[] { "send-keys", "-t", targetPane, "Enter" },
-                    out _))
-            {
-                return;
-            }
+            Log.Info(
+                LogCategory,
+                $"Sent message to psmux session with send-keys. Session={identifier}, Length={message.Length}");
         }
 
         private Task QueueSessionOperation(string identifier, Action operation)
