@@ -17,7 +17,7 @@ namespace HaloCreek.Models
 
         private string FormatActivity()
         {
-            return SessionStateSnapshot.IsActive(StateSnapshots?.Current.LastActiveTime) switch
+            return StateSnapshots?.Current.Active switch
             {
                 true => "Active",
                 false => "Idle",

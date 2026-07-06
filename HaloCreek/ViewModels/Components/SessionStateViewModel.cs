@@ -56,7 +56,7 @@ namespace HaloCreek.ViewModels.Components
 
             Update(
                 string.IsNullOrWhiteSpace(session.Title) ? "Front session" : session.Title,
-                FormatActivity(snapshot.LastActiveTime),
+                FormatActivity(snapshot.Active),
                 snapshot,
                 snapshot.Messages);
         }
@@ -123,9 +123,9 @@ namespace HaloCreek.ViewModels.Components
             };
         }
 
-        private static string FormatActivity(DateTimeOffset? lastActiveTime)
+        private static string FormatActivity(bool? active)
         {
-            return SessionStateSnapshot.IsActive(lastActiveTime) switch
+            return active switch
             {
                 true => "Active",
                 false => "Idle",

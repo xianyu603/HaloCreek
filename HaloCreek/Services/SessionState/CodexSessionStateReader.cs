@@ -70,11 +70,23 @@ namespace HaloCreek.Services.SessionState
                 state,
                 stateTimestamp,
                 lastActiveTime,
+                CalculateActive(lastActiveTime),
                 messages,
-                tokenInfo)
+                tokenInfo) with
             {
                 SnapshotListenPath = sessionFilePath,
             };
+        }
+
+        private static bool? CalculateActive(DateTimeOffset? lastActiveTime)
+        {
+            if (lastActiveTime is null)
+            {
+                return null;
+            }
+
+            return DateTimeOffset.UtcNow - lastActiveTime.Value.ToUniversalTime()
+                < SessionStateSnapshot.ActiveThreshold;
         }
 
         private static bool TryReadMessage(
