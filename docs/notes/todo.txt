@@ -23,3 +23,4 @@ $补全卡顿问题 考虑新增一个workspaceskillsnapshot
 wsl内文件监听暂时关闭, 后续如果能迁移到windows内的codex cli再考虑接回来
 多session 最大化有bug
 send msg不稳定
+idle 探测不稳定
