@@ -93,6 +93,12 @@ namespace HaloCreek
             var sessionLifecycleService = new SessionLifecycleService(
                 tmuxService,
                 appCommonRuntime);
+            var userNotificationPlatform = new UserNotificationPlatform(mainWindow);
+            var applicationWindowFocusTracker = new ApplicationWindowFocusTracker(mainWindow);
+            var appNotificationPublisher = new AppNotificationPublisher(
+                sessionLifecycleService,
+                userNotificationPlatform,
+                () => applicationWindowFocusTracker.HasFocus);
             var gitService = new GitService();
             var workspacePathIndexSnapshots =
                 WorkspaceSnapshotStore.Create<WorkspacePathIndexSnapshot>();
@@ -170,7 +176,9 @@ namespace HaloCreek
                 reviewIndexSnapshots,
                 reviewIndexKeeper,
                 floatingPromptService,
-                globalHotkeyRegistrar);
+                globalHotkeyRegistrar,
+                appNotificationPublisher,
+                applicationWindowFocusTracker);
         }
 
         // 统一收口应用级对象的退出释放。当前这里同时承载少量对象组装职责，
@@ -191,6 +199,8 @@ namespace HaloCreek
             private readonly ReviewIndexKeeper _reviewIndexKeeper;
             private readonly FloatingPromptService _floatingPromptService;
             private readonly GlobalHotkeyRegistrar _globalHotkeyRegistrar;
+            private readonly AppNotificationPublisher _appNotificationPublisher;
+            private readonly ApplicationWindowFocusTracker _applicationWindowFocusTracker;
             private bool _isDisposed;
 
             public AppDisposeScope(
@@ -208,7 +218,9 @@ namespace HaloCreek
                 WorkspaceSnapshotStore<ReviewIndexSnapshot> reviewIndexSnapshots,
                 ReviewIndexKeeper reviewIndexKeeper,
                 FloatingPromptService floatingPromptService,
-                GlobalHotkeyRegistrar globalHotkeyRegistrar)
+                GlobalHotkeyRegistrar globalHotkeyRegistrar,
+                AppNotificationPublisher appNotificationPublisher,
+                ApplicationWindowFocusTracker applicationWindowFocusTracker)
             {
                 MainWindowViewModel = mainWindowViewModel;
                 _promptEditor = promptEditor ?? throw new ArgumentNullException(nameof(promptEditor));
@@ -233,6 +245,10 @@ namespace HaloCreek
                     ?? throw new ArgumentNullException(nameof(floatingPromptService));
                 _globalHotkeyRegistrar = globalHotkeyRegistrar
                     ?? throw new ArgumentNullException(nameof(globalHotkeyRegistrar));
+                _appNotificationPublisher = appNotificationPublisher
+                    ?? throw new ArgumentNullException(nameof(appNotificationPublisher));
+                _applicationWindowFocusTracker = applicationWindowFocusTracker
+                    ?? throw new ArgumentNullException(nameof(applicationWindowFocusTracker));
             }
 
             public MainWindowViewModel MainWindowViewModel { get; }
@@ -253,6 +269,8 @@ namespace HaloCreek
                 _reviewIndexKeeper.Dispose();
                 _historySessions.Dispose();
                 _logs.Dispose();
+                _appNotificationPublisher.Dispose();
+                _applicationWindowFocusTracker.Dispose();
                 _reviewIndexSnapshots.Dispose();
                 _gitSnapshots.Dispose();
                 _workspacePathIndexSnapshots.Dispose();
