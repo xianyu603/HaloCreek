@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,6 +15,7 @@ namespace HaloCreek.Services
         private static readonly TimeSpan CodexHistoryMatchTimeout = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
         private const string PsmuxExecutableName = "psmux";
+        private const string PsmuxAttachScriptRelativePath = @"scripts\psmux_attach.bat";
 
         private readonly string _frontClientId;
         private readonly object _sessionOperationTasksLock = new();
@@ -104,10 +106,20 @@ namespace HaloCreek.Services
                 }
             }
 
+            var attachScriptPath = Path.Combine(
+                AppContext.BaseDirectory,
+                PsmuxAttachScriptRelativePath);
+            if (!File.Exists(attachScriptPath))
+            {
+                throw new FileNotFoundException(
+                    "psmux attach script is missing from app output.",
+                    attachScriptPath);
+            }
+
             return new TerminalWindowsCommandSpec(
                 workspacePath,
-                PsmuxExecutableName,
-                new[] { "attach-session", "-t", initialIdentifier });
+                "cmd.exe",
+                new[] { "/d", "/c", "call", attachScriptPath, "-t", initialIdentifier });
         }
 
         public void SendMessageToSession(
