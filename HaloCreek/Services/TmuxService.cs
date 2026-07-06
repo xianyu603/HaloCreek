@@ -15,6 +15,7 @@ namespace HaloCreek.Services
     {
         private static readonly TimeSpan CodexHistoryMatchTimeout = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
+        private static readonly TimeSpan SendKeysEnterDelay = TimeSpan.FromMilliseconds(100);
         private const string LogCategory = "Tmux";
         private const string PsmuxExecutableName = "psmux";
         private const string PsmuxAttachScriptRelativePath = @"scripts\psmux_attach.bat";
@@ -196,6 +197,8 @@ namespace HaloCreek.Services
                     new[] { "send-keys", "-l", "-t", targetPane, message.Substring(offset, chunkLength) },
                     "send literal keys to psmux session");
             }
+
+            Thread.Sleep(SendKeysEnterDelay); // 立刻enter会被吞 可能是codex cli自己的死区
 
             RunMuxCommand(
                 new[] { "send-keys", "-t", targetPane, "Enter" },
