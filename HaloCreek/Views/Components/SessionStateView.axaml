@@ -58,66 +58,69 @@
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
                               Padding="16,10,20,0">
-                    <ItemsControl x:Name="MessagesItemsControl"
-                                  ItemsSource="{Binding Messages}"
-                                  HorizontalAlignment="Stretch">
-                        <ItemsControl.Styles>
-                            <Style Selector="ContentPresenter">
-                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
-                                <Setter Property="MinWidth" Value="0"/>
-                            </Style>
-                        </ItemsControl.Styles>
-                        <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="vm:SessionStateMessageViewModel">
-                            <Border Background="{Binding BackgroundBrush}"
-                                    BorderBrush="{Binding BorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="6"
-                                    Padding="10,9"
-                                    Margin="0,0,0,10"
-                                    MinWidth="0"
-                                    HorizontalAlignment="Stretch">
-                                <Grid RowDefinitions="Auto,Auto"
-                                      MinWidth="0"
-                                      RowSpacing="6">
-                                    <Grid ColumnDefinitions="4,*,Auto"
+                    <StackPanel>
+                        <ItemsControl x:Name="MessagesItemsControl"
+                                      ItemsSource="{Binding Messages}"
+                                      HorizontalAlignment="Stretch">
+                            <ItemsControl.Styles>
+                                <Style Selector="ContentPresenter">
+                                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                    <Setter Property="MinWidth" Value="0"/>
+                                </Style>
+                            </ItemsControl.Styles>
+                            <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:SessionStateMessageViewModel">
+                                <Border Background="{Binding BackgroundBrush}"
+                                        BorderBrush="{Binding BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="10,9"
+                                        Margin="0,0,0,10"
+                                        MinWidth="0"
+                                        HorizontalAlignment="Stretch">
+                                    <Grid RowDefinitions="Auto,Auto"
                                           MinWidth="0"
-                                          ColumnSpacing="8">
-                                        <Border Background="{Binding AccentBrush}"
-                                                CornerRadius="2"
-                                                Margin="0,2,0,2"/>
-                                        <StackPanel Grid.Column="1"
-                                                    MinWidth="0"
-                                                    Orientation="Horizontal"
-                                                    Spacing="7">
-                                            <TextBlock Text="{Binding SenderText}"
-                                                       Foreground="#0F172A"
-                                                       FontSize="12"
-                                                       FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding PhaseText}"
+                                          RowSpacing="6">
+                                        <Grid ColumnDefinitions="4,*,Auto"
+                                              MinWidth="0"
+                                              ColumnSpacing="8">
+                                            <Border Background="{Binding AccentBrush}"
+                                                    CornerRadius="2"
+                                                    Margin="0,2,0,2"/>
+                                            <StackPanel Grid.Column="1"
+                                                        MinWidth="0"
+                                                        Orientation="Horizontal"
+                                                        Spacing="7">
+                                                <TextBlock Text="{Binding SenderText}"
+                                                           Foreground="#0F172A"
+                                                           FontSize="12"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding PhaseText}"
+                                                           Foreground="#64748B"
+                                                           FontSize="12"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding TimestampText}"
                                                        Foreground="#64748B"
                                                        FontSize="12"
                                                        TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="2"
-                                                   Text="{Binding TimestampText}"
-                                                   Foreground="#64748B"
-                                                   FontSize="12"
-                                                   TextTrimming="CharacterEllipsis"/>
+                                        </Grid>
+                                        <md:MarkdownRenderer Grid.Row="1"
+                                                             MarkdownBuilder="{Binding Message, Converter={x:Static md:ValueConverters.ToObservableStringBuilder}}"
+                                                             LinkCommand="{Binding OpenMarkdownLinkCommand, RelativeSource={RelativeSource AncestorType=views:SessionStateView}}"
+                                                             CodeBlockColorTheme="LightPlus"
+                                                             AttachedToVisualTree="MarkdownRenderer_AttachedToVisualTree"
+                                                             MinWidth="0"
+                                                             HorizontalAlignment="Stretch"/>
                                     </Grid>
-                                    <md:MarkdownRenderer Grid.Row="1"
-                                                         MarkdownBuilder="{Binding Message, Converter={x:Static md:ValueConverters.ToObservableStringBuilder}}"
-                                                         LinkCommand="{Binding OpenMarkdownLinkCommand, RelativeSource={RelativeSource AncestorType=views:SessionStateView}}"
-                                                         CodeBlockColorTheme="LightPlus"
-                                                         AttachedToVisualTree="MarkdownRenderer_AttachedToVisualTree"
-                                                         MinWidth="0"
-                                                         HorizontalAlignment="Stretch"/>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                                </Border>
+                            </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Height="16"/>
+                    </StackPanel>
                 </ScrollViewer>
             </Border>
 
