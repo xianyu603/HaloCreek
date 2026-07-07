@@ -189,12 +189,16 @@ namespace HaloCreek.Services
             string message)
         {
             var targetPane = identifier + ":0.0";
-
+            var normalizedMsg = message.Replace("\r\n", "\r").Replace('\n', '\r');
+            /*
+             psmux literal send truncates at LF in this path; 
+             CR reaches Codex as Enter and is handled by Codex paste-burst as multiline paste.
+            */
             for (var offset = 0; offset < message.Length; offset += SendKeysChunkLength)
             {
                 var chunkLength = Math.Min(SendKeysChunkLength, message.Length - offset);
                 RunMuxCommand(
-                    new[] { "send-keys", "-l", "-t", targetPane, message.Substring(offset, chunkLength) },
+                    new[] { "send-keys", "-l", "-t", targetPane, normalizedMsg },
                     "send literal keys to psmux session");
             }
 

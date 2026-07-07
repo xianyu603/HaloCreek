@@ -1,0 +1,9 @@
+psmux list-sessions
+$target = 'halocreek-ab4779add7b8-f68b2f1c'
+$msg = "第一行`n第二行`n第三行"
+psmux send-keys -l -t $target $msg
+psmux send-keys -t $target S-Enter
+psmux send-keys -l -t $target '一行'
+psmux send-keys -t $target enter
+psmux send-keys -l -t $target '两行'
+$msg = " ESC [ 200 ~`r第一行`r第二行`r第三行`rESC [ 201 ~"

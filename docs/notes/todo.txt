@@ -19,3 +19,4 @@ view边框的问题, history尤其明显, 四个角感觉被啃了
 截图自动化迭代的skill
 考虑给tmux添加alive 判别 tmux display-message -p -t '<session>:0.0' '#{pane_dead} #{pane_pid} #{pane_current_command}'
 $补全卡顿问题 考虑新增一个workspaceskillsnapshot
+输入框补全 在底下位置不够的时候(考虑以过半为判据), 挪到最顶上
