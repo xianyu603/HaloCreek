@@ -6,20 +6,25 @@ using HaloCreek.Services.SessionState;
 using HaloCreek.Services.WorkspaceSnapshots;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace HaloCreek.Services
 {
-    public sealed class SessionLifecycleService : IDisposable
+    public sealed class SessionLifecycleService : IDisposable, INotifyPropertyChanged
     {
         private const string LogCategory = "SessionState";
 
         // 正确性前提是所有共享状态的直接操作都来自同一个 UI 线程。
         private readonly Dictionary<string, OngoingSessionInfo> _sessionsById = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, OngoingSession> _observableSessionsById = new(StringComparer.Ordinal);
+        private readonly ObservableCollection<OngoingSession> _allSessions = [];
         private readonly Dictionary<string, WorkspaceSnapshotStore<SessionStateSnapshot>> _sessionStateStoresById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
         private readonly TransientEventService _transientEventService;
+        private OngoingSession? _frontSession;
         private string? _frontSessionId;
         private bool _isDisposed;
 
@@ -30,9 +35,23 @@ namespace HaloCreek.Services
             _tmuxService = tmuxService ?? throw new ArgumentNullException(nameof(tmuxService));
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
             _transientEventService = appCommonRuntime.TransientEventService;
+            AllSessions = new ReadOnlyObservableCollection<OngoingSession>(_allSessions);
         }
 
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         public event EventHandler<SessionLifecycleChangedEventArgs>? SessionsChanged;
+
+        public OngoingSession? FrontSession
+        {
+            get
+            {
+                RequireUiThread();
+                return _frontSession;
+            }
+        }
+
+        public ReadOnlyObservableCollection<OngoingSession> AllSessions { get; }
 
         public bool HasFrontSession
         {
@@ -81,7 +100,10 @@ namespace HaloCreek.Services
 
             DisposeSessionStateStores();
             _sessionsById.Clear();
+            _observableSessionsById.Clear();
+            _allSessions.Clear();
             _frontSessionId = null;
+            SetFrontSession(null);
         }
 
         public Task<OngoingSessionInfo> LaunchAsync(string promptText)
@@ -172,6 +194,14 @@ namespace HaloCreek.Services
                 IsInteractive: false);
 
             _sessionsById.Add(identifier, session);
+            var observableSession = new OngoingSession(
+                identifier,
+                title,
+                now,
+                isFront: false,
+                SessionStateSnapshot.CreateEmpty(),
+                isInteractive: false);
+            AddObservableSession(observableSession);
             PublishSessionsChanged(SessionLifecycleChangeKind.Added, session);
             BringToFront(identifier);
 
@@ -200,6 +230,12 @@ namespace HaloCreek.Services
                     IsInteractive = true
                 };
                 _sessionsById[identifier] = session;
+                if (_observableSessionsById.TryGetValue(identifier, out observableSession))
+                {
+                    observableSession.StateSnapshot = stateSnapshots.Current;
+                    observableSession.IsInteractive = true;
+                }
+
                 PublishSessionsChanged(
                     SessionLifecycleChangeKind.Updated,
                     session,
@@ -217,6 +253,7 @@ namespace HaloCreek.Services
                         _frontSessionId = null;
                     }
 
+                    RemoveObservableSession(identifier);
                     PublishSessionsChanged(SessionLifecycleChangeKind.Removed, removedSession);
                 }
 
@@ -251,11 +288,13 @@ namespace HaloCreek.Services
                 && !string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal)
                 && _sessionsById.TryGetValue(_frontSessionId, out var currentPreviousFrontSession))
             {
+                var previousFrontSessionId = _frontSessionId;
                 previousFrontSession = currentPreviousFrontSession with
                 {
                     FrontState = FrontSessionState.Background
                 };
-                _sessionsById[_frontSessionId] = previousFrontSession;
+                _sessionsById[previousFrontSessionId] = previousFrontSession;
+                SetObservableSessionFront(previousFrontSessionId, false);
                 _frontSessionId = null;
             }
 
@@ -268,7 +307,9 @@ namespace HaloCreek.Services
             {
                 FrontState = FrontSessionState.Front
             };
+            SetObservableSessionFront(sessionId, true);
             _frontSessionId = sessionId;
+            SetFrontSession(_observableSessionsById.GetValueOrDefault(sessionId));
 
             PublishSessionsChanged(
                 SessionLifecycleChangeKind.FrontChanged,
@@ -329,6 +370,7 @@ namespace HaloCreek.Services
                 _frontSessionId = null;
             }
 
+            RemoveObservableSession(sessionId);
             PublishSessionsChanged(SessionLifecycleChangeKind.Removed, removedSession);
         }
 
@@ -399,6 +441,11 @@ namespace HaloCreek.Services
                 StateSnapshot = snapshot
             };
             _sessionsById[sessionId] = updatedSession;
+            if (_observableSessionsById.TryGetValue(sessionId, out var observableSession))
+            {
+                observableSession.StateSnapshot = snapshot;
+            }
+
             PublishSessionsChanged(
                 SessionLifecycleChangeKind.StateSnapshotChanged,
                 updatedSession,
@@ -424,6 +471,47 @@ namespace HaloCreek.Services
             SessionsChanged?.Invoke(
                 this,
                 new SessionLifecycleChangedEventArgs(changeKind, session, previousSession));
+        }
+
+        private void AddObservableSession(OngoingSession session)
+        {
+            _observableSessionsById.Add(session.Id, session);
+            _allSessions.Add(session);
+        }
+
+        private void RemoveObservableSession(string sessionId)
+        {
+            if (!_observableSessionsById.Remove(sessionId, out var session))
+            {
+                return;
+            }
+
+            session.IsFront = false;
+            if (ReferenceEquals(_frontSession, session))
+            {
+                SetFrontSession(null);
+            }
+
+            _allSessions.Remove(session);
+        }
+
+        private void SetObservableSessionFront(string sessionId, bool isFront)
+        {
+            if (_observableSessionsById.TryGetValue(sessionId, out var session))
+            {
+                session.IsFront = isFront;
+            }
+        }
+
+        private void SetFrontSession(OngoingSession? session)
+        {
+            if (ReferenceEquals(_frontSession, session))
+            {
+                return;
+            }
+
+            _frontSession = session;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FrontSession)));
         }
 
         private void RemoveSessionStateStore(string sessionId)
