@@ -60,7 +60,7 @@ namespace HaloCreek.Models
 
         public SessionTokenInfo? TokenInfo => _tokenInfo;
 
-        public string StatusText => $"{(IsFront ? FrontSessionState.Front : FrontSessionState.Background)} / {FormatActivity()}";
+        public string StatusText => $"{(IsFront ? "Front" : "Background")} / {FormatActivity()}";
 
         public string ActivityText => FormatActivity();
 
