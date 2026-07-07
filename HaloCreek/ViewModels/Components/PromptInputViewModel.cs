@@ -10,7 +10,6 @@ using HaloCreek.Services;
 using HaloCreek.Services.Completions;
 using HaloCreek.Services.PromptTemplates;
 using HaloCreek.Services.SessionHistory;
-using HaloCreek.Services.SessionState;
 using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.ViewModels.Components
@@ -139,9 +138,6 @@ namespace HaloCreek.ViewModels.Components
 
         // 在真正干活之前触发 消息处理抛异常会导致发送失败 不过目前风险可控
         public event EventHandler? PromptSubmitted;
-
-        private IWorkspaceSnapshotSource<SessionStateSnapshot>? FrontSessionStateSnapshots
-            => _frontSession?.StateSnapshots;
 
         private void RefreshCompletionTrigger()
         {
@@ -289,7 +285,6 @@ namespace HaloCreek.ViewModels.Components
 
             _isDisposed = true;
             _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
-            StopFrontSessionStateSubscription();
             StopActiveCompletionQuery();
         }
 
@@ -574,7 +569,9 @@ namespace HaloCreek.ViewModels.Components
             return _hasFrontSession && HasPromptText();
         }
 
-        private void RefreshFrontSessionState(object? sender = null, EventArgs? e = null)
+        private void RefreshFrontSessionState(
+            object? sender = null,
+            SessionLifecycleChangedEventArgs? e = null)
         {
             if (!Dispatcher.UIThread.CheckAccess())
             {
@@ -600,40 +597,7 @@ namespace HaloCreek.ViewModels.Components
 
         private void SetFrontSession(OngoingSessionInfo? frontSession)
         {
-            if (!ReferenceEquals(FrontSessionStateSnapshots, frontSession?.StateSnapshots))
-            {
-                StopFrontSessionStateSubscription();
-                _frontSession = frontSession;
-                if (FrontSessionStateSnapshots is not null)
-                {
-                    FrontSessionStateSnapshots.Changed += HandleFrontSessionStateChanged;
-                }
-                return;
-            }
-
             _frontSession = frontSession;
-        }
-
-        private void StopFrontSessionStateSubscription()
-        {
-            if (FrontSessionStateSnapshots is null)
-            {
-                return;
-            }
-
-            FrontSessionStateSnapshots.Changed -= HandleFrontSessionStateChanged;
-            _frontSession = null;
-        }
-
-        private void HandleFrontSessionStateChanged(object? sender, EventArgs e)
-        {
-            if (!Dispatcher.UIThread.CheckAccess())
-            {
-                Dispatcher.UIThread.Post(ApplyFrontSessionState);
-                return;
-            }
-
-            ApplyFrontSessionState();
         }
 
         private void ApplyFrontSessionState()
@@ -646,7 +610,7 @@ namespace HaloCreek.ViewModels.Components
 
             FrontSessionState.UpdateFromSnapshot(
                 _frontSession,
-                _frontSession.StateSnapshots?.Current ?? SessionStateSnapshot.CreateEmpty());
+                _frontSession.StateSnapshot);
         }
 
         private readonly record struct CompletionTriggerState(

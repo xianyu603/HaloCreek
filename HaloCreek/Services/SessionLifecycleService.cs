@@ -32,8 +32,7 @@ namespace HaloCreek.Services
             _transientEventService = appCommonRuntime.TransientEventService;
         }
 
-        // 只向外部汇报session或其状态发生了变化 先不实现复杂的消息通知 卡了再优化
-        public event EventHandler? SessionsChanged;
+        public event EventHandler<SessionLifecycleChangedEventArgs>? SessionsChanged;
 
         public bool HasFrontSession
         {
@@ -169,10 +168,11 @@ namespace HaloCreek.Services
                 workspace.WorkspacePath,
                 now,
                 FrontSessionState.Background,
-                StateSnapshots: null,
+                SessionStateSnapshot.CreateEmpty(),
                 IsInteractive: false);
 
             _sessionsById.Add(identifier, session);
+            PublishSessionsChanged(SessionLifecycleChangeKind.Added, session);
             BringToFront(identifier);
 
             var launchCompleted = false;
@@ -192,28 +192,32 @@ namespace HaloCreek.Services
                     throw new InvalidOperationException("Session closed before launch completed.");
                 }
 
-                var stateSnapshots = CreateSessionStateStore(session, launchResult.CodexSessionId);
+                var stateSnapshots = CreateSessionStateStore(session.Id, launchResult.CodexSessionId);
+                var previousSession = session;
                 session = session with
                 {
-                    StateSnapshots = stateSnapshots,
+                    StateSnapshot = stateSnapshots.Current,
                     IsInteractive = true
                 };
                 _sessionsById[identifier] = session;
-                SessionsChanged?.Invoke(this, EventArgs.Empty);
+                PublishSessionsChanged(
+                    SessionLifecycleChangeKind.Updated,
+                    session,
+                    previousSession);
 
                 launchCompleted = true;
             }
             finally
             {
                 if (!launchCompleted
-                    && _sessionsById.Remove(identifier))
+                    && _sessionsById.Remove(identifier, out var removedSession))
                 {
                     if (string.Equals(_frontSessionId, identifier, StringComparison.Ordinal))
                     {
                         _frontSessionId = null;
                     }
 
-                    SessionsChanged?.Invoke(this, EventArgs.Empty);
+                    PublishSessionsChanged(SessionLifecycleChangeKind.Removed, removedSession);
                 }
 
                 if (!launchCompleted)
@@ -230,21 +234,28 @@ namespace HaloCreek.Services
             RequireUiThread();
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
-            string? previousFrontSessionId = null;
+            OngoingSessionInfo? previousFrontSession = null;
             if (!_sessionsById.ContainsKey(sessionId))
+            {
+                return;
+            }
+
+            if (string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal)
+                && _sessionsById.TryGetValue(sessionId, out var currentFrontSession)
+                && currentFrontSession.FrontState == FrontSessionState.Front)
             {
                 return;
             }
 
             if (!string.IsNullOrWhiteSpace(_frontSessionId)
                 && !string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal)
-                && _sessionsById.TryGetValue(_frontSessionId, out var previousFrontSession))
+                && _sessionsById.TryGetValue(_frontSessionId, out var currentPreviousFrontSession))
             {
-                previousFrontSessionId = _frontSessionId;
-                _sessionsById[previousFrontSessionId] = previousFrontSession with
+                previousFrontSession = currentPreviousFrontSession with
                 {
                     FrontState = FrontSessionState.Background
                 };
+                _sessionsById[_frontSessionId] = previousFrontSession;
                 _frontSessionId = null;
             }
 
@@ -259,7 +270,10 @@ namespace HaloCreek.Services
             };
             _frontSessionId = sessionId;
 
-            SessionsChanged?.Invoke(this, EventArgs.Empty);
+            PublishSessionsChanged(
+                SessionLifecycleChangeKind.FrontChanged,
+                _sessionsById[sessionId],
+                previousFrontSession);
         }
 
         public async Task SendMessageToFrontSessionAsync(string message)
@@ -301,7 +315,7 @@ namespace HaloCreek.Services
             RequireUiThread();
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
-            if (!_sessionsById.ContainsKey(sessionId))
+            if (!_sessionsById.TryGetValue(sessionId, out var removedSession))
             {
                 return;
             }
@@ -315,7 +329,7 @@ namespace HaloCreek.Services
                 _frontSessionId = null;
             }
 
-            SessionsChanged?.Invoke(this, EventArgs.Empty);
+            PublishSessionsChanged(SessionLifecycleChangeKind.Removed, removedSession);
         }
 
         private bool TryGetFrontSessionId(out string frontSessionId)
@@ -345,30 +359,60 @@ namespace HaloCreek.Services
         }
 
         private WorkspaceSnapshotStore<SessionStateSnapshot> CreateSessionStateStore(
-            OngoingSessionInfo session,
+            string sessionId,
             string codexSessionId)
         {
-            ArgumentNullException.ThrowIfNull(session);
+            ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
             ArgumentException.ThrowIfNullOrWhiteSpace(codexSessionId);
 
             var store = WorkspaceSnapshotStore.Create<SessionStateSnapshot>(codexSessionId);
             store.Changed += (_, _) =>
             {
                 LogSessionStateSnapshotPublished(
-                    session.Id,
+                    sessionId,
                     codexSessionId,
                     store.Current);
-                PublishSessionsChanged();
+                PublishSessionStateSnapshotChanged(sessionId, store.Current);
             };
-            _sessionStateStoresById.Add(session.Id, store);
+            _sessionStateStoresById.Add(sessionId, store);
             return store;
         }
 
-        private void PublishSessionsChanged()
+        private void PublishSessionStateSnapshotChanged(
+            string sessionId,
+            SessionStateSnapshot snapshot)
         {
             if (!Dispatcher.UIThread.CheckAccess())
             {
-                Dispatcher.UIThread.Post(PublishSessionsChanged);
+                Dispatcher.UIThread.Post(() => PublishSessionStateSnapshotChanged(sessionId, snapshot));
+                return;
+            }
+
+            if (_isDisposed
+                || !_sessionsById.TryGetValue(sessionId, out var session))
+            {
+                return;
+            }
+
+            var updatedSession = session with
+            {
+                StateSnapshot = snapshot
+            };
+            _sessionsById[sessionId] = updatedSession;
+            PublishSessionsChanged(
+                SessionLifecycleChangeKind.StateSnapshotChanged,
+                updatedSession,
+                session);
+        }
+
+        private void PublishSessionsChanged(
+            SessionLifecycleChangeKind changeKind,
+            OngoingSessionInfo? session,
+            OngoingSessionInfo? previousSession = null)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => PublishSessionsChanged(changeKind, session, previousSession));
                 return;
             }
 
@@ -377,7 +421,9 @@ namespace HaloCreek.Services
                 return;
             }
 
-            SessionsChanged?.Invoke(this, EventArgs.Empty);
+            SessionsChanged?.Invoke(
+                this,
+                new SessionLifecycleChangedEventArgs(changeKind, session, previousSession));
         }
 
         private void RemoveSessionStateStore(string sessionId)

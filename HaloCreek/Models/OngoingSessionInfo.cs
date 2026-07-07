@@ -1,6 +1,5 @@
 using System;
 using HaloCreek.Services.SessionState;
-using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.Models
 {
@@ -10,14 +9,14 @@ namespace HaloCreek.Models
         string WorkspacePath,
         DateTimeOffset StartedAt,
         FrontSessionState FrontState,
-        IWorkspaceSnapshotSource<SessionStateSnapshot>? StateSnapshots,
+        SessionStateSnapshot StateSnapshot,
         bool IsInteractive)
     {
         public string StatusText => $"{FrontState} / {FormatActivity()}";
 
         private string FormatActivity()
         {
-            return StateSnapshots?.Current.Active switch
+            return StateSnapshot.Active switch
             {
                 true => "Active",
                 false => "Idle",

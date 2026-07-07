@@ -152,10 +152,62 @@ namespace HaloCreek.ViewModels.Tabs
                 && session.IsInteractive;
         }
 
-        private void HandleSessionsChanged(object? sender, EventArgs e)
+        private void HandleSessionsChanged(object? sender, SessionLifecycleChangedEventArgs e)
         {
             // 走一下post防同步重入 现在已经不会从别的线程到这了
-            Dispatcher.UIThread.Post(RefreshOngoingSessions);
+            Dispatcher.UIThread.Post(() => ApplySessionChange(e));
+        }
+
+        private void ApplySessionChange(SessionLifecycleChangedEventArgs e)
+        {
+            var selectedSessionId = SelectedOngoingSession?.Id;
+            var sessions = OngoingSessions.ToList();
+
+            if (e.PreviousSession is not null)
+            {
+                UpsertSession(sessions, e.PreviousSession);
+            }
+
+            if (e.Session is null)
+            {
+                RefreshOngoingSessions();
+                return;
+            }
+
+            if (e.ChangeKind == SessionLifecycleChangeKind.Removed)
+            {
+                sessions.RemoveAll(session => string.Equals(
+                    session.Id,
+                    e.Session.Id,
+                    StringComparison.Ordinal));
+            }
+            else
+            {
+                UpsertSession(sessions, e.Session);
+            }
+
+            OngoingSessions = sessions
+                .OrderBy(session => session.StartedAt)
+                .ToArray();
+            SelectedOngoingSession = OngoingSessions.FirstOrDefault(
+                session => string.Equals(session.Id, selectedSessionId, StringComparison.Ordinal));
+        }
+
+        private static void UpsertSession(
+            List<OngoingSessionInfo> sessions,
+            OngoingSessionInfo session)
+        {
+            var index = sessions.FindIndex(candidate => string.Equals(
+                candidate.Id,
+                session.Id,
+                StringComparison.Ordinal));
+            if (index < 0)
+            {
+                sessions.Add(session);
+                return;
+            }
+
+            sessions[index] = session;
         }
 
         public void Dispose()
