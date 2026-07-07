@@ -9,13 +9,13 @@ namespace HaloCreek.Views.Components
     public static class SessionMessageDisplayConverters
     {
         private static readonly IBrush UserAccent = new SolidColorBrush(Color.Parse("#0284C7"));
-        private static readonly IBrush AgentAccent = new SolidColorBrush(Color.Parse("#7C3AED"));
+        private static readonly IBrush AgentAccent = new SolidColorBrush(Color.Parse("#16A34A"));
         private static readonly IBrush UnknownAccent = new SolidColorBrush(Color.Parse("#64748B"));
         private static readonly IBrush UserBackground = new SolidColorBrush(Color.Parse("#EFF6FF"));
-        private static readonly IBrush AgentBackground = new SolidColorBrush(Color.Parse("#F5F3FF"));
+        private static readonly IBrush AgentBackground = new SolidColorBrush(Color.Parse("#F0FDF4"));
         private static readonly IBrush UnknownBackground = new SolidColorBrush(Color.Parse("#F8FAFC"));
         private static readonly IBrush UserBorder = new SolidColorBrush(Color.Parse("#BFDBFE"));
-        private static readonly IBrush AgentBorder = new SolidColorBrush(Color.Parse("#DDD6FE"));
+        private static readonly IBrush AgentBorder = new SolidColorBrush(Color.Parse("#BBF7D0"));
         private static readonly IBrush UnknownBorder = new SolidColorBrush(Color.Parse("#CBD5E1"));
 
         public static IValueConverter BackgroundBrush { get; } = new SessionMessageBrushConverter(
