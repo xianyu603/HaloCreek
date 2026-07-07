@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using HaloCreek.Services.SessionState;
 
@@ -8,7 +10,12 @@ namespace HaloCreek.Models
     {
         private bool _isFront;
         private bool _isInteractive;
-        private SessionStateSnapshot _stateSnapshot;
+        private SessionTaskState _taskState;
+        private DateTimeOffset? _stateTimestamp;
+        private DateTimeOffset? _lastActiveTime;
+        private bool? _isActive;
+        private IReadOnlyList<SessionMessage> _messages = Array.Empty<SessionMessage>();
+        private SessionTokenInfo? _tokenInfo;
 
         internal OngoingSession(
             string id,
@@ -20,13 +27,15 @@ namespace HaloCreek.Models
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(id);
             ArgumentNullException.ThrowIfNull(title);
+            ArgumentNullException.ThrowIfNull(stateSnapshot);
 
             Id = id;
             Title = title;
             StartedAt = startedAt;
-            _isFront = isFront;
-            _stateSnapshot = stateSnapshot ?? throw new ArgumentNullException(nameof(stateSnapshot));
-            _isInteractive = isInteractive;
+            Set(
+                isFront: isFront,
+                isInteractive: isInteractive,
+                stateSnapshot: stateSnapshot);
         }
 
         public string Id { get; }
@@ -35,33 +44,85 @@ namespace HaloCreek.Models
 
         public DateTimeOffset StartedAt { get; }
 
-        public bool IsFront
-        {
-            get => _isFront;
-            internal set => SetProperty(ref _isFront, value);
-        }
+        public bool IsFront => _isFront;
 
-        public bool IsInteractive
-        {
-            get => _isInteractive;
-            internal set => SetProperty(ref _isInteractive, value);
-        }
+        public bool IsInteractive => _isInteractive;
 
-        public SessionStateSnapshot StateSnapshot
+        public SessionTaskState TaskState => _taskState;
+
+        public DateTimeOffset? StateTimestamp => _stateTimestamp;
+
+        public DateTimeOffset? LastActiveTime => _lastActiveTime;
+
+        public bool? IsActive => _isActive;
+
+        public IReadOnlyList<SessionMessage> Messages => _messages;
+
+        public SessionTokenInfo? TokenInfo => _tokenInfo;
+
+        public string StatusText => $"{(IsFront ? FrontSessionState.Front : FrontSessionState.Background)} / {FormatActivity()}";
+
+        // This is intentionally internal and should only be called by SessionLifecycleService.
+        // Keep it direct so reference search shows every lifecycle update point.
+        internal void Set(
+            bool? isFront = null,
+            bool? isInteractive = null,
+            SessionStateSnapshot? stateSnapshot = null)
         {
-            get => _stateSnapshot;
-            internal set
+            var statusTextChanged = false;
+
+            if (isFront is { } nextIsFront // isFront有值表达式为true 并将值扔到nextXX
+                && SetProperty(ref _isFront, nextIsFront, nameof(IsFront)))
             {
-                if (SetProperty(ref _stateSnapshot, value ?? throw new ArgumentNullException(nameof(value))))
-                {
-                    OnPropertyChanged(nameof(TaskState));
-                    OnPropertyChanged(nameof(IsActive));
-                }
+                statusTextChanged = true;
+            }
+
+            if (isInteractive is { } nextIsInteractive)
+            {
+                SetProperty(ref _isInteractive, nextIsInteractive, nameof(IsInteractive));
+            }
+
+            if (stateSnapshot is not null)
+            {
+                SetState(stateSnapshot, out var statusTextChangedBySnapshot);
+                statusTextChanged |= statusTextChangedBySnapshot;
+            }
+
+            if (statusTextChanged)
+            {
+                OnPropertyChanged(nameof(StatusText));
             }
         }
 
-        public SessionTaskState TaskState => StateSnapshot.State;
+        private void SetState(SessionStateSnapshot snapshot, out bool statusTextChanged)
+        {
+            statusTextChanged = false;
 
-        public bool? IsActive => StateSnapshot.Active;
+            SetProperty(ref _taskState, snapshot.State, nameof(TaskState));
+            SetProperty(ref _stateTimestamp, snapshot.StateTimestamp, nameof(StateTimestamp));
+            SetProperty(ref _lastActiveTime, snapshot.LastActiveTime, nameof(LastActiveTime));
+            if (SetProperty(ref _isActive, snapshot.Active, nameof(IsActive)))
+            {
+                statusTextChanged = true;
+            }
+
+            SetProperty(ref _tokenInfo, snapshot.TokenInfo, nameof(TokenInfo));
+
+            if (!_messages.SequenceEqual(snapshot.Messages))
+            {
+                _messages = snapshot.Messages.ToArray();
+                OnPropertyChanged(nameof(Messages));
+            }
+        }
+
+        private string FormatActivity()
+        {
+            return IsActive switch
+            {
+                true => "Active",
+                false => "Idle",
+                _ => "Unknown",
+            };
+        }
     }
 }

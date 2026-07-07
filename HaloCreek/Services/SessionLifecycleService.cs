@@ -199,7 +199,7 @@ namespace HaloCreek.Services
                 title,
                 now,
                 isFront: false,
-                SessionStateSnapshot.CreateEmpty(),
+                stateSnapshot: SessionStateSnapshot.CreateEmpty(),
                 isInteractive: false);
             AddObservableSession(observableSession);
             PublishSessionsChanged(SessionLifecycleChangeKind.Added, session);
@@ -232,8 +232,9 @@ namespace HaloCreek.Services
                 _sessionsById[identifier] = session;
                 if (_observableSessionsById.TryGetValue(identifier, out observableSession))
                 {
-                    observableSession.StateSnapshot = stateSnapshots.Current;
-                    observableSession.IsInteractive = true;
+                    observableSession.Set(
+                        isInteractive: true,
+                        stateSnapshot: stateSnapshots.Current);
                 }
 
                 PublishSessionsChanged(
@@ -443,7 +444,7 @@ namespace HaloCreek.Services
             _sessionsById[sessionId] = updatedSession;
             if (_observableSessionsById.TryGetValue(sessionId, out var observableSession))
             {
-                observableSession.StateSnapshot = snapshot;
+                observableSession.Set(stateSnapshot: snapshot);
             }
 
             PublishSessionsChanged(
@@ -486,7 +487,7 @@ namespace HaloCreek.Services
                 return;
             }
 
-            session.IsFront = false;
+            session.Set(isFront: false);
             if (ReferenceEquals(_frontSession, session))
             {
                 SetFrontSession(null);
@@ -499,7 +500,7 @@ namespace HaloCreek.Services
         {
             if (_observableSessionsById.TryGetValue(sessionId, out var session))
             {
-                session.IsFront = isFront;
+                session.Set(isFront: isFront);
             }
         }
 
