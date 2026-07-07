@@ -14,7 +14,7 @@ namespace HaloCreek.Views.Tabs
             InitializeComponent();
         }
 
-        private void OngoingSessionsList_OnDoubleTapped(object? sender, TappedEventArgs e)
+        private void OngoingSessionsItems_OnDoubleTapped(object? sender, TappedEventArgs e)
         {
             if (e.Source is Button
                 || (e.Source is Visual source && source.FindAncestorOfType<Button>() is not null))
@@ -23,16 +23,33 @@ namespace HaloCreek.Views.Tabs
             }
 
             if (DataContext is not PromptEditorViewModel viewModel
-                || OngoingSessionsList.SelectedItem is not OngoingSessionInfo session)
+                || TryGetOngoingSession(e.Source) is not { } session)
             {
                 return;
             }
 
-            if (viewModel.BringToFrontCommand.CanExecute(session))
+            if (session.IsInteractive
+                && viewModel.BringToFrontCommand.CanExecute(session))
             {
                 viewModel.BringToFrontCommand.Execute(session);
                 e.Handled = true;
             }
+        }
+
+        private static OngoingSession? TryGetOngoingSession(object? source)
+        {
+            var visual = source as Visual;
+            while (visual is not null)
+            {
+                if (visual is StyledElement { DataContext: OngoingSession session })
+                {
+                    return session;
+                }
+
+                visual = visual.GetVisualParent();
+            }
+
+            return null;
         }
     }
 }

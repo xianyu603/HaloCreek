@@ -1,12 +1,12 @@
 using System;
-using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
-using HaloCreek.ViewModels.Components;
+using HaloCreek.Models;
 using LiveMarkdown.Avalonia;
 
 namespace HaloCreek.Views.Components
@@ -14,7 +14,7 @@ namespace HaloCreek.Views.Components
     public partial class SessionStateView : UserControl
     {
         private const string LogCategory = "SessionStateView";
-        private INotifyCollectionChanged? _messagesCollection;
+        private OngoingSession? _session;
         private bool _scrollToEndQueued;
 
         public ICommand OpenMarkdownLinkCommand { get; } = new MarkdownLinkCommand();
@@ -28,15 +28,15 @@ namespace HaloCreek.Views.Components
         {
             base.OnDataContextChanged(e);
 
-            if (_messagesCollection is not null)
+            if (_session is not null)
             {
-                _messagesCollection.CollectionChanged -= Messages_CollectionChanged;
+                _session.PropertyChanged -= Session_PropertyChanged;
             }
 
-            _messagesCollection = (DataContext as SessionStateViewModel)?.Messages;
-            if (_messagesCollection is not null)
+            _session = DataContext as OngoingSession;
+            if (_session is not null)
             {
-                _messagesCollection.CollectionChanged += Messages_CollectionChanged;
+                _session.PropertyChanged += Session_PropertyChanged;
                 QueueScrollToEnd();
             }
         }
@@ -50,11 +50,9 @@ namespace HaloCreek.Views.Components
             MessagesItemsControl.Width = Math.Max(0, contentWidth);
         }
 
-        private void Messages_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        private void Session_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.Action is NotifyCollectionChangedAction.Add
-                or NotifyCollectionChangedAction.Replace
-                or NotifyCollectionChangedAction.Reset)
+            if (e.PropertyName == nameof(OngoingSession.Messages))
             {
                 QueueScrollToEnd();
             }

@@ -62,6 +62,16 @@ namespace HaloCreek.Models
 
         public string StatusText => $"{(IsFront ? FrontSessionState.Front : FrontSessionState.Background)} / {FormatActivity()}";
 
+        public string ActivityText => FormatActivity();
+
+        public string TaskStateText => FormatTaskState(TaskState);
+
+        public string StateTimestampText => StateTimestamp is null
+            ? "No state timestamp"
+            : $"Updated {StateTimestamp.Value.ToLocalTime():HH:mm:ss}";
+
+        public string TokenSummaryText => FormatTokenSummary(TokenInfo);
+
         // This is intentionally internal and should only be called by SessionLifecycleService.
         // Keep it direct so reference search shows every lifecycle update point.
         internal void Set(
@@ -98,15 +108,27 @@ namespace HaloCreek.Models
         {
             statusTextChanged = false;
 
-            SetProperty(ref _taskState, snapshot.State, nameof(TaskState));
-            SetProperty(ref _stateTimestamp, snapshot.StateTimestamp, nameof(StateTimestamp));
+            if (SetProperty(ref _taskState, snapshot.State, nameof(TaskState)))
+            {
+                OnPropertyChanged(nameof(TaskStateText));
+            }
+
+            if (SetProperty(ref _stateTimestamp, snapshot.StateTimestamp, nameof(StateTimestamp)))
+            {
+                OnPropertyChanged(nameof(StateTimestampText));
+            }
+
             SetProperty(ref _lastActiveTime, snapshot.LastActiveTime, nameof(LastActiveTime));
             if (SetProperty(ref _isActive, snapshot.Active, nameof(IsActive)))
             {
                 statusTextChanged = true;
+                OnPropertyChanged(nameof(ActivityText));
             }
 
-            SetProperty(ref _tokenInfo, snapshot.TokenInfo, nameof(TokenInfo));
+            if (SetProperty(ref _tokenInfo, snapshot.TokenInfo, nameof(TokenInfo)))
+            {
+                OnPropertyChanged(nameof(TokenSummaryText));
+            }
 
             if (!_messages.SequenceEqual(snapshot.Messages))
             {
@@ -123,6 +145,34 @@ namespace HaloCreek.Models
                 false => "Idle",
                 _ => "Unknown",
             };
+        }
+
+        private static string FormatTaskState(SessionTaskState state)
+        {
+            return state switch
+            {
+                SessionTaskState.TaskStarted => "Started",
+                SessionTaskState.TaskAborted => "Aborted",
+                SessionTaskState.TaskCompleted => "Completed",
+                _ => "Unknown",
+            };
+        }
+
+        private static string FormatTokenSummary(SessionTokenInfo? tokenInfo)
+        {
+            if (tokenInfo is null)
+            {
+                return "Token usage unavailable";
+            }
+
+            var total = tokenInfo.TotalTokenUsageTotal is null
+                ? "total ?"
+                : $"total {tokenInfo.TotalTokenUsageTotal.Value:N0}";
+            var usedPercentage = tokenInfo.ContextWindow is null || tokenInfo.LastTokenUsageTotal is null
+                ? "?"
+                : $"{100 * tokenInfo.LastTokenUsageTotal.Value / tokenInfo.ContextWindow.Value:N0}";
+
+            return $"context {usedPercentage}% used, {total}";
         }
     }
 }

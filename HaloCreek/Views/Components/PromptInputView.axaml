@@ -183,7 +183,21 @@
             </Border>
         </Grid>
 
-        <components:SessionStateView Grid.Column="1"
-                                     DataContext="{Binding FrontSessionState}"/>
+        <Grid Grid.Column="1"
+              IsVisible="{Binding HasFrontSession}">
+            <components:SessionStateView DataContext="{Binding FrontSession}"/>
+        </Grid>
+
+        <Border Grid.Column="1"
+                IsVisible="{Binding !HasFrontSession}"
+                Background="#FFFFFF"
+                BorderBrush="#E2E8F0"
+                BorderThickness="1,0,0,0">
+            <TextBlock Text="No front session"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="#64748B"
+                       FontSize="13"/>
+        </Border>
     </Grid>
 </UserControl>

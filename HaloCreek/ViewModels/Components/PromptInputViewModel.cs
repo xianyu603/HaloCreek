@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -31,10 +32,6 @@ namespace HaloCreek.ViewModels.Components
         [
             new PromptCompletionMenuLevel(Array.Empty<PromptCompletionItem>()),
         ];
-        private OngoingSessionInfo? _frontSession;
-        private SessionStateViewModel _frontSessionState =
-            SessionStateViewModel.CreateEmpty();
-        private bool _hasFrontSession;
         private bool _isDisposed;
 
         public PromptInputViewModel(
@@ -57,8 +54,7 @@ namespace HaloCreek.ViewModels.Components
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
             SendToFrontCommand = new AsyncRelayCommand(SendToFrontAsync, CanSendToFront);
 
-            _sessionLifecycleService.SessionsChanged += RefreshFrontSessionState;
-            RefreshFrontSessionState();
+            _sessionLifecycleService.PropertyChanged += SessionLifecycleService_OnPropertyChanged;
         }
 
         public string PromptText
@@ -91,11 +87,9 @@ namespace HaloCreek.ViewModels.Components
 
         public PromptTemplatePickerViewModel TemplatePicker { get; }
 
-        public SessionStateViewModel FrontSessionState
-        {
-            get => _frontSessionState;
-            private set => SetProperty(ref _frontSessionState, value);
-        }
+        public OngoingSession? FrontSession => _sessionLifecycleService.FrontSession;
+
+        public bool HasFrontSession => FrontSession is not null;
 
         public bool IsCompletionOpen
         {
@@ -284,7 +278,7 @@ namespace HaloCreek.ViewModels.Components
             }
 
             _isDisposed = true;
-            _sessionLifecycleService.SessionsChanged -= RefreshFrontSessionState;
+            _sessionLifecycleService.PropertyChanged -= SessionLifecycleService_OnPropertyChanged;
             StopActiveCompletionQuery();
         }
 
@@ -566,16 +560,22 @@ namespace HaloCreek.ViewModels.Components
 
         private bool CanSendToFront()
         {
-            return _hasFrontSession && HasPromptText();
+            return HasFrontSession && HasPromptText();
         }
 
-        private void RefreshFrontSessionState(
-            object? sender = null,
-            SessionLifecycleChangedEventArgs? e = null)
+        private void SessionLifecycleService_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(SessionLifecycleService.FrontSession))
+            {
+                NotifyFrontSessionChanged();
+            }
+        }
+
+        private void NotifyFrontSessionChanged()
         {
             if (!Dispatcher.UIThread.CheckAccess())
             {
-                Dispatcher.UIThread.Post(() => RefreshFrontSessionState());
+                Dispatcher.UIThread.Post(NotifyFrontSessionChanged);
                 return;
             }
 
@@ -584,33 +584,9 @@ namespace HaloCreek.ViewModels.Components
                 return;
             }
 
-            var hasFrontSession = _sessionLifecycleService.HasFrontSession;
-            if (_hasFrontSession != hasFrontSession)
-            {
-                _hasFrontSession = hasFrontSession;
-                SendToFrontCommand.NotifyCanExecuteChanged();
-            }
-
-            SetFrontSession(_sessionLifecycleService.GetFrontSessionInfo());
-            ApplyFrontSessionState();
-        }
-
-        private void SetFrontSession(OngoingSessionInfo? frontSession)
-        {
-            _frontSession = frontSession;
-        }
-
-        private void ApplyFrontSessionState()
-        {
-            if (_frontSession is null)
-            {
-                FrontSessionState.UpdateEmpty();
-                return;
-            }
-
-            FrontSessionState.UpdateFromSnapshot(
-                _frontSession,
-                _frontSession.StateSnapshot);
+            OnPropertyChanged(nameof(FrontSession));
+            OnPropertyChanged(nameof(HasFrontSession));
+            SendToFrontCommand.NotifyCanExecuteChanged();
         }
 
         private readonly record struct CompletionTriggerState(

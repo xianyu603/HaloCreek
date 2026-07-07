@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
@@ -19,8 +19,6 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TmuxService _tmuxService;
         private readonly TerminalService _terminalService;
-        private IReadOnlyList<OngoingSessionInfo> _ongoingSessions = Array.Empty<OngoingSessionInfo>();
-        private OngoingSessionInfo? _selectedOngoingSession;
         private bool _isDisposed;
 
         public PromptEditorViewModel(
@@ -44,59 +42,32 @@ namespace HaloCreek.ViewModels.Tabs
                 completionCoordinator,
                 historySnapshots);
 
-            BringToFrontCommand = new RelayCommand<OngoingSessionInfo>(BringToFront, CanBringToFront);
-            OpenCliCommand = new AsyncRelayCommand<OngoingSessionInfo>(OpenCliAsync, CanOpenCli);
-            ExitSessionCommand = new RelayCommand<OngoingSessionInfo>(ExitSession, CanExitSession);
+            BringToFrontCommand = new RelayCommand<OngoingSession>(BringToFront, CanBringToFront);
+            OpenCliCommand = new AsyncRelayCommand<OngoingSession>(OpenCliAsync, CanOpenCli);
+            ExitSessionCommand = new RelayCommand<OngoingSession>(ExitSession, CanExitSession);
 
-            _sessionLifecycleService.SessionsChanged += HandleSessionsChanged;
-            RefreshOngoingSessions();
+            ((INotifyCollectionChanged)_sessionLifecycleService.AllSessions).CollectionChanged +=
+                OngoingSessions_OnCollectionChanged;
         }
 
         public PromptInputViewModel PromptInput { get; }
 
-        public IReadOnlyList<OngoingSessionInfo> OngoingSessions
-        {
-            get => _ongoingSessions;
-            private set
-            {
-                if (SetProperty(ref _ongoingSessions, value))
-                {
-                    OnPropertyChanged(nameof(HasOngoingSessions));
-                    OnPropertyChanged(nameof(IsOngoingSessionsEmpty));
-                    BringToFrontCommand.NotifyCanExecuteChanged();
-                    OpenCliCommand.NotifyCanExecuteChanged();
-                    ExitSessionCommand.NotifyCanExecuteChanged();
-                }
-            }
-        }
-
-        public OngoingSessionInfo? SelectedOngoingSession
-        {
-            get => _selectedOngoingSession;
-            set => SetProperty(ref _selectedOngoingSession, value);
-        }
+        public ReadOnlyObservableCollection<OngoingSession> OngoingSessions =>
+            _sessionLifecycleService.AllSessions;
 
         public bool HasOngoingSessions => OngoingSessions.Count > 0;
 
         public bool IsOngoingSessionsEmpty => !HasOngoingSessions;
 
-        public IRelayCommand<OngoingSessionInfo> BringToFrontCommand { get; }
+        public IRelayCommand<OngoingSession> BringToFrontCommand { get; }
 
-        public IAsyncRelayCommand<OngoingSessionInfo> OpenCliCommand { get; }
+        public IAsyncRelayCommand<OngoingSession> OpenCliCommand { get; }
 
-        public IRelayCommand<OngoingSessionInfo> ExitSessionCommand { get; }
+        public IRelayCommand<OngoingSession> ExitSessionCommand { get; }
 
-        private void RefreshOngoingSessions()
+        private void BringToFront(OngoingSession? session)
         {
-            var selectedSessionId = SelectedOngoingSession?.Id;
-            OngoingSessions = _sessionLifecycleService.GetOngoingSessionInfos();
-            SelectedOngoingSession = OngoingSessions.FirstOrDefault(
-                session => string.Equals(session.Id, selectedSessionId, StringComparison.Ordinal));
-        }
-
-        private void BringToFront(OngoingSessionInfo? session)
-        {
-            if (session is null)
+            if (session is null || !session.IsInteractive)
             {
                 return;
             }
@@ -105,9 +76,9 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("PromptEditor", "Bring to front requested.");
         }
 
-        private async Task OpenCliAsync(OngoingSessionInfo? session)
+        private async Task OpenCliAsync(OngoingSession? session)
         {
-            if (session is null)
+            if (session is null || !session.IsInteractive)
             {
                 return;
             }
@@ -123,9 +94,9 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("PromptEditor", "CLI entry completed.");
         }
 
-        private void ExitSession(OngoingSessionInfo? session)
+        private void ExitSession(OngoingSession? session)
         {
-            if (session is null)
+            if (session is null || !session.IsInteractive)
             {
                 return;
             }
@@ -134,80 +105,37 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("PromptEditor", "Session exit requested.");
         }
 
-        private static bool CanExitSession(OngoingSessionInfo? session)
+        private static bool CanExitSession(OngoingSession? session)
         {
-            return session is not null
-                && session.IsInteractive;
+            return session is not null;
         }
 
-        private static bool CanBringToFront(OngoingSessionInfo? session)
+        private static bool CanBringToFront(OngoingSession? session)
         {
-            return session is not null
-                && session.IsInteractive;
+            return session is not null;
         }
 
-        private static bool CanOpenCli(OngoingSessionInfo? session)
+        private static bool CanOpenCli(OngoingSession? session)
         {
-            return session is not null
-                && session.IsInteractive;
+            return session is not null;
         }
 
-        private void HandleSessionsChanged(object? sender, SessionLifecycleChangedEventArgs e)
+        private void OngoingSessions_OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             // 走一下post防同步重入 现在已经不会从别的线程到这了
-            Dispatcher.UIThread.Post(() => ApplySessionChange(e));
-        }
-
-        private void ApplySessionChange(SessionLifecycleChangedEventArgs e)
-        {
-            var selectedSessionId = SelectedOngoingSession?.Id;
-            var sessions = OngoingSessions.ToList();
-
-            if (e.PreviousSession is not null)
+            if (!Dispatcher.UIThread.CheckAccess())
             {
-                UpsertSession(sessions, e.PreviousSession);
-            }
-
-            if (e.Session is null)
-            {
-                RefreshOngoingSessions();
+                Dispatcher.UIThread.Post(() => OngoingSessions_OnCollectionChanged(sender, e));
                 return;
             }
 
-            if (e.ChangeKind == SessionLifecycleChangeKind.Removed)
+            if (_isDisposed)
             {
-                sessions.RemoveAll(session => string.Equals(
-                    session.Id,
-                    e.Session.Id,
-                    StringComparison.Ordinal));
-            }
-            else
-            {
-                UpsertSession(sessions, e.Session);
-            }
-
-            OngoingSessions = sessions
-                .OrderBy(session => session.StartedAt)
-                .ToArray();
-            SelectedOngoingSession = OngoingSessions.FirstOrDefault(
-                session => string.Equals(session.Id, selectedSessionId, StringComparison.Ordinal));
-        }
-
-        private static void UpsertSession(
-            List<OngoingSessionInfo> sessions,
-            OngoingSessionInfo session)
-        {
-            var index = sessions.FindIndex(candidate => string.Equals(
-                candidate.Id,
-                session.Id,
-                StringComparison.Ordinal));
-            if (index < 0)
-            {
-                sessions.Add(session);
                 return;
             }
 
-            sessions[index] = session;
+            OnPropertyChanged(nameof(HasOngoingSessions));
+            OnPropertyChanged(nameof(IsOngoingSessionsEmpty));
         }
 
         public void Dispose()
@@ -218,7 +146,9 @@ namespace HaloCreek.ViewModels.Tabs
             }
 
             _isDisposed = true;
-            _sessionLifecycleService.SessionsChanged -= HandleSessionsChanged;
+            ((INotifyCollectionChanged)_sessionLifecycleService.AllSessions).CollectionChanged -=
+                OngoingSessions_OnCollectionChanged;
+
             PromptInput.Dispose();
         }
     }
