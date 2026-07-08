@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,6 +31,19 @@ namespace HaloCreek.Infrastructure
     {
         private const string LogCategory = "Platform";
         private const int WslCommandTimeoutMilliseconds = 10000;
+
+        private static readonly IReadOnlyDictionary<string, Func<MarkdownFileLineTarget, string[]>>
+            MarkdownLineEditorArgumentFactories =
+                new Dictionary<string, Func<MarkdownFileLineTarget, string[]>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["devenv"] = target => new[]
+                    {
+                        "/edit",
+                        Path.GetFullPath(target.Path),
+                        "/command",
+                        $"Edit.GoTo {target.Line}",
+                    },
+                };
 
         private static IReadOnlyList<string>? _wslDistributionNames;
 
@@ -611,9 +625,11 @@ namespace HaloCreek.Infrastructure
 
             var target = href.OriginalString.Trim();
             ArgumentException.ThrowIfNullOrWhiteSpace(target);
+            Log.Info(LogCategory, $"Opening markdown link. Target={target}");
 
             if (StartsWithProtocol(target))
             {
+                Log.Info(LogCategory, $"Markdown link uses protocol. Target={target}");
                 using var process = Process.Start(new ProcessStartInfo
                 {
                     FileName = target,
@@ -622,7 +638,23 @@ namespace HaloCreek.Infrastructure
                 return;
             }
 
-            var shellTarget = TrimAfterLastPathExtension(NormalizeExternalShellPath(target));
+            var normalizedTarget = NormalizeExternalShellPath(target);
+            var shellTarget = TrimAfterLastPathExtension(normalizedTarget);
+            if (TryParseMarkdownFileLineTarget(normalizedTarget, out var fileLineTarget))
+            {
+                shellTarget = TrimAfterLastPathExtension(fileLineTarget.Path);
+                var editorPath = QueryDefaultExecutableForPath(shellTarget);
+                if (editorPath is not null
+                    && MarkdownLineEditorArgumentFactories.TryGetValue(
+                        Path.GetFileNameWithoutExtension(editorPath) ?? string.Empty,
+                        out var createArguments))
+                {
+                    StartProcess(
+                        editorPath,
+                        createArguments(fileLineTarget with { Path = shellTarget }));
+                    return;
+                }
+            }
 
             using var fileProcess = Process.Start(new ProcessStartInfo
             {
@@ -709,6 +741,98 @@ namespace HaloCreek.Infrastructure
                     ? path
                     : path[..extensionEndIndex];
         }
+
+        private static bool TryParseMarkdownFileLineTarget(
+            string target,
+            out MarkdownFileLineTarget fileLineTarget)
+        {
+            fileLineTarget = default;
+
+            var lineSeparatorIndex = target.LastIndexOf(':');
+            if (lineSeparatorIndex < 0
+                || !int.TryParse(target[(lineSeparatorIndex + 1)..], out var lineOrColumn)
+                || lineOrColumn <= 0)
+            {
+                return false;
+            }
+
+            var path = target[..lineSeparatorIndex];
+            int? column = null;
+            var previousSeparatorIndex = path.LastIndexOf(':');
+            if (previousSeparatorIndex >= 0
+                && int.TryParse(path[(previousSeparatorIndex + 1)..], out var line)
+                && line > 0)
+            {
+                column = lineOrColumn;
+                lineOrColumn = line;
+                path = path[..previousSeparatorIndex];
+            }
+
+            fileLineTarget = new MarkdownFileLineTarget(
+                path,
+                lineOrColumn,
+                column);
+
+            return true;
+        }
+
+        private static string? QueryDefaultExecutableForPath(string path)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+            if (!OperatingSystem.IsWindows())
+            {
+                return null;
+            }
+
+            var extension = Path.GetExtension(path);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                return null;
+            }
+
+            return QueryAssociationString(extension);
+        }
+
+        private static string? QueryAssociationString(string extension)
+        {
+            const int BufferCharacterCount = 4096;
+
+            var characterCount = (uint)BufferCharacterCount;
+            var buffer = new StringBuilder(BufferCharacterCount);
+            var result = AssocQueryString(
+                0,// AssocF.None
+                2, // AssocStr.Executable
+                extension,
+                "open",
+                buffer,
+                ref characterCount);
+
+            if (result < 0)
+            {
+                Log.Debug(
+                    LogCategory,
+                    $"AssocQueryString failed. Extension={extension} HResult=0x{result:X8}");
+                return null;
+            }
+
+            var value = buffer.ToString().TrimEnd('\0');
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+
+        [DllImport("Shlwapi.dll", CharSet = CharSet.Unicode)]
+        private static extern int AssocQueryString(
+            int flags,
+            int associationString,
+            string association,
+            string? extra,
+            StringBuilder output,
+            ref uint outputCharacterCount);
+
+        private readonly record struct MarkdownFileLineTarget(
+            string Path,
+            int Line,
+            int? Column);
 
         private static string NormalizeExternalShellPath(string path)
         {
