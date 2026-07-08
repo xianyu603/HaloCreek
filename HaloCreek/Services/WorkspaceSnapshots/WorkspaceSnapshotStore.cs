@@ -41,6 +41,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         private RefreshState _state;
         private SnapshotRefreshReason _pendingReason;// 调试信息 不讲究地只记录第一个pending请求的触发方
         private bool _hasSuccessfulRefresh;
+        private bool _isReadingSnapshot = false;
 
         internal WorkspaceSnapshotStore(Func<TSnapshot> readSnapshot)
         {
@@ -163,8 +164,9 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
                 try
                 {
-                    RemoveFileSystemWatcher();
+                    lock (_lock) { _isReadingSnapshot = true; }
                     var snapshot = _readSnapshot();
+                    lock (_lock) { _isReadingSnapshot = false; }
                     UpdateFileSystemWatcher(workspace, snapshot.SnapshotListenPath);
                     PublishRefreshResult(workspace, snapshot, reason);
                 }
@@ -173,6 +175,9 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                     Log.Warning(
                         LogCategory,
                         $"Snapshot refresh failed. Snapshot={typeof(TSnapshot).Name}, Reason={reason}, Workspace={workspace.WorkspacePath}, Error={ex}");
+                } finally
+                {
+                    lock (_lock) { _isReadingSnapshot = false; }
                 }
 
                 if (!CompleteRefreshAndGetIsPending(out reason))
@@ -242,12 +247,12 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
         private void OnFileSystemWatcherChanged(object sender, FileSystemEventArgs e)
         {
-            ScheduleFileSystemChangedRefresh();
+            ScheduleFileSystemChangedRefresh(sender);
         }
 
         private void OnFileSystemWatcherRenamed(object sender, RenamedEventArgs e)
         {
-            ScheduleFileSystemChangedRefresh();
+            ScheduleFileSystemChangedRefresh(sender);
         }
 
         private void OnFileSystemWatcherError(object sender, ErrorEventArgs e)
@@ -255,14 +260,16 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             Log.Warning(
                 LogCategory,
                 $"Snapshot file watcher failed. Snapshot={typeof(TSnapshot).Name}, Path={GetFileSystemListenPath()}, Error={e.GetException()}");
-            ScheduleFileSystemChangedRefresh();
+            ScheduleFileSystemChangedRefresh(sender);
         }
 
-        private void ScheduleFileSystemChangedRefresh()
+        private void ScheduleFileSystemChangedRefresh(object sender)
         {
             lock (_lock)
             {
-                if (_state == RefreshState.Disposed)
+                if (_state == RefreshState.Disposed
+                    || _isReadingSnapshot
+                    || !ReferenceEquals(sender, _fileSystemWatcher))
                 {
                     return;
                 }
@@ -277,13 +284,23 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             WorkspaceContext workspace,
             string? listenPath)
         {
-            if (string.IsNullOrWhiteSpace(listenPath))
+            var trimmedListenPath = listenPath?.Trim() ?? null;
+            if(string.IsNullOrWhiteSpace(trimmedListenPath))
             {
+                RemoveFileSystemWatcher();
                 return;
             }
 
-            var trimmedListenPath = listenPath.Trim();
             FileSystemWatcher? watcher = null;
+            lock (_lock)
+            {
+                if (string.Equals(trimmedListenPath, _fileSystemListenPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            RemoveFileSystemWatcher();
             try
             {
                 watcher = CreateFileSystemWatcher(trimmedListenPath);
