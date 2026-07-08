@@ -184,9 +184,9 @@ namespace HaloCreek.Services
              psmux literal send truncates at LF in this path; 
              CR reaches Codex as Enter and is handled by Codex paste-burst as multiline paste.
             */
-            for (var offset = 0; offset < message.Length; offset += SendKeysChunkLength)
+            for (var offset = 0; offset < normalizedMsg.Length; offset += SendKeysChunkLength)
             {
-                var chunkLength = Math.Min(SendKeysChunkLength, message.Length - offset);
+                var chunkLength = Math.Min(SendKeysChunkLength, normalizedMsg.Length - offset);
                 RunMuxCommand(
                     new[] { "send-keys", "-l", "-t", targetPane, normalizedMsg.Substring(offset, chunkLength) },
                     "send literal keys to psmux session");
