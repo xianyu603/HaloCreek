@@ -1,2 +1,0 @@
-tmux session的alive判断(进程级), 可选自动重启, 用于处理更新之后得手动重新发送消息的问题
-tmux session的超时trouble shooting展示, 如果卡住太久并且不是完成态高亮最大化, 如果是前台展示按钮
