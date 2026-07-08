@@ -43,7 +43,7 @@ namespace HaloCreek.ViewModels.Tabs
                 historySnapshots);
 
             BringToFrontCommand = new RelayCommand<OngoingSession>(BringToFront, CanBringToFront);
-            OpenCliCommand = new AsyncRelayCommand<OngoingSession>(OpenCliAsync, CanOpenCli);
+            OpenCliCommand = new AsyncRelayCommand<OngoingSession>(OpenCliAsync);
             ExitSessionCommand = new RelayCommand<OngoingSession>(ExitSession, CanExitSession);
 
             ((INotifyCollectionChanged)_sessionLifecycleService.AllSessions).CollectionChanged +=
@@ -113,11 +113,6 @@ namespace HaloCreek.ViewModels.Tabs
         private static bool CanBringToFront(OngoingSession? session)
         {
             return session is not null;
-        }
-
-        private static bool CanOpenCli(OngoingSession? session)
-        {
-            return session?.CanOpenCli == true;
         }
 
         private void OngoingSessions_OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
