@@ -12,14 +12,16 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         public static WorkspaceSnapshotStore<TSnapshot> Create<TSnapshot>()
             where TSnapshot : IWorkspaceSnapshot<TSnapshot>
         {
-            return new WorkspaceSnapshotStore<TSnapshot>(TSnapshot.ReadSnapshot);
+            return new WorkspaceSnapshotStore<TSnapshot>(
+                readHint => TSnapshot.ReadSnapshot(readHint));
         }
 
         public static WorkspaceSnapshotStore<TSnapshot> Create<TSnapshot>(string key)
             where TSnapshot : IKeyedWorkspaceSnapshot<TSnapshot>
         {
             ArgumentNullException.ThrowIfNull(key);
-            return new WorkspaceSnapshotStore<TSnapshot>(() => TSnapshot.ReadSnapshot(key));
+            return new WorkspaceSnapshotStore<TSnapshot>(
+                readHint => TSnapshot.ReadSnapshot(key, readHint));
         }
     }
 
@@ -32,18 +34,19 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         private static readonly TimeSpan FileSystemChangeDebounce = TimeSpan.FromMilliseconds(500);
 
         private readonly object _lock = new();
-        private readonly Func<TSnapshot> _readSnapshot;
+        private readonly Func<object?, TSnapshot> _readSnapshot;
         private readonly Timer _refreshTimer;
         private readonly Timer _fileSystemWatcherDebounceTimer;
         private TSnapshot _current;
         private FileSystemWatcher? _fileSystemWatcher;
         private string? _fileSystemListenPath;
+        private object? _readHint;
         private RefreshState _state;
         private SnapshotRefreshReason _pendingReason;// 调试信息 不讲究地只记录第一个pending请求的触发方
         private bool _hasSuccessfulRefresh;
         private bool _isReadingSnapshot = false;
 
-        internal WorkspaceSnapshotStore(Func<TSnapshot> readSnapshot)
+        internal WorkspaceSnapshotStore(Func<object?, TSnapshot> readSnapshot)
         {
             _readSnapshot = readSnapshot ?? throw new ArgumentNullException(nameof(readSnapshot));
             _current = TSnapshot.CreateEmpty();
@@ -165,7 +168,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                 try
                 {
                     lock (_lock) { _isReadingSnapshot = true; }
-                    var snapshot = _readSnapshot();
+                    var snapshot = _readSnapshot(GetReadHint());
                     lock (_lock) { _isReadingSnapshot = false; }
                     UpdateFileSystemWatcher(workspace, snapshot.SnapshotListenPath);
                     PublishRefreshResult(workspace, snapshot, reason);
@@ -202,6 +205,7 @@ namespace HaloCreek.Services.WorkspaceSnapshots
                 }
 
                 var contentChanged = !TSnapshot.ContentEquals(_current, snapshot);
+                _readHint = snapshot.SnapshotReadHint;
                 if (contentChanged)
                 {
                     _current = snapshot;
@@ -414,6 +418,14 @@ namespace HaloCreek.Services.WorkspaceSnapshots
             }
 
             DisposeFileSystemWatcher(watcher);
+        }
+
+        private object? GetReadHint()
+        {
+            lock (_lock)
+            {
+                return _readHint;
+            }
         }
 
         private string? GetFileSystemListenPath()

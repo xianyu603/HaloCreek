@@ -16,11 +16,9 @@ namespace HaloCreek.Services.SessionState
     {
         public static readonly TimeSpan ActiveThreshold = TimeSpan.FromSeconds(4);
 
-        public static TimeSpan SnapshotRefreshInterval => TimeSpan.FromSeconds(1);
-
-        public static TimeSpan SnapshotRefreshJitter => TimeSpan.Zero;
-
         public string? SnapshotListenPath { get; init; }
+
+        public object? SnapshotReadHint => SnapshotListenPath;
 
         public static SessionStateSnapshot CreateEmpty()
         {
@@ -35,7 +33,14 @@ namespace HaloCreek.Services.SessionState
 
         public static SessionStateSnapshot ReadSnapshot(string key)
         {
-            return CodexSessionStateReader.ReadSessionState(key);
+            return ReadSnapshot(key, readHint: null);
+        }
+
+        public static SessionStateSnapshot ReadSnapshot(
+            string key,
+            object? readHint)
+        {
+            return CodexSessionStateReader.ReadSessionState(key, readHint);
         }
 
         static SessionStateSnapshot IWorkspaceSnapshot<SessionStateSnapshot>.ReadSnapshot()

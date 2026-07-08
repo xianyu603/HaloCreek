@@ -15,6 +15,11 @@ namespace HaloCreek.Services.WorkspaceSnapshots
 
         static abstract TSnapshot ReadSnapshot();
 
+        static virtual TSnapshot ReadSnapshot(object? readHint)
+        {
+            return TSnapshot.ReadSnapshot();
+        }
+
         static abstract bool ContentEquals(TSnapshot left, TSnapshot right);
 
         static virtual TimeSpan SnapshotRefreshInterval { get { return TimeSpan.FromSeconds(10); } }
@@ -22,17 +27,24 @@ namespace HaloCreek.Services.WorkspaceSnapshots
         static virtual TimeSpan SnapshotRefreshJitter { get { return TimeSpan.FromSeconds(2); } }
 
         string? SnapshotListenPath { get { return null; } }
+
+        object? SnapshotReadHint { get { return null; } }
     }
 
     public interface IKeyedWorkspaceSnapshot<TSnapshot> :
         IWorkspaceSnapshot<TSnapshot>
-        where TSnapshot : IWorkspaceSnapshot<TSnapshot>
+        where TSnapshot : IKeyedWorkspaceSnapshot<TSnapshot>
     {
         // Keyed snapshots are expected to be read through WorkspaceSnapshotStore(string key).
         // The inherited parameterless ReadSnapshot contract is not used by the store for keyed snapshots.
         // Snapshots that support both keyed and keyless reads are not modeled yet.
         // If that requirement appears, add an explicit hybrid contract instead of loosening keyed-only semantics.
         static abstract TSnapshot ReadSnapshot(string key);
+
+        static virtual TSnapshot ReadSnapshot(string key, object? readHint)
+        {
+            return TSnapshot.ReadSnapshot(key);
+        }
     }
 
     public interface IWorkspaceSnapshotSource<TSnapshot>

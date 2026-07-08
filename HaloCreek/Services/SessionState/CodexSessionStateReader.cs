@@ -8,9 +8,18 @@ namespace HaloCreek.Services.SessionState
 {
     public static class CodexSessionStateReader
     {
-        public static SessionStateSnapshot ReadSessionState(string sessionId)
+        public static SessionStateSnapshot ReadSessionState(
+            string sessionId,
+            object? readHint)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+
+            if (readHint is string hintedSessionFilePath
+                && !string.IsNullOrWhiteSpace(hintedSessionFilePath)
+                && TryReadSessionFile(hintedSessionFilePath, out var hintedSnapshot))
+            {
+                return hintedSnapshot;
+            }
 
             var sessionFilePath = CodexSessionFileLocator.FindSessionFilePath(sessionId);
             if (sessionFilePath is null)
@@ -21,8 +30,33 @@ namespace HaloCreek.Services.SessionState
             return ReadSessionFile(sessionFilePath);
         }
 
+        private static bool TryReadSessionFile(
+            string sessionFilePath,
+            out SessionStateSnapshot snapshot)
+        {
+            try
+            {
+                snapshot = ReadSessionFile(sessionFilePath);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException
+                or NotSupportedException
+                or UnauthorizedAccessException)
+            {
+                snapshot = default!;
+                return false;
+            }
+        }
+
         private static SessionStateSnapshot ReadSessionFile(string sessionFilePath)
         {
+            if (!File.Exists(sessionFilePath))
+            {
+                throw new FileNotFoundException(
+                    "Codex session file does not exist.",
+                    sessionFilePath);
+            }
+
             var lastActiveTime = new DateTimeOffset(File.GetLastWriteTimeUtc(sessionFilePath));
             var state = SessionTaskState.Unknown;
             DateTimeOffset? stateTimestamp = null;
