@@ -9,7 +9,7 @@ namespace HaloCreek.Models
     public sealed class OngoingSession : ObservableObject
     {
         private bool _isFront;
-        private bool _isInteractive;
+        private SessionLaunchState _launchState;
         private SessionTaskState _taskState;
         private DateTimeOffset? _stateTimestamp;
         private DateTimeOffset? _lastActiveTime;
@@ -23,7 +23,7 @@ namespace HaloCreek.Models
             DateTimeOffset startedAt,
             bool isFront,
             SessionStateSnapshot stateSnapshot,
-            bool isInteractive)
+            SessionLaunchState launchState)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(id);
             ArgumentNullException.ThrowIfNull(title);
@@ -34,7 +34,7 @@ namespace HaloCreek.Models
             StartedAt = startedAt;
             Set(
                 isFront: isFront,
-                isInteractive: isInteractive,
+                launchState: launchState,
                 stateSnapshot: stateSnapshot);
         }
 
@@ -46,7 +46,11 @@ namespace HaloCreek.Models
 
         public bool IsFront => _isFront;
 
-        public bool IsInteractive => _isInteractive;
+        public SessionLaunchState LaunchState => _launchState;
+
+        public bool CanOpenCli => LaunchState is SessionLaunchState.Launched or SessionLaunchState.Started;
+
+        public bool CanSendMessage => LaunchState == SessionLaunchState.Started;
 
         public SessionTaskState TaskState => _taskState;
 
@@ -60,7 +64,7 @@ namespace HaloCreek.Models
 
         public SessionTokenInfo? TokenInfo => _tokenInfo;
 
-        public string StatusText => $"{(IsFront ? "Front" : "Background")} / {FormatActivity()}";
+        public string StatusText => $"{(IsFront ? "Front" : "Background")} / {FormatStatus()}";
 
         public string ActivityText => FormatActivity();
 
@@ -76,7 +80,7 @@ namespace HaloCreek.Models
         // Keep it direct so reference search shows every lifecycle update point.
         internal void Set(
             bool? isFront = null,
-            bool? isInteractive = null,
+            SessionLaunchState? launchState = null,
             SessionStateSnapshot? stateSnapshot = null)
         {
             var statusTextChanged = false;
@@ -87,9 +91,12 @@ namespace HaloCreek.Models
                 statusTextChanged = true;
             }
 
-            if (isInteractive is { } nextIsInteractive)
+            if (launchState is { } nextLaunchState
+                && SetProperty(ref _launchState, nextLaunchState, nameof(LaunchState)))
             {
-                SetProperty(ref _isInteractive, nextIsInteractive, nameof(IsInteractive));
+                statusTextChanged = true;
+                OnPropertyChanged(nameof(CanOpenCli));
+                OnPropertyChanged(nameof(CanSendMessage));
             }
 
             if (stateSnapshot is not null)
@@ -147,6 +154,17 @@ namespace HaloCreek.Models
             };
         }
 
+        private string FormatStatus()
+        {
+            return LaunchState switch
+            {
+                SessionLaunchState.Requested => "Requested",
+                SessionLaunchState.Launched => "Launched",
+                SessionLaunchState.Started => FormatActivity(),
+                _ => "Unknown",
+            };
+        }
+
         private static string FormatTaskState(SessionTaskState state)
         {
             return state switch
@@ -174,5 +192,12 @@ namespace HaloCreek.Models
 
             return $"context {usedPercentage}% used, {total}";
         }
+    }
+
+    public enum SessionLaunchState
+    {
+        Requested,
+        Launched,
+        Started,
     }
 }

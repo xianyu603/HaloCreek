@@ -28,8 +28,7 @@ namespace HaloCreek.Views.Tabs
                 return;
             }
 
-            if (session.IsInteractive
-                && viewModel.BringToFrontCommand.CanExecute(session))
+            if (viewModel.BringToFrontCommand.CanExecute(session))
             {
                 viewModel.BringToFrontCommand.Execute(session);
                 e.Handled = true;

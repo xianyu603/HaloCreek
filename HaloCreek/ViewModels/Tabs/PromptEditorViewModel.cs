@@ -67,7 +67,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void BringToFront(OngoingSession? session)
         {
-            if (session is null || !session.IsInteractive)
+            if (session is null)
             {
                 return;
             }
@@ -78,7 +78,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private async Task OpenCliAsync(OngoingSession? session)
         {
-            if (session is null || !session.IsInteractive)
+            if (session is null || !session.CanOpenCli)
             {
                 return;
             }
@@ -96,7 +96,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private void ExitSession(OngoingSession? session)
         {
-            if (session is null || !session.IsInteractive)
+            if (session is null)
             {
                 return;
             }
@@ -117,7 +117,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         private static bool CanOpenCli(OngoingSession? session)
         {
-            return session is not null;
+            return session?.CanOpenCli == true;
         }
 
         private void OngoingSessions_OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

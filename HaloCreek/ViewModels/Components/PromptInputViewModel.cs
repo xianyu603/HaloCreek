@@ -52,7 +52,7 @@ namespace HaloCreek.ViewModels.Components
                 historySnapshots);
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);
-            SendToFrontCommand = new AsyncRelayCommand(SendToFrontAsync, CanSendToFront);
+            SendToFrontCommand = new AsyncRelayCommand(SendToFrontAsync);
 
             _sessionLifecycleService.PropertyChanged += SessionLifecycleService_OnPropertyChanged;
         }
@@ -65,7 +65,6 @@ namespace HaloCreek.ViewModels.Components
                 if (SetProperty(ref _promptText, value ?? string.Empty))
                 {
                     LaunchCommand.NotifyCanExecuteChanged();
-                    SendToFrontCommand.NotifyCanExecuteChanged();
                     RefreshCompletionTrigger();
                 }
             }
@@ -558,11 +557,6 @@ namespace HaloCreek.ViewModels.Components
             return !string.IsNullOrWhiteSpace(PromptText);
         }
 
-        private bool CanSendToFront()
-        {
-            return HasFrontSession && HasPromptText();
-        }
-
         private void SessionLifecycleService_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(SessionLifecycleService.FrontSession))
@@ -586,7 +580,6 @@ namespace HaloCreek.ViewModels.Components
 
             OnPropertyChanged(nameof(FrontSession));
             OnPropertyChanged(nameof(HasFrontSession));
-            SendToFrontCommand.NotifyCanExecuteChanged();
         }
 
         private readonly record struct CompletionTriggerState(

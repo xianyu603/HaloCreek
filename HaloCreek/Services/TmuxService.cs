@@ -13,8 +13,6 @@ namespace HaloCreek.Services
 {
     public sealed class TmuxService : IDisposable
     {
-        private static readonly TimeSpan CodexHistoryMatchTimeout = TimeSpan.FromSeconds(20);
-        private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
         private static readonly TimeSpan SendKeysEnterDelay = TimeSpan.FromMilliseconds(100);
         private const string LogCategory = "Tmux";
         private const string PsmuxExecutableName = "psmux";
@@ -33,7 +31,7 @@ namespace HaloCreek.Services
             ArgumentNullException.ThrowIfNull(appCommonRuntime);
         }
 
-        public Task<TmuxLaunchResult> LaunchAsync(TmuxLaunchRequest request, out string identifier)
+        public Task LaunchAsync(TmuxLaunchRequest request, out string identifier)
         {
             ArgumentNullException.ThrowIfNull(request);
             ArgumentException.ThrowIfNullOrWhiteSpace(request.WorkspacePath);
@@ -59,9 +57,6 @@ namespace HaloCreek.Services
 
             return QueueSessionOperation(sessionIdentifier, () =>
             {
-                var historySnapshot = string.IsNullOrWhiteSpace(request.KnownCodexSessionId)
-                    ? CodexSessionFileLocator.CaptureHistorySnapshot()
-                    : null;
                 RunMuxCommand(arguments, "launch psmux session");
                 lock (_ownedSessionsLock)
                 {
@@ -71,11 +66,6 @@ namespace HaloCreek.Services
 
                 TryRunMuxCommand(new[] { "set-option", "-t", sessionIdentifier, "mouse", "on" }, out _);
                 SetSessionMetadata(sessionIdentifier, windowsWorkspacePath, request.Title);
-
-                var codexSessionId = !string.IsNullOrWhiteSpace(request.KnownCodexSessionId)
-                    ? request.KnownCodexSessionId.Trim()
-                    : WaitForCodexSessionId(historySnapshot!, request.HistoryPromptText);
-                return new TmuxLaunchResult(sessionIdentifier, codexSessionId);
             });
         }
 
@@ -246,39 +236,6 @@ namespace HaloCreek.Services
                     TaskScheduler.Default);
                 return task;
             }
-        }
-
-        private static string WaitForCodexSessionId(
-            CodexHistorySnapshot historySnapshot,
-            string? promptText)
-        {
-            if (string.IsNullOrWhiteSpace(promptText))
-            {
-                throw new InvalidOperationException(
-                    "Codex history prompt text is required to match the launched session.");
-            }
-
-            var deadline = DateTimeOffset.UtcNow + CodexHistoryMatchTimeout;
-            while (true)
-            {
-                var entry = CodexSessionFileLocator.FindNewHistoryEntry(
-                    historySnapshot,
-                    promptText);
-                if (entry is not null)
-                {
-                    return entry.SessionId;
-                }
-
-                if (DateTimeOffset.UtcNow >= deadline)
-                {
-                    break;
-                }
-
-                Thread.Sleep(CodexHistoryMatchPollInterval);
-            }
-
-            throw new InvalidOperationException(
-                "Timed out waiting for Codex history to record the launched session.");
         }
 
         private void RemoveCompletedSessionOperation(string identifier, Task completedTask)

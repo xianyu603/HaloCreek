@@ -95,7 +95,7 @@
                                                         VerticalAlignment="Center">
                                                 <Button Classes="sessionActionButton"
                                                         ToolTip.Tip="CLI"
-                                                        IsEnabled="{Binding IsInteractive}"
+                                                        IsEnabled="{Binding CanOpenCli}"
                                                         Command="{Binding DataContext.OpenCliCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}">
                                                     <PathIcon Width="8"
@@ -104,7 +104,6 @@
                                                 </Button>
                                                 <Button Classes="sessionActionButton"
                                                         ToolTip.Tip="Exit"
-                                                        IsEnabled="{Binding IsInteractive}"
                                                         Command="{Binding DataContext.ExitSessionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}">
                                                     <PathIcon Width="8"

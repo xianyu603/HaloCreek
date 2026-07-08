@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HaloCreek.Services
@@ -16,11 +17,13 @@ namespace HaloCreek.Services
     public sealed class SessionLifecycleService : IDisposable, INotifyPropertyChanged
     {
         private const string LogCategory = "SessionState";
+        private static readonly TimeSpan CodexHistoryMatchPollInterval = TimeSpan.FromMilliseconds(250);
 
         // 正确性前提是所有共享状态的直接操作都来自同一个 UI 线程。
         private readonly Dictionary<string, OngoingSession> _sessionsById = new(StringComparer.Ordinal);
         private readonly ObservableCollection<OngoingSession> _allSessions = [];
         private readonly Dictionary<string, WorkspaceSnapshotStore<SessionStateSnapshot>> _sessionStateStoresById = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, CancellationTokenSource> _codexSessionIdWaitsById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
         private readonly TransientEventService _transientEventService;
         private OngoingSession? _frontSession;
@@ -83,6 +86,7 @@ namespace HaloCreek.Services
             }
 
             DisposeSessionStateStores();
+            CancelCodexSessionIdWaits();
             _sessionsById.Clear();
             _allSessions.Clear();
             _frontSessionId = null;
@@ -150,13 +154,16 @@ namespace HaloCreek.Services
                 title = "Codex session";
             }
 
+            // 这个记录的是history.jsonl的快照
+            var historySnapshot = string.IsNullOrWhiteSpace(knownCodexSessionId)
+                ? CodexSessionFileLocator.CaptureHistorySnapshot()
+                : null;
+
             var launchTask = _tmuxService.LaunchAsync(new TmuxLaunchRequest(
                 workspace.WorkspacePath,
                 config.CodexExecutableName,
                 config.CodexLaunchArguments.Concat(codexArguments).ToArray(),
-                title,
-                historyPromptText,
-                knownCodexSessionId),
+                title),
                 out var identifier);
 
             var now = DateTimeOffset.Now;
@@ -166,14 +173,14 @@ namespace HaloCreek.Services
                 now,
                 isFront: false,
                 stateSnapshot: SessionStateSnapshot.CreateEmpty(),
-                isInteractive: false);
+                launchState: SessionLaunchState.Requested);
             AddSession(session);
             BringToFront(identifier);
 
             var launchCompleted = false;
             try
             {
-                var launchResult = await launchTask;
+                await launchTask;
 
                 if (_isDisposed)
                 {
@@ -187,12 +194,20 @@ namespace HaloCreek.Services
                     throw new InvalidOperationException("Session closed before launch completed.");
                 }
 
-                var stateSnapshots = CreateSessionStateStore(session.Id, launchResult.CodexSessionId);
-                session.Set(
-                    isInteractive: true,
-                    stateSnapshot: stateSnapshots.Current);
-
+                session.Set(launchState: SessionLaunchState.Launched);
                 launchCompleted = true;
+
+                if (!string.IsNullOrWhiteSpace(knownCodexSessionId))
+                {
+                    StartSessionStateStore(identifier, knownCodexSessionId.Trim());
+                }
+                else
+                {
+                    _ = WaitForCodexSessionIdAndStartStoreAsync(
+                        identifier,
+                        historySnapshot!,
+                        historyPromptText);
+                }
             }
             finally
             {
@@ -210,6 +225,7 @@ namespace HaloCreek.Services
                 if (!launchCompleted)
                 {
                     RemoveSessionStateStore(identifier);
+                    RemoveCodexSessionIdWait(identifier, true);
                 }
             }
 
@@ -269,7 +285,7 @@ namespace HaloCreek.Services
             }
 
             if (!_sessionsById.TryGetValue(frontSessionId, out var frontSession)
-                || !frontSession.IsInteractive)
+                || !frontSession.CanSendMessage)
             {
                 ReportFrontSessionFailure("Send to front failed", "Front session is still starting.");
                 return;
@@ -298,6 +314,7 @@ namespace HaloCreek.Services
             _tmuxService.Exit(sessionId);
 
             RemoveSessionStateStore(sessionId);
+            RemoveCodexSessionIdWait(sessionId, cancel: true);
             if (string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal))
             {
                 _frontSessionId = null;
@@ -350,6 +367,98 @@ namespace HaloCreek.Services
             };
             _sessionStateStoresById.Add(sessionId, store);
             return store;
+        }
+
+        private void StartSessionStateStore(
+            string sessionId,
+            string codexSessionId)
+        {
+            if (_isDisposed
+                || !_sessionsById.TryGetValue(sessionId, out var session)
+                || _sessionStateStoresById.ContainsKey(sessionId))
+            {
+                return;
+            }
+
+            var stateSnapshots = CreateSessionStateStore(sessionId, codexSessionId);
+            session.Set(
+                launchState: SessionLaunchState.Started,
+                stateSnapshot: stateSnapshots.Current);
+        }
+
+        private async Task WaitForCodexSessionIdAndStartStoreAsync(
+            string sessionId,
+            CodexHistorySnapshot historySnapshot,
+            string? promptText)
+        {
+            if (string.IsNullOrWhiteSpace(promptText))
+            {
+                throw new InvalidOperationException(
+                    "Codex history prompt text is required to match the launched session.");
+            }
+
+            var cancellationTokenSource = new CancellationTokenSource();
+            _codexSessionIdWaitsById.Add(sessionId, cancellationTokenSource);
+            try
+            {
+                var codexSessionId = await Task.Run(
+                    () => WaitForCodexSessionId(
+                        historySnapshot,
+                        promptText,
+                        cancellationTokenSource.Token),
+                    cancellationTokenSource.Token);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    RemoveCodexSessionIdWait(sessionId, cancel: false);
+
+                    if (_isDisposed
+                        || !_sessionsById.ContainsKey(sessionId))
+                    {
+                        return;
+                    }
+
+                    StartSessionStateStore(sessionId, codexSessionId);
+                });
+            }
+            catch (Exception ex)
+            {
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    RemoveCodexSessionIdWait(sessionId, cancel: false);
+
+                    if (_isDisposed
+                        || !_sessionsById.ContainsKey(sessionId) 
+                        || ex is OperationCanceledException)
+                    {
+                        return;
+                    }
+
+                    ReportFrontSessionFailure(
+                        "Session state unavailable",
+                        ex.Message,
+                        ex);
+                });
+            }
+            finally
+            {
+                cancellationTokenSource.Dispose();
+            }
+        }
+
+        private void RemoveCodexSessionIdWait(
+            string sessionId,
+            bool cancel)
+        {
+            if (!_codexSessionIdWaitsById.Remove(sessionId, out var cancellationTokenSource))
+            {
+                return;
+            }
+
+            if (cancel)
+            {
+                cancellationTokenSource.Cancel();
+            }
         }
 
         private void PublishSessionStateSnapshotChanged(
@@ -423,6 +532,37 @@ namespace HaloCreek.Services
             }
 
             _sessionStateStoresById.Clear();
+        }
+
+        private void CancelCodexSessionIdWaits()
+        {
+            foreach (var cancellationTokenSource in _codexSessionIdWaitsById.Values)
+            {
+                cancellationTokenSource.Cancel();
+            }
+
+            _codexSessionIdWaitsById.Clear();
+        }
+
+        private static string WaitForCodexSessionId(
+            CodexHistorySnapshot historySnapshot,
+            string promptText,
+            CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var entry = CodexSessionFileLocator.FindNewHistoryEntry(
+                    historySnapshot,
+                    promptText);
+                if (entry is not null)
+                {
+                    return entry.SessionId;
+                }
+
+                Thread.Sleep(CodexHistoryMatchPollInterval);
+            }
         }
 
         private static void LogSessionStateSnapshotPublished(
