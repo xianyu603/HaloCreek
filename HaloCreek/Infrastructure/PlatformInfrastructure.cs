@@ -622,10 +622,13 @@ namespace HaloCreek.Infrastructure
                 return;
             }
 
-            StartProcess(
-                "explorer.exe",
-                new[] { NormalizeExternalShellPath(target) },
-                createNoWindow: true);
+            var shellTarget = TrimAfterLastPathExtension(NormalizeExternalShellPath(target));
+
+            using var fileProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = new Uri(Path.GetFullPath(shellTarget)).AbsoluteUri,
+                UseShellExecute = true,
+            });
         }
 
         public static int StartCurrentApplication(string workspacePath)
@@ -682,6 +685,29 @@ namespace HaloCreek.Infrastructure
             }
 
             return true;
+        }
+
+        private static string TrimAfterLastPathExtension(string path)
+        {
+            var lastBackslashIndex = path.LastIndexOf('\\');
+            var lastSlashIndex = path.LastIndexOf('/');
+            var fileNameStartIndex = Math.Max(lastBackslashIndex, lastSlashIndex) + 1;
+            var extensionStartInFileName = path.AsSpan(fileNameStartIndex).LastIndexOf('.');
+            if (extensionStartInFileName < 0)
+            {
+                return path;
+            }
+
+            var extensionEndIndex = fileNameStartIndex + extensionStartInFileName + 1;
+            while (extensionEndIndex < path.Length && char.IsAsciiLetterOrDigit(path[extensionEndIndex]))
+            {
+                extensionEndIndex++;
+            }
+
+            return extensionEndIndex == fileNameStartIndex + extensionStartInFileName + 1
+                || extensionEndIndex == path.Length
+                    ? path
+                    : path[..extensionEndIndex];
         }
 
         private static string NormalizeExternalShellPath(string path)

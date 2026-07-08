@@ -188,7 +188,7 @@ namespace HaloCreek.Services
             {
                 var chunkLength = Math.Min(SendKeysChunkLength, message.Length - offset);
                 RunMuxCommand(
-                    new[] { "send-keys", "-l", "-t", targetPane, normalizedMsg },
+                    new[] { "send-keys", "-l", "-t", targetPane, normalizedMsg.Substring(offset, chunkLength) },
                     "send literal keys to psmux session");
             }
 

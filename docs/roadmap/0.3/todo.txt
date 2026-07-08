@@ -1,2 +1,8 @@
 tmux session的alive判断(进程级), 可选自动重启, 用于处理更新之后得手动重新发送消息的问题
 tmux session的超时trouble shooting展示, 如果卡住太久并且不是完成态高亮最大化, 如果是前台展示按钮
+
+中高优先级：session state 定位成本可能会随历史会话膨胀。
+CodexSessionFileLocator.cs 每次读状态都递归扫 .codex/sessions/**/*.jsonl，再按 LastWriteTimeUtc 排序匹配。结合 1 秒刷新，多个 ongoing session 时 IO 成本会明显上来。这里适合在首次找到 session 文件后缓存路径，失败或文件消失再重新定位。
+
+中优先级：状态刷新模型已经好用，但生命周期还没完全收口。
+WorkspaceSnapshotStore 统一了 timer + 文件监听，这是个好抽象；但它在每次刷新时都会先移除 watcher 再重建 watcher：WorkspaceSnapshotStore.cs。这能简单保证 listen path 更新，但会带来监听空窗和额外 churn。当前阶段可接受，后续如果状态刷新还是核心路径，建议只在 listen path 变化时重建。
