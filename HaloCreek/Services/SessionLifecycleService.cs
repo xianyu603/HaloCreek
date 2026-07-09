@@ -109,6 +109,7 @@ namespace HaloCreek.Services
                 new[] { promptText },
                 promptText,
                 promptText,
+                new SessionRestartSource.LaunchPrompt(promptText),
                 knownCodexSessionId: null);
         }
 
@@ -130,6 +131,7 @@ namespace HaloCreek.Services
                 new[] { "resume", session.Id },
                 session.InitialPrompt,
                 historyPromptText: null,
+                new SessionRestartSource.CodexSession(session.Id),
                 knownCodexSessionId: session.Id);
         }
 
@@ -137,10 +139,12 @@ namespace HaloCreek.Services
             IReadOnlyList<string> codexArguments,
             string titleSource,
             string? historyPromptText,
+            SessionRestartSource restartSource,
             string? knownCodexSessionId)
         {
             RequireUiThread();
             ArgumentNullException.ThrowIfNull(codexArguments);
+            ArgumentNullException.ThrowIfNull(restartSource);
 
             var workspace = WorkspaceRuntime.Current;
             var config = workspace.EffectiveConfig;
@@ -173,6 +177,7 @@ namespace HaloCreek.Services
             var session = new OngoingSession(
                 identifier,
                 title,
+                restartSource,
                 now,
                 isFront: false,
                 stateSnapshot: SessionStateSnapshot.CreateEmpty(),
@@ -404,6 +409,7 @@ namespace HaloCreek.Services
             _sessionStateStoresById.Add(sessionId, stateSnapshots);
             session.Set(
                 launchState: SessionLaunchState.Started,
+                restartSource: new SessionRestartSource.CodexSession(codexSessionId),
                 stateSnapshot: stateSnapshots.Current);
         }
 

@@ -18,10 +18,12 @@ namespace HaloCreek.Models
         private IReadOnlyList<SessionMessage> _messages = Array.Empty<SessionMessage>();
         private SessionTokenInfo? _tokenInfo;
         private int? _keepAliveExitCode;
+        private SessionRestartSource _restartSource;
 
         internal OngoingSession(
             string id,
             string title,
+            SessionRestartSource restartSource,
             DateTimeOffset startedAt,
             bool isFront,
             SessionStateSnapshot stateSnapshot,
@@ -29,10 +31,12 @@ namespace HaloCreek.Models
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(id);
             ArgumentNullException.ThrowIfNull(title);
+            ArgumentNullException.ThrowIfNull(restartSource);
             ArgumentNullException.ThrowIfNull(stateSnapshot);
 
             Id = id;
             Title = title;
+            _restartSource = restartSource;
             StartedAt = startedAt;
             Set(
                 isFront: isFront,
@@ -43,6 +47,8 @@ namespace HaloCreek.Models
         public string Id { get; }
 
         public string Title { get; }
+
+        public SessionRestartSource RestartSource => _restartSource;
 
         public DateTimeOffset StartedAt { get; }
 
@@ -89,6 +95,7 @@ namespace HaloCreek.Models
         internal void Set(
             bool? isFront = null,
             SessionLaunchState? launchState = null,
+            SessionRestartSource? restartSource = null,
             SessionStateSnapshot? stateSnapshot = null,
             SessionKeepAliveSnapshot? keepAliveSnapshot = null)
         {
@@ -106,6 +113,11 @@ namespace HaloCreek.Models
                 statusTextChanged = true;
                 OnPropertyChanged(nameof(CanOpenCli));
                 OnPropertyChanged(nameof(CanSendMessage));
+            }
+
+            if (restartSource is { } nextRestartSource)
+            {
+                SetProperty(ref _restartSource, nextRestartSource, nameof(RestartSource));
             }
 
             if (stateSnapshot is not null)
