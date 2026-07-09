@@ -91,7 +91,9 @@ namespace HaloCreek.Models
 
         public string TaskStateText => FormatTaskState(TaskState);
 
-        public string StateTimestampText => StateTimestamp is null
+        public string StateTimestampText => IsDead
+            ? "Process exited. Close or restart this session."
+            : StateTimestamp is null
             ? "No state timestamp"
             : $"Updated {StateTimestamp.Value.ToLocalTime():HH:mm:ss}";
 
@@ -196,6 +198,7 @@ namespace HaloCreek.Models
                 OnPropertyChanged(nameof(CanOpenCli));
                 OnPropertyChanged(nameof(CanRestart));
                 OnPropertyChanged(nameof(ActivityText));
+                OnPropertyChanged(nameof(StateTimestampText));
             }
 
             statusTextChanged = previousIsProcessAlive != IsProcessAlive;

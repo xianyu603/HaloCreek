@@ -25,7 +25,8 @@
                             Background="#DCFCE7"
                             CornerRadius="5"
                             Padding="8,2"
-                            VerticalAlignment="Center">
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding IsAliveOrUnknown}">
                         <TextBlock Text="{Binding ActivityText}"
                                    Foreground="#166534"
                                    FontSize="12"
@@ -36,9 +37,23 @@
                             Background="#DCFCE7"
                             CornerRadius="5"
                             Padding="8,2"
-                            VerticalAlignment="Center">
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding IsAliveOrUnknown}">
                         <TextBlock Text="{Binding TaskStateText}"
                                    Foreground="#166534"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </Border>
+                    <Border Grid.Column="1"
+                            Grid.ColumnSpan="2"
+                            Background="#FEE2E2"
+                            CornerRadius="5"
+                            Padding="8,2"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding IsDead}">
+                        <TextBlock Text="{Binding ActivityText}"
+                                   Foreground="#B91C1C"
                                    FontSize="12"
                                    FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis"/>
