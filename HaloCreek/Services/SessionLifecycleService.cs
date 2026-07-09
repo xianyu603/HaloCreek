@@ -492,6 +492,10 @@ namespace HaloCreek.Services
                     {
                         return;
                     }
+                    if (_sessionKeepAliveStoresById.TryGetValue(sessionId, out var keepAliveStore))
+                    {
+                        keepAliveStore.RequestRefresh(SnapshotRefreshReason.Manual);
+                    }
 
                     StartSessionStateStore(sessionId, codexSessionId);
                 });

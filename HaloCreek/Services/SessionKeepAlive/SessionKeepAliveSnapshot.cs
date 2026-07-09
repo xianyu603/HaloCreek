@@ -16,6 +16,10 @@ namespace HaloCreek.Services.SessionKeepAlive
             "\x1B\\[0;2;48;2;[^m\\r\\n]*m>?",
             RegexOptions.Compiled);
 
+        public static TimeSpan SnapshotRefreshInterval => TimeSpan.FromSeconds(3);
+
+        public static TimeSpan SnapshotRefreshJitter => TimeSpan.Zero;
+
         public static SessionKeepAliveSnapshot CreateEmpty()
         {
             return new SessionKeepAliveSnapshot(SessionKeepAliveStatus.Other);
