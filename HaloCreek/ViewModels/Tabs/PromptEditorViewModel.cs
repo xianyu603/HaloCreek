@@ -44,6 +44,7 @@ namespace HaloCreek.ViewModels.Tabs
 
             BringToFrontCommand = new RelayCommand<OngoingSession>(BringToFront, CanBringToFront);
             OpenCliCommand = new AsyncRelayCommand<OngoingSession>(OpenCliAsync);
+            RestartSessionCommand = new RelayCommand<OngoingSession>(RestartSession);
             ExitSessionCommand = new RelayCommand<OngoingSession>(ExitSession, CanExitSession);
 
             ((INotifyCollectionChanged)_sessionLifecycleService.AllSessions).CollectionChanged +=
@@ -62,6 +63,8 @@ namespace HaloCreek.ViewModels.Tabs
         public IRelayCommand<OngoingSession> BringToFrontCommand { get; }
 
         public IAsyncRelayCommand<OngoingSession> OpenCliCommand { get; }
+
+        public IRelayCommand<OngoingSession> RestartSessionCommand { get; }
 
         public IRelayCommand<OngoingSession> ExitSessionCommand { get; }
 
@@ -103,6 +106,25 @@ namespace HaloCreek.ViewModels.Tabs
 
             _sessionLifecycleService.Exit(session.Id);
             Log.Info("PromptEditor", "Session exit requested.");
+        }
+
+        private void RestartSession(OngoingSession? session)
+        {
+            if (session is null || !session.CanRestart)
+            {
+                return;
+            }
+
+            var restartMode = session.RestartSource switch
+            {
+                SessionRestartSource.CodexSession source => $"resume codex session {source.SessionId}",
+                SessionRestartSource.LaunchPrompt => "launch from first prompt",
+                _ => "unknown restart source",
+            };
+
+            Log.Info(
+                "PromptEditor",
+                $"Session restart requested. SessionId={session.Id}, Action={restartMode}.");
         }
 
         private static bool CanExitSession(OngoingSession? session)

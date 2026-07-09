@@ -60,6 +60,11 @@
                                     <Setter Property="BorderThickness" Value="1"/>
                                     <Setter Property="Foreground" Value="#334155"/>
                                 </Style>
+                                <Style Selector="Button.restartActionButton">
+                                    <Setter Property="Background" Value="#FFF7ED"/>
+                                    <Setter Property="BorderBrush" Value="#FDBA74"/>
+                                    <Setter Property="Foreground" Value="#C2410C"/>
+                                </Style>
                             </ItemsControl.Styles>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="model:OngoingSession"
@@ -95,12 +100,23 @@
                                                         VerticalAlignment="Center">
                                                 <Button Classes="sessionActionButton"
                                                         ToolTip.Tip="CLI"
+                                                        IsVisible="{Binding IsAliveOrUnknown}"
                                                         IsEnabled="{Binding CanOpenCli}"
                                                         Command="{Binding DataContext.OpenCliCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}">
                                                     <PathIcon Width="8"
                                                               Height="8"
                                                               Data="M19,3 L5,3 C3.9,3 3,3.9 3,5 L3,19 C3,20.1 3.9,21 5,21 L19,21 C20.1,21 21,20.1 21,19 L21,5 C21,3.9 20.1,3 19,3 Z M19,19 L5,19 L5,5 L19,5 Z"/>
+                                                </Button>
+                                                <Button Classes="sessionActionButton restartActionButton"
+                                                        ToolTip.Tip="Restart"
+                                                        IsVisible="{Binding IsDead}"
+                                                        IsEnabled="{Binding CanRestart}"
+                                                        Command="{Binding DataContext.RestartSessionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}">
+                                                    <PathIcon Width="10"
+                                                              Height="10"
+                                                              Data="M17.7,6.3 C16.2,4.3 13.8,3 11.2,3 C6.7,3 3,6.7 3,11.2 C3,15.7 6.7,19.4 11.2,19.4 C14.7,19.4 17.8,17.2 18.9,13.9 L16.8,13.2 C16,15.6 13.8,17.2 11.2,17.2 C7.9,17.2 5.2,14.5 5.2,11.2 C5.2,7.9 7.9,5.2 11.2,5.2 C13.2,5.2 15,6.2 16.1,7.8 L12.8,7.8 L12.8,10 L20,10 L20,2.8 L17.7,2.8 Z"/>
                                                 </Button>
                                                 <Button Classes="sessionActionButton"
                                                         ToolTip.Tip="Exit"

@@ -56,7 +56,14 @@ namespace HaloCreek.Models
 
         public SessionLaunchState LaunchState => _launchState;
 
-        public bool CanOpenCli => LaunchState is SessionLaunchState.Launched or SessionLaunchState.Started;
+        public bool IsDead => IsProcessAlive == false;
+
+        public bool IsAliveOrUnknown => !IsDead;
+
+        public bool CanOpenCli => IsAliveOrUnknown
+            && LaunchState is SessionLaunchState.Launched or SessionLaunchState.Started;
+
+        public bool CanRestart => IsDead;
 
         public bool CanSendMessage => LaunchState == SessionLaunchState.Started;
 
@@ -184,6 +191,10 @@ namespace HaloCreek.Models
 
             if (previousIsProcessAlive != IsProcessAlive)
             {
+                OnPropertyChanged(nameof(IsDead));
+                OnPropertyChanged(nameof(IsAliveOrUnknown));
+                OnPropertyChanged(nameof(CanOpenCli));
+                OnPropertyChanged(nameof(CanRestart));
                 OnPropertyChanged(nameof(ActivityText));
             }
 
