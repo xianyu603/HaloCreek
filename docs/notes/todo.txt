@@ -19,4 +19,4 @@ view边框的问题, history尤其明显, 四个角感觉被啃了
 截图自动化迭代的skill
 $补全卡顿问题 考虑新增一个workspaceskillsnapshot
 输入框补全 在底下位置不够的时候(考虑以过半为判据), 挪到最顶上
-tmux session 卡住的trouble shooting. 试图不检测卡住, 检测'未到达输入界面' 试了试psmux没有很靠谱的检查输入状态的指令, capture pane搞启发式也有点不合理 暂定用输入框pattern 吧 只影响展示喽
+KeepAlive探测频率提高, 另外在获取launch获取到codex session id之类的敏感点位手动发起刷新

@@ -65,6 +65,11 @@
                                     <Setter Property="BorderBrush" Value="#FDBA74"/>
                                     <Setter Property="Foreground" Value="#C2410C"/>
                                 </Style>
+                                <Style Selector="Button.sessionActionButton.keepAliveOtherActionButton">
+                                    <Setter Property="Background" Value="#FFFBEB"/>
+                                    <Setter Property="BorderBrush" Value="#F59E0B"/>
+                                    <Setter Property="Foreground" Value="#B45309"/>
+                                </Style>
                             </ItemsControl.Styles>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="model:OngoingSession"
@@ -99,6 +104,7 @@
                                                         Spacing="4"
                                                         VerticalAlignment="Center">
                                                 <Button Classes="sessionActionButton"
+                                                        Classes.keepAliveOtherActionButton="{Binding IsKeepAliveOther}"
                                                         ToolTip.Tip="CLI"
                                                         IsVisible="{Binding IsAliveOrUnknown}"
                                                         IsEnabled="{Binding CanOpenCli}"

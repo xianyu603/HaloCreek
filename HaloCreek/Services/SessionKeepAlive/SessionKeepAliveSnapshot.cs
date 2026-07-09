@@ -7,7 +7,7 @@ using HaloCreek.Services.WorkspaceSnapshots;
 
 namespace HaloCreek.Services.SessionKeepAlive
 {
-    public sealed record SessionKeepAliveSnapshot(int? ExitCode, SessionKeepAliveStatus Status)
+    public sealed record SessionKeepAliveSnapshot(SessionKeepAliveStatus Status)
         : IKeyedWorkspaceSnapshot<SessionKeepAliveSnapshot>
     {
         private const string PsmuxExecutableName = "psmux";
@@ -18,7 +18,7 @@ namespace HaloCreek.Services.SessionKeepAlive
 
         public static SessionKeepAliveSnapshot CreateEmpty()
         {
-            return new SessionKeepAliveSnapshot(null, SessionKeepAliveStatus.Other);
+            return new SessionKeepAliveSnapshot(SessionKeepAliveStatus.Other);
         }
 
         public static SessionKeepAliveSnapshot ReadSnapshot(string key)
@@ -28,9 +28,7 @@ namespace HaloCreek.Services.SessionKeepAlive
                 PsmuxExecutableName,
                 new[] { "capture-pane", "-pe", "-t", key + ":0.0"});
 
-            return new SessionKeepAliveSnapshot(
-                result.ExitCode,
-                ParseStatus(result.ExitCode, result.Output));
+            return new SessionKeepAliveSnapshot(ParseStatus(result.ExitCode, result.Output));
         }
 
         static SessionKeepAliveSnapshot IWorkspaceSnapshot<SessionKeepAliveSnapshot>.ReadSnapshot()
@@ -43,8 +41,7 @@ namespace HaloCreek.Services.SessionKeepAlive
             SessionKeepAliveSnapshot left,
             SessionKeepAliveSnapshot right)
         {
-            return left.ExitCode == right.ExitCode
-                && left.Status == right.Status;
+            return left.Status == right.Status;
         }
 
         private static SessionKeepAliveStatus ParseStatus(

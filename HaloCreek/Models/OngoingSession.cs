@@ -17,7 +17,7 @@ namespace HaloCreek.Models
         private bool? _isActive;
         private IReadOnlyList<SessionMessage> _messages = Array.Empty<SessionMessage>();
         private SessionTokenInfo? _tokenInfo;
-        private int? _keepAliveExitCode;
+        private SessionKeepAliveStatus _sessionKeepAliveStatus = SessionKeepAliveStatus.Other;
         private SessionRestartSource _restartSource;
 
         internal OngoingSession(
@@ -56,9 +56,17 @@ namespace HaloCreek.Models
 
         public SessionLaunchState LaunchState => _launchState;
 
-        public bool IsDead => IsProcessAlive == false;
+        public SessionKeepAliveStatus SessionKeepAliveStatus => _sessionKeepAliveStatus;
+
+        public bool IsDead => SessionKeepAliveStatus == SessionKeepAliveStatus.Dead;
 
         public bool IsAliveOrUnknown => !IsDead;
+
+        public bool IsKeepAliveOther => SessionKeepAliveStatus == SessionKeepAliveStatus.Other;
+
+        public bool ShowNormalStatusBubbles => SessionKeepAliveStatus == SessionKeepAliveStatus.HasInputPane;
+
+        public bool ShowAttentionStatusBubble => IsDead || IsKeepAliveOther;
 
         public bool CanOpenCli => IsAliveOrUnknown
             && LaunchState is SessionLaunchState.Launched or SessionLaunchState.Started;
@@ -79,12 +87,6 @@ namespace HaloCreek.Models
 
         public SessionTokenInfo? TokenInfo => _tokenInfo;
 
-        public int? KeepAliveExitCode => _keepAliveExitCode;
-
-        public bool? IsProcessAlive => KeepAliveExitCode is null
-            ? null
-            : KeepAliveExitCode == 0;
-
         public string StatusText => $"{(IsFront ? "Front" : "Background")} / {FormatStatus()}";
 
         public string ActivityText => FormatActivity();
@@ -93,6 +95,8 @@ namespace HaloCreek.Models
 
         public string StateTimestampText => IsDead
             ? "Process exited. Close or restart this session."
+            : IsKeepAliveOther
+            ? "Input pane was not detected. Open CLI to inspect this session."
             : StateTimestamp is null
             ? "No state timestamp"
             : $"Updated {StateTimestamp.Value.ToLocalTime():HH:mm:ss}";
@@ -184,31 +188,34 @@ namespace HaloCreek.Models
             SessionKeepAliveSnapshot snapshot,
             out bool statusTextChanged)
         {
-            var previousIsProcessAlive = IsProcessAlive;
+            var previousStatus = SessionKeepAliveStatus;
 
-            if (SetProperty(ref _keepAliveExitCode, snapshot.ExitCode, nameof(KeepAliveExitCode)))
-            {
-                OnPropertyChanged(nameof(IsProcessAlive));
-            }
-
-            if (previousIsProcessAlive != IsProcessAlive)
+            if (SetProperty(ref _sessionKeepAliveStatus, snapshot.Status, nameof(SessionKeepAliveStatus)))
             {
                 OnPropertyChanged(nameof(IsDead));
                 OnPropertyChanged(nameof(IsAliveOrUnknown));
+                OnPropertyChanged(nameof(IsKeepAliveOther));
+                OnPropertyChanged(nameof(ShowNormalStatusBubbles));
+                OnPropertyChanged(nameof(ShowAttentionStatusBubble));
                 OnPropertyChanged(nameof(CanOpenCli));
                 OnPropertyChanged(nameof(CanRestart));
                 OnPropertyChanged(nameof(ActivityText));
                 OnPropertyChanged(nameof(StateTimestampText));
             }
 
-            statusTextChanged = previousIsProcessAlive != IsProcessAlive;
+            statusTextChanged = previousStatus != SessionKeepAliveStatus;
         }
 
         private string FormatActivity()
         {
-            if (IsProcessAlive == false)
+            if (IsDead)
             {
                 return "Dead";
+            }
+
+            if (IsKeepAliveOther)
+            {
+                return "CLI attention";
             }
 
             return IsActive switch
@@ -221,9 +228,14 @@ namespace HaloCreek.Models
 
         private string FormatStatus()
         {
-            if (IsProcessAlive == false)
+            if (IsDead)
             {
                 return "Dead";
+            }
+
+            if (IsKeepAliveOther)
+            {
+                return "CLI attention";
             }
 
             return LaunchState switch
