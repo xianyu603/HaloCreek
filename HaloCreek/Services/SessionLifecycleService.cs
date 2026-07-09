@@ -12,6 +12,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Collections.Specialized.BitVector32;
 
 namespace HaloCreek.Services
 {
@@ -107,7 +108,7 @@ namespace HaloCreek.Services
 
             return StartCodexSessionAsync(
                 new[] { promptText },
-                promptText,
+                FirstPromptSummaryFormatter.Format(promptText),
                 promptText,
                 new SessionRestartSource.LaunchPrompt(promptText),
                 knownCodexSessionId: null);
@@ -129,15 +130,63 @@ namespace HaloCreek.Services
 
             return StartCodexSessionAsync(
                 new[] { "resume", session.Id },
-                session.InitialPrompt,
+                FirstPromptSummaryFormatter.Format(session.InitialPrompt),
                 historyPromptText: null,
                 new SessionRestartSource.CodexSession(session.Id),
                 knownCodexSessionId: session.Id);
         }
 
+        public Task<OngoingSession> RestartAsync(OngoingSession? session)
+        {
+            RequireUiThread();
+
+            if (session is null)
+            {
+                throw new InvalidOperationException("No session selected.");
+            }
+
+            if (!_sessionsById.TryGetValue(session.Id, out var currentSession))
+            {
+                throw new InvalidOperationException("Session is no longer available.");
+            }
+
+            if (!currentSession.CanRestart)
+            {
+                throw new InvalidOperationException("Session is not dead.");
+            }
+
+            var restartSource = currentSession.RestartSource;
+            var titleSource = currentSession.Title;
+            Exit(currentSession.Id);
+
+            return restartSource switch
+            {
+                SessionRestartSource.CodexSession source => RestartCodexSessionAsync(source, titleSource),
+                SessionRestartSource.LaunchPrompt source => LaunchAsync(source.PromptText),
+                _ => throw new InvalidOperationException("Session restart source is unavailable."),
+            };
+        }
+
+        private Task<OngoingSession> RestartCodexSessionAsync(
+            SessionRestartSource.CodexSession source,
+            string title)
+        {
+            if (string.IsNullOrWhiteSpace(source.SessionId))
+            {
+                throw new InvalidOperationException("Codex session id is empty.");
+            }
+
+            return StartCodexSessionAsync(
+                new[] { "resume", source.SessionId },
+                title,
+                historyPromptText: null,
+                new SessionRestartSource.CodexSession(source.SessionId),
+                knownCodexSessionId: source.SessionId);
+        }
+
         private async Task<OngoingSession> StartCodexSessionAsync(
             IReadOnlyList<string> codexArguments,
-            string titleSource,
+            string title,
             string? historyPromptText,
             SessionRestartSource restartSource,
             string? knownCodexSessionId)
@@ -155,7 +204,6 @@ namespace HaloCreek.Services
 
             ArgumentNullException.ThrowIfNull(config.CodexLaunchArguments);
 
-            var title = FirstPromptSummaryFormatter.Format(titleSource);
             if (string.IsNullOrWhiteSpace(title))
             {
                 title = "Codex session";

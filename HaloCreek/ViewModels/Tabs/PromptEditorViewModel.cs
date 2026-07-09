@@ -19,6 +19,7 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly SessionLifecycleService _sessionLifecycleService;
         private readonly TmuxService _tmuxService;
         private readonly TerminalService _terminalService;
+        private readonly TransientEventService _transientEventService;
         private bool _isDisposed;
 
         public PromptEditorViewModel(
@@ -36,6 +37,7 @@ namespace HaloCreek.ViewModels.Tabs
                 ?? throw new ArgumentNullException(nameof(sessionLifecycleService));
             _tmuxService = tmuxService ?? throw new ArgumentNullException(nameof(tmuxService));
             _terminalService = terminalService ?? throw new ArgumentNullException(nameof(terminalService));
+            _transientEventService = appCommonRuntime.TransientEventService;
             PromptInput = new PromptInputViewModel(
                 _sessionLifecycleService,
                 appCommonRuntime,
@@ -44,7 +46,7 @@ namespace HaloCreek.ViewModels.Tabs
 
             BringToFrontCommand = new RelayCommand<OngoingSession>(BringToFront, CanBringToFront);
             OpenCliCommand = new AsyncRelayCommand<OngoingSession>(OpenCliAsync);
-            RestartSessionCommand = new RelayCommand<OngoingSession>(RestartSession);
+            RestartSessionCommand = new AsyncRelayCommand<OngoingSession>(RestartSessionAsync);
             ExitSessionCommand = new RelayCommand<OngoingSession>(ExitSession, CanExitSession);
 
             ((INotifyCollectionChanged)_sessionLifecycleService.AllSessions).CollectionChanged +=
@@ -64,7 +66,7 @@ namespace HaloCreek.ViewModels.Tabs
 
         public IAsyncRelayCommand<OngoingSession> OpenCliCommand { get; }
 
-        public IRelayCommand<OngoingSession> RestartSessionCommand { get; }
+        public IAsyncRelayCommand<OngoingSession> RestartSessionCommand { get; }
 
         public IRelayCommand<OngoingSession> ExitSessionCommand { get; }
 
@@ -108,23 +110,35 @@ namespace HaloCreek.ViewModels.Tabs
             Log.Info("PromptEditor", "Session exit requested.");
         }
 
-        private void RestartSession(OngoingSession? session)
+        private async Task RestartSessionAsync(OngoingSession? session)
         {
             if (session is null || !session.CanRestart)
             {
                 return;
             }
 
-            var restartMode = session.RestartSource switch
+            try
             {
-                SessionRestartSource.CodexSession source => $"resume codex session {source.SessionId}",
-                SessionRestartSource.LaunchPrompt => "launch from first prompt",
-                _ => "unknown restart source",
-            };
+                var restartMode = session.RestartSource switch
+                {
+                    SessionRestartSource.CodexSession source => $"resume codex session {source.SessionId}",
+                    SessionRestartSource.LaunchPrompt => "launch from first prompt",
+                    _ => "unknown restart source",
+                };
 
-            Log.Info(
-                "PromptEditor",
-                $"Session restart requested. SessionId={session.Id}, Action={restartMode}.");
+                var restartedSession = await _sessionLifecycleService.RestartAsync(session);
+                Log.Info(
+                    "PromptEditor",
+                    $"Session restart requested. SessionId={session.Id}, NewSessionId={restartedSession.Id}, Action={restartMode}.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                _transientEventService.ReportUserActionFailure(
+                    "PromptEditor",
+                    "Restart failed",
+                    ex.Message,
+                    ex);
+            }
         }
 
         private static bool CanExitSession(OngoingSession? session)
