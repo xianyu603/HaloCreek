@@ -705,7 +705,8 @@ namespace HaloCreek.Services
                 LogCategory,
                 "Ongoing session keep-alive snapshot published. "
                 + $"TmuxSessionId={tmuxSessionId}, "
-                + $"ExitCode={snapshot.ExitCode}");
+                + $"ExitCode={snapshot.ExitCode}, "
+                + $"Status={snapshot.Status}");
         }
 
         private static void RequireUiThread()

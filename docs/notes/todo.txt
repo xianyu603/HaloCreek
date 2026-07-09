@@ -17,7 +17,6 @@ review加点提示信息，方便先捡软柿子review
 json parser有点零散  考虑集中infra
 view边框的问题, history尤其明显, 四个角感觉被啃了
 截图自动化迭代的skill
-考虑给tmux添加alive 判别 tmux display-message -p -t '<session>:0.0' '#{pane_dead} #{pane_pid} #{pane_current_command}'
 $补全卡顿问题 考虑新增一个workspaceskillsnapshot
 输入框补全 在底下位置不够的时候(考虑以过半为判据), 挪到最顶上
-tmux session的超时trouble shooting展示, 如果卡住太久并且不是完成态高亮最大化, 如果是前台展示按钮
+tmux session 卡住的trouble shooting. 试图不检测卡住, 检测'未到达输入界面' 试了试psmux没有很靠谱的检查输入状态的指令, capture pane搞启发式也有点不合理 暂定用输入框pattern 吧 只影响展示喽

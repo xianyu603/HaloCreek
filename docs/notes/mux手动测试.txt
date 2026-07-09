@@ -7,3 +7,5 @@ psmux send-keys -l -t $target '一行'
 psmux send-keys -t $target enter
 psmux send-keys -l -t $target '两行'
 $msg = " ESC [ 200 ~`r第一行`r第二行`r第三行`rESC [ 201 ~"
+
+psmux display-message -p -t $target 'dead=#{pane_dead} active=#{pane_active} mode=#{pane_in_mode}#{pane_mode} input_off=#{pane_input_off} cmd=#{pane_current_command} pid=#{pane_pid} tty=#{pane_tty} bp=#{bracket_paste_flag} alt=#{alternate_on} insert=#{insert_flag} keypad=#{keypad_flag}/#{keypad_cursor_flag} mouse=#{mouse_any_flag} cursor=#{cursor_x},#{cursor_y} char=#{cursor_character}'
