@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using HaloCreek.Services.SessionKeepAlive;
 using HaloCreek.Services.SessionState;
 
 namespace HaloCreek.Models
@@ -16,6 +17,7 @@ namespace HaloCreek.Models
         private bool? _isActive;
         private IReadOnlyList<SessionMessage> _messages = Array.Empty<SessionMessage>();
         private SessionTokenInfo? _tokenInfo;
+        private int? _keepAliveExitCode;
 
         internal OngoingSession(
             string id,
@@ -64,6 +66,12 @@ namespace HaloCreek.Models
 
         public SessionTokenInfo? TokenInfo => _tokenInfo;
 
+        public int? KeepAliveExitCode => _keepAliveExitCode;
+
+        public bool? IsProcessAlive => KeepAliveExitCode is null
+            ? null
+            : KeepAliveExitCode == 0;
+
         public string StatusText => $"{(IsFront ? "Front" : "Background")} / {FormatStatus()}";
 
         public string ActivityText => FormatActivity();
@@ -81,7 +89,8 @@ namespace HaloCreek.Models
         internal void Set(
             bool? isFront = null,
             SessionLaunchState? launchState = null,
-            SessionStateSnapshot? stateSnapshot = null)
+            SessionStateSnapshot? stateSnapshot = null,
+            SessionKeepAliveSnapshot? keepAliveSnapshot = null)
         {
             var statusTextChanged = false;
 
@@ -103,6 +112,12 @@ namespace HaloCreek.Models
             {
                 SetState(stateSnapshot, out var statusTextChangedBySnapshot);
                 statusTextChanged |= statusTextChangedBySnapshot;
+            }
+
+            if (keepAliveSnapshot is not null)
+            {
+                SetKeepAlive(keepAliveSnapshot, out var statusTextChangedByKeepAlive);
+                statusTextChanged |= statusTextChangedByKeepAlive;
             }
 
             if (statusTextChanged)
@@ -144,8 +159,32 @@ namespace HaloCreek.Models
             }
         }
 
+        private void SetKeepAlive(
+            SessionKeepAliveSnapshot snapshot,
+            out bool statusTextChanged)
+        {
+            var previousIsProcessAlive = IsProcessAlive;
+
+            if (SetProperty(ref _keepAliveExitCode, snapshot.ExitCode, nameof(KeepAliveExitCode)))
+            {
+                OnPropertyChanged(nameof(IsProcessAlive));
+            }
+
+            if (previousIsProcessAlive != IsProcessAlive)
+            {
+                OnPropertyChanged(nameof(ActivityText));
+            }
+
+            statusTextChanged = previousIsProcessAlive != IsProcessAlive;
+        }
+
         private string FormatActivity()
         {
+            if (IsProcessAlive == false)
+            {
+                return "Dead";
+            }
+
             return IsActive switch
             {
                 true => "Active",
@@ -156,6 +195,11 @@ namespace HaloCreek.Models
 
         private string FormatStatus()
         {
+            if (IsProcessAlive == false)
+            {
+                return "Dead";
+            }
+
             return LaunchState switch
             {
                 SessionLaunchState.Requested => "Requested",

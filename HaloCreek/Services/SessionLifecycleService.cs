@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
 using HaloCreek.Models;
+using HaloCreek.Services.SessionKeepAlive;
 using HaloCreek.Services.SessionState;
 using HaloCreek.Services.WorkspaceSnapshots;
 using System;
@@ -23,6 +24,7 @@ namespace HaloCreek.Services
         private readonly Dictionary<string, OngoingSession> _sessionsById = new(StringComparer.Ordinal);
         private readonly ObservableCollection<OngoingSession> _allSessions = [];
         private readonly Dictionary<string, WorkspaceSnapshotStore<SessionStateSnapshot>> _sessionStateStoresById = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, WorkspaceSnapshotStore<SessionKeepAliveSnapshot>> _sessionKeepAliveStoresById = new(StringComparer.Ordinal);
         private readonly Dictionary<string, CancellationTokenSource> _codexSessionIdWaitsById = new(StringComparer.Ordinal);
         private readonly TmuxService _tmuxService;
         private readonly TransientEventService _transientEventService;
@@ -86,6 +88,7 @@ namespace HaloCreek.Services
             }
 
             DisposeSessionStateStores();
+            DisposeSessionKeepAliveStores();
             CancelCodexSessionIdWaits();
             _sessionsById.Clear();
             _allSessions.Clear();
@@ -195,6 +198,7 @@ namespace HaloCreek.Services
                 }
 
                 session.Set(launchState: SessionLaunchState.Launched);
+                StartSessionKeepAliveStore(identifier);
                 launchCompleted = true;
 
                 if (!string.IsNullOrWhiteSpace(knownCodexSessionId))
@@ -225,6 +229,7 @@ namespace HaloCreek.Services
                 if (!launchCompleted)
                 {
                     RemoveSessionStateStore(identifier);
+                    RemoveSessionKeepAliveStore(identifier);
                     RemoveCodexSessionIdWait(identifier, true);
                 }
             }
@@ -314,6 +319,7 @@ namespace HaloCreek.Services
             _tmuxService.Exit(sessionId);
 
             RemoveSessionStateStore(sessionId);
+            RemoveSessionKeepAliveStore(sessionId);
             RemoveCodexSessionIdWait(sessionId, cancel: true);
             if (string.Equals(_frontSessionId, sessionId, StringComparison.Ordinal))
             {
@@ -349,30 +355,36 @@ namespace HaloCreek.Services
                 exception);
         }
 
-        private WorkspaceSnapshotStore<SessionStateSnapshot> CreateSessionStateStore(
-            string sessionId,
-            string codexSessionId)
+        private void StartSessionKeepAliveStore(string sessionId)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
-            ArgumentException.ThrowIfNullOrWhiteSpace(codexSessionId);
 
-            var store = WorkspaceSnapshotStore.Create<SessionStateSnapshot>(codexSessionId);
-            store.Changed += (_, _) =>
+            if (_isDisposed
+                || !_sessionsById.TryGetValue(sessionId, out var session)
+                || _sessionKeepAliveStoresById.ContainsKey(sessionId))
             {
-                LogSessionStateSnapshotPublished(
+                return;
+            }
+
+            var keepAliveSnapshots = WorkspaceSnapshotStore.Create<SessionKeepAliveSnapshot>(sessionId);
+            keepAliveSnapshots.Changed += (_, _) =>
+            {
+                LogSessionKeepAliveSnapshotPublished(
                     sessionId,
-                    codexSessionId,
-                    store.Current);
-                PublishSessionStateSnapshotChanged(sessionId, store.Current);
+                    keepAliveSnapshots.Current);
+                PublishSessionKeepAliveSnapshotChanged(sessionId, keepAliveSnapshots.Current);
             };
-            _sessionStateStoresById.Add(sessionId, store);
-            return store;
+            _sessionKeepAliveStoresById.Add(sessionId, keepAliveSnapshots);
+            session.Set(keepAliveSnapshot: keepAliveSnapshots.Current);
         }
 
         private void StartSessionStateStore(
             string sessionId,
             string codexSessionId)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+            ArgumentException.ThrowIfNullOrWhiteSpace(codexSessionId);
+
             if (_isDisposed
                 || !_sessionsById.TryGetValue(sessionId, out var session)
                 || _sessionStateStoresById.ContainsKey(sessionId))
@@ -380,7 +392,16 @@ namespace HaloCreek.Services
                 return;
             }
 
-            var stateSnapshots = CreateSessionStateStore(sessionId, codexSessionId);
+            var stateSnapshots = WorkspaceSnapshotStore.Create<SessionStateSnapshot>(codexSessionId);
+            stateSnapshots.Changed += (_, _) =>
+            {
+                LogSessionStateSnapshotPublished(
+                    sessionId,
+                    codexSessionId,
+                    stateSnapshots.Current);
+                PublishSessionStateSnapshotChanged(sessionId, stateSnapshots.Current);
+            };
+            _sessionStateStoresById.Add(sessionId, stateSnapshots);
             session.Set(
                 launchState: SessionLaunchState.Started,
                 stateSnapshot: stateSnapshots.Current);
@@ -480,6 +501,25 @@ namespace HaloCreek.Services
             session.Set(stateSnapshot: snapshot);
         }
 
+        private void PublishSessionKeepAliveSnapshotChanged(
+            string sessionId,
+            SessionKeepAliveSnapshot snapshot)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => PublishSessionKeepAliveSnapshotChanged(sessionId, snapshot));
+                return;
+            }
+
+            if (_isDisposed
+                || !_sessionsById.TryGetValue(sessionId, out var session))
+            {
+                return;
+            }
+
+            session.Set(keepAliveSnapshot: snapshot);
+        }
+
         private void AddSession(OngoingSession session)
         {
             _sessionsById.Add(session.Id, session);
@@ -524,6 +564,16 @@ namespace HaloCreek.Services
             store.Dispose();
         }
 
+        private void RemoveSessionKeepAliveStore(string sessionId)
+        {
+            if (!_sessionKeepAliveStoresById.Remove(sessionId, out var store))
+            {
+                return;
+            }
+
+            store.Dispose();
+        }
+
         private void DisposeSessionStateStores()
         {
             foreach (var store in _sessionStateStoresById.Values)
@@ -532,6 +582,16 @@ namespace HaloCreek.Services
             }
 
             _sessionStateStoresById.Clear();
+        }
+
+        private void DisposeSessionKeepAliveStores()
+        {
+            foreach (var store in _sessionKeepAliveStoresById.Values)
+            {
+                store.Dispose();
+            }
+
+            _sessionKeepAliveStoresById.Clear();
         }
 
         private void CancelCodexSessionIdWaits()
@@ -581,6 +641,17 @@ namespace HaloCreek.Services
                 + $"ContextWindow={snapshot.TokenInfo?.ContextWindow}, "
                 + $"TotalTokenUsageTotal={snapshot.TokenInfo?.TotalTokenUsageTotal}, "
                 + $"LastTokenUsageTotal={snapshot.TokenInfo?.LastTokenUsageTotal}");
+        }
+
+        private static void LogSessionKeepAliveSnapshotPublished(
+            string tmuxSessionId,
+            SessionKeepAliveSnapshot snapshot)
+        {
+            Log.Info(
+                LogCategory,
+                "Ongoing session keep-alive snapshot published. "
+                + $"TmuxSessionId={tmuxSessionId}, "
+                + $"ExitCode={snapshot.ExitCode}");
         }
 
         private static void RequireUiThread()
