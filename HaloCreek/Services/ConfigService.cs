@@ -108,6 +108,9 @@ namespace HaloCreek.Services
                 Coalesce(fileConfig.CodexExecutableName, baseConfig.CodexExecutableName),
                 Coalesce(fileConfig.CodexLaunchArguments, baseConfig.CodexLaunchArguments),
                 CoalescePositive(fileConfig.MaxSessionHistoryFiles, baseConfig.MaxSessionHistoryFiles),
+                CoalesceMarkdownLineJumpCommands(
+                    fileConfig.MarkdownLineJumpCommands,
+                    baseConfig.MarkdownLineJumpCommands),
                 Coalesce(fileConfig.ShortcutPhraseCategories, baseConfig.ShortcutPhraseCategories));
         }
 
@@ -141,6 +144,43 @@ namespace HaloCreek.Services
             return values ?? fallback;
         }
 
+        private static IReadOnlyDictionary<string, IReadOnlyList<string>> CoalesceMarkdownLineJumpCommands(
+            IReadOnlyDictionary<string, List<string?>?>? commands,
+            IReadOnlyDictionary<string, IReadOnlyList<string>> fallback)
+        {
+            if (commands is null)
+            {
+                return fallback;
+            }
+
+            var merged = new Dictionary<string, IReadOnlyList<string>>(
+                fallback,
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in commands)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.Key)
+                    && entry.Value is not null
+                    && entry.Value.Count > 0
+                    && entry.Value.All(IsSupportedMarkdownLineJumpArgument))
+                {
+                    merged[entry.Key.Trim()] = entry.Value.Select(argument => argument!).ToArray();
+                }
+            }
+
+            return merged;
+        }
+
+        private static bool IsSupportedMarkdownLineJumpArgument(string? argument)
+        {
+            var remaining = argument?
+                .Replace("{Path}", string.Empty, StringComparison.Ordinal)
+                .Replace("{Line}", string.Empty, StringComparison.Ordinal);
+
+            return remaining is not null
+                && !remaining.Contains('{', StringComparison.Ordinal)
+                && !remaining.Contains('}', StringComparison.Ordinal);
+        }
+
         private sealed class AppConfigFile
         {
             public string? CodexExecutableName { get; init; }
@@ -148,6 +188,8 @@ namespace HaloCreek.Services
             public List<string?>? CodexLaunchArguments { get; init; }
 
             public int? MaxSessionHistoryFiles { get; init; }
+
+            public Dictionary<string, List<string?>?>? MarkdownLineJumpCommands { get; init; }
 
             public List<ShortcutPhraseCategory>? ShortcutPhraseCategories { get; init; }
         }

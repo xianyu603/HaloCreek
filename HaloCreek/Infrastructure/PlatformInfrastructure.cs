@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -31,19 +32,6 @@ namespace HaloCreek.Infrastructure
     {
         private const string LogCategory = "Platform";
         private const int WslCommandTimeoutMilliseconds = 10000;
-
-        private static readonly IReadOnlyDictionary<string, Func<MarkdownFileLineTarget, string[]>>
-            MarkdownLineEditorArgumentFactories =
-                new Dictionary<string, Func<MarkdownFileLineTarget, string[]>>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["devenv"] = target => new[]
-                    {
-                        "/edit",
-                        Path.GetFullPath(target.Path),
-                        "/command",
-                        $"Edit.GoTo {target.Line}",
-                    },
-                };
 
         private static IReadOnlyList<string>? _wslDistributionNames;
 
@@ -645,13 +633,17 @@ namespace HaloCreek.Infrastructure
                 shellTarget = TrimAfterLastPathExtension(fileLineTarget.Path);
                 var editorPath = QueryDefaultExecutableForPath(shellTarget);
                 if (editorPath is not null
-                    && MarkdownLineEditorArgumentFactories.TryGetValue(
+                    && WorkspaceRuntime.Current.EffectiveConfig.MarkdownLineJumpCommands.TryGetValue(
                         Path.GetFileNameWithoutExtension(editorPath) ?? string.Empty,
-                        out var createArguments))
+                        out var argumentTemplates))
                 {
                     StartProcess(
                         editorPath,
-                        createArguments(fileLineTarget with { Path = shellTarget }));
+                        argumentTemplates
+                            .Select(argument => ResolveMarkdownLineJumpArgument(
+                                argument,
+                                fileLineTarget with { Path = shellTarget }))
+                            .ToArray());
                     return;
                 }
             }
@@ -792,6 +784,15 @@ namespace HaloCreek.Infrastructure
             }
 
             return QueryAssociationString(extension);
+        }
+
+        private static string ResolveMarkdownLineJumpArgument(
+            string argument,
+            MarkdownFileLineTarget target)
+        {
+            return argument
+                .Replace("{Path}", Path.GetFullPath(target.Path), StringComparison.Ordinal)
+                .Replace("{Line}", target.Line.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
         }
 
         private static string? QueryAssociationString(string extension)
