@@ -20,7 +20,7 @@ namespace HaloCreek.Services
         private readonly UserNotificationPlatform _userNotificationPlatform;
         private readonly Func<bool> _applicationWindowHasFocus;
         private readonly Dictionary<string, OngoingSession> _trackedSessionsById = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, SessionTaskState> _taskStatesBySessionId = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, (DateTimeOffset Timestamp, string Message)> _handledFinalAnswersBySessionId = new(StringComparer.Ordinal);
         private bool _isDisposed;
 
         public AppNotificationPublisher(
@@ -135,62 +135,77 @@ namespace HaloCreek.Services
             }
 
             session.PropertyChanged += OnSessionPropertyChanged;
-            _taskStatesBySessionId[session.Id] = session.TaskState;
+            var finalAnswer = GetLatestFinalAnswer(session);
+            if (finalAnswer is not null)
+            {
+                _handledFinalAnswersBySessionId[session.Id] = (finalAnswer.Timestamp, finalAnswer.Message);
+            }
         }
 
         private void UntrackSession(OngoingSession session)
         {
             session.PropertyChanged -= OnSessionPropertyChanged;
             _trackedSessionsById.Remove(session.Id);
-            _taskStatesBySessionId.Remove(session.Id);
+            _handledFinalAnswersBySessionId.Remove(session.Id);
         }
 
         private void OnSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (_isDisposed
-                || e.PropertyName != nameof(OngoingSession.TaskState)
+                || e.PropertyName != nameof(OngoingSession.Messages)
                 || sender is not OngoingSession session)
             {
                 return;
             }
 
-            EvaluateSessionState(session);
+            EvaluateSessionMessages(session);
         }
 
-        private void EvaluateSessionState(OngoingSession session)
+        private void EvaluateSessionMessages(OngoingSession session)
         {
-            var previousTaskState = _taskStatesBySessionId.GetValueOrDefault(
-                session.Id,
-                SessionTaskState.Unknown);
-            _taskStatesBySessionId[session.Id] = session.TaskState;
-
-            // Notification follows the task-state edge. If snapshot refresh misses a
-            // brief Completed -> Started -> Completed cycle, one notification may be missed;
-            // that belongs in snapshot refresh/listen behavior, not notification state.
-            if (session.TaskState != SessionTaskState.TaskCompleted
-                || previousTaskState == SessionTaskState.TaskCompleted)
+            var finalAnswer = GetLatestFinalAnswer(session);
+            if (finalAnswer is null)
             {
                 return;
             }
 
+            var notificationKey = (finalAnswer.Timestamp, finalAnswer.Message);
+            if (_handledFinalAnswersBySessionId.TryGetValue(session.Id, out var handledKey)
+                && handledKey == notificationKey)
+            {
+                return;
+            }
+
+            _handledFinalAnswersBySessionId[session.Id] = notificationKey;
             if (_applicationWindowHasFocus())
             {
                 return;
             }
 
-            _ = SendSessionCompletedNotificationAsync(session);
+            _ = SendFinalAnswerNotificationAsync(session, finalAnswer.Message);
         }
 
-        private async Task SendSessionCompletedNotificationAsync(OngoingSession session)
+        private static SessionMessage? GetLatestFinalAnswer(OngoingSession session)
+        {
+            return session.Messages.LastOrDefault(
+                message => message is
+                {
+                    Sender: SessionMessageSender.Agent,
+                    Phase: SessionMessagePhase.FinalAnswer,
+                });
+        }
+
+        private async Task SendFinalAnswerNotificationAsync(
+            OngoingSession session,
+            string message)
         {
             try
             {
-                var message = session.Messages.LastOrDefault()?.Message;
                 if (string.IsNullOrWhiteSpace(message))
                 {
                     Log.Warning(
                         LogCategory,
-                        $"Session completed notification skipped because no session message is available. SessionId={session.Id}");
+                        $"Final answer notification skipped because no final answer message is available. SessionId={session.Id}");
                     return;
                 }
 
