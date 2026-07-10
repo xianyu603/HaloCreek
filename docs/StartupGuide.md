@@ -21,7 +21,7 @@ scripts\install_deps.bat
 - `git.exe`：通过 WinGet 安装 Git for Windows。
 - `TortoiseGitProc.exe`：通过 WinGet 安装 TortoiseGit。
 
-Git 和 TortoiseGit 安装器可能显示安装 UI。脚本结束前会再次验证依赖；如果刚安装的工具还没有进入当前进程的 PATH，重新打开 PowerShell 后再运行一次脚本。
+Git 和 TortoiseGit 安装器可能显示安装 UI。脚本在安装后会刷新当前进程的 PATH，并在结束前再次验证依赖；如果验证仍失败，请人工检查对应工具是否把可执行文件目录写入了用户或系统 PATH。
 
 ### 1.2 手动检查项
 

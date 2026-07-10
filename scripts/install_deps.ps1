@@ -15,6 +15,39 @@ function Test-CommandAvailable {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Update-ProcessPath {
+    $pathSeparator = [IO.Path]::PathSeparator
+    $paths = @(
+        [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::Machine),
+        [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User),
+        [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::Process)
+    )
+
+    $seen = @{}
+    $mergedPaths = foreach ($path in $paths) {
+        if ([string]::IsNullOrWhiteSpace($path)) {
+            continue
+        }
+
+        foreach ($entry in $path.Split($pathSeparator)) {
+            if ([string]::IsNullOrWhiteSpace($entry)) {
+                continue
+            }
+
+            $trimmedEntry = $entry.Trim()
+            $normalizedEntry = $trimmedEntry.TrimEnd("\").ToUpperInvariant()
+            if ($seen.ContainsKey($normalizedEntry)) {
+                continue
+            }
+
+            $seen[$normalizedEntry] = $true
+            $trimmedEntry
+        }
+    }
+
+    $env:Path = $mergedPaths -join $pathSeparator
+}
+
 function Invoke-ExternalCommand {
     param(
         [string]$FilePath,
@@ -50,6 +83,7 @@ function Install-WinGetPackage {
     )
 
     Invoke-ExternalCommand "winget.exe" $arguments "Installing $DisplayName with WinGet ($PackageId)."
+    Update-ProcessPath
 }
 
 function Ensure-WinGetPackage {
@@ -80,6 +114,7 @@ function Ensure-CodexCli {
     )
 
     Invoke-ExternalCommand "powershell.exe" $arguments "Installing Codex CLI with the official Windows installer."
+    Update-ProcessPath
 }
 
 function Ensure-TortoiseGit {
@@ -123,6 +158,7 @@ function Test-Dependency {
 
 Write-Host "HaloCreek Windows dependency installer"
 Write-Host "This script installs missing dependencies. Git and TortoiseGit installers may show setup UI."
+Update-ProcessPath
 
 Write-Step "Install psmux"
 Ensure-WinGetPackage "psmux.exe" "marlocarlo.psmux" "psmux"
@@ -137,6 +173,7 @@ Write-Step "Install TortoiseGit"
 Ensure-TortoiseGit
 
 Write-Step "Verify dependencies"
+Update-ProcessPath
 $results = @(
     (Test-Dependency "psmux" { psmux.exe --version } { param($Output) $Output -match "\d+\.\d+" }),
     (Test-Dependency "Codex CLI" { cmd.exe /d /c "codex.exe --version 2>&1" } { param($Output) $Output -match "codex-cli\s+\d+\." }),
@@ -147,8 +184,7 @@ $results = @(
 if ($results -contains $false) {
     Write-Host ""
     Write-Host "Some dependencies are still unavailable on PATH."
-    Write-Host "If an installer just finished, open a new PowerShell and run this script again."
-    Write-Host "If it still fails, check whether the installed tool added its executable directory to PATH."
+    Write-Host "Check whether the installed tool added its executable directory to PATH, and add them by hand."
     exit 1
 }
 
