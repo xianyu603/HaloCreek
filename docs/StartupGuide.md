@@ -1,120 +1,59 @@
 # HaloCreek Startup Guide
 
-HaloCreek 是一个面向 Windows + WSL + Codex CLI 的本地桌面工作流壳层。当前版本启动后必须有一个有效的 Git 仓库根目录作为 workspace；Codex session 在默认 WSL 发行版内运行；前台交互窗口由 Windows Terminal 打开；Diff 和部分 Git 操作依赖 TortoiseGit。
+HaloCreek 是一个面向 Windows + Codex CLI 的本地桌面工作流壳层。当前版本启动后必须有一个有效的 Git 仓库根目录作为 workspace；Codex session 通过 Windows 侧 `codex.exe` 在后台 psmux session 中运行；只有用户显式点击 `CLI` 时才通过 Windows Terminal 打开交互窗口；Diff 和部分 Git 操作依赖 TortoiseGit。
 
 功能操作说明见 [Feature Guide](FeatureGuide.md)。
 
-## 1. 依赖检查与安装
+## 1. 依赖安装与检查
 
-### 1.1 运行依赖检查
+### 1.1 推荐安装入口
 
 在 Windows 侧打开 PowerShell 或命令提示符，进入仓库目录后运行：
 
 ```bat
-scripts\check_deps.bat
+scripts\install_deps.bat
 ```
 
-检查全部通过时，脚本会输出多行 `[PASS] ... - OK` 并以退出码 `0` 结束。任意检查失败时，会输出 `[FAIL]`，并在同一行显示脚本期望的能力、实际退出码和命令输出；脚本最终以退出码 `1` 结束。
+脚本会尝试安装或确认以下依赖：
 
-### 1.2 检查项说明
+- `psmux.exe`：通过 WinGet 安装 `marlocarlo.psmux`。
+- `codex.exe`：通过 Codex CLI Windows 官方安装脚本安装。
+- `git.exe`：通过 WinGet 安装 Git for Windows。
+- `TortoiseGitProc.exe`：通过 WinGet 安装 TortoiseGit。
 
-#### 1.2.1 WSL default distribution
+Git 和 TortoiseGit 安装器可能显示安装 UI。脚本结束前会再次验证依赖；如果刚安装的工具还没有进入当前进程的 PATH，重新打开 PowerShell 后再运行一次脚本。
 
-通过时输出：
+### 1.2 手动检查项
 
-```text
-[PASS] WSL default distribution - OK
-```
-
-这一项执行 `wsl.exe --exec bash -ic "printf halocreek-wsl-ok"`，用于确认 Windows 可以启动默认 WSL 发行版，并且发行版内有可用的 `bash`。HaloCreek 后续启动 Codex、tmux、读取 WSL 环境变量和转换路径时都依赖默认 WSL 发行版。
-
-失败时，通常需要先安装 WSL 和 Linux 发行版，并确认 `wsl.exe` 可用：
+如果不使用安装脚本，可以手动确认：
 
 ```powershell
-wsl --install
-wsl --status
-wsl --list --verbose
-```
-
-如果机器上有多个发行版，建议把日常使用的发行版设为默认发行版：
-
-```powershell
-wsl --set-default <DistributionName>
-```
-
-#### 1.2.2 WSL tmux
-
-通过时输出：
-
-```text
-[PASS] WSL tmux - OK
-```
-
-这一项在默认 WSL 发行版内执行 `tmux -V`，用于确认 `tmux` 已安装。HaloCreek 的 `Launch` 和 `Resume` 会先在 WSL 内创建后台 tmux session，再把其中一个 session 切到前台 Windows Terminal 窗口。
-
-失败时，在默认 WSL 发行版中安装 tmux。例如 Ubuntu/Debian：
-
-```bash
-sudo apt update
-sudo apt install tmux
-tmux -V
-```
-
-#### 1.2.3 WSL Codex CLI
-
-通过时输出：
-
-```text
-[PASS] WSL Codex CLI - OK
-```
-
-这一项在默认 WSL 发行版内执行 `codex --version`，并要求输出形如 `codex-cli x.y...`。HaloCreek 不内置 Codex 执行能力，实际任务由 WSL 内的 Codex CLI 完成。
-
-失败时，需要在默认 WSL 发行版中安装并登录 Codex CLI。安装完成后确认：
-
-```bash
-codex --version
-```
-
-如果你的 Codex 可执行文件不叫 `codex`，可以通过配置项 `CodexExecutableName` 修改。见 [3.3 Codex 启动配置](#33-codex-启动配置)。
-
-#### 1.2.4 Windows Git on PATH
-
-通过时输出：
-
-```text
-[PASS] Windows Git on PATH - OK
-```
-
-这一项在 Windows 侧执行 `git.exe --version`。HaloCreek 在 Windows 进程里读取当前 workspace 的 Git 状态、HEAD 内容、工作区文件 hash，并执行部分 Git 文件操作，所以 Windows PATH 上必须能找到 `git.exe`。
-
-失败时，安装 [Git for Windows](https://git-scm.com/install/windows)，并确认新开一个 PowerShell 后可执行：
-
-```powershell
+psmux.exe --version
+codex.exe --version
 git.exe --version
-```
-
-#### 1.2.5 TortoiseGitProc on PATH
-
-通过时输出：
-
-```text
-[PASS] TortoiseGitProc on PATH - OK
-```
-
-这一项在 Windows 侧执行 `where.exe TortoiseGitProc.exe`。HaloCreek 当前使用 TortoiseGitProc 打开 diff、commit 和 log 等外部 Git 窗口。
-
-失败时，安装 [TortoiseGit](https://tortoisegit.org/download/)，并把安装目录加入 Windows PATH。常见安装目录类似：
-
-```text
-C:\Program Files\TortoiseGit\bin
-```
-
-确认方式：
-
-```powershell
 where.exe TortoiseGitProc.exe
 ```
+
+期望结果：
+
+- `psmux.exe --version` 能正常输出版本号。
+- `codex.exe --version` 输出形如 `codex-cli x.y...`。
+- `git.exe --version` 输出形如 `git version x.y...`。
+- `where.exe TortoiseGitProc.exe` 能找到 TortoiseGit 的可执行文件路径。
+
+`scripts\check_deps.bat` 当前仍保留旧的 WSL/tmux 检查逻辑，不作为 0.3 Windows/psmux 路线的推荐检查入口。
+
+### 1.3 依赖用途
+
+`psmux.exe` 用于创建、维护和 attach 后台 session。HaloCreek 的 `Launch`、`Resume`、`SendToFront`、`CLI`、`Exit`、`Restart` 都依赖它。
+
+`codex.exe` 是实际执行 Agent 编程任务的 Codex CLI。HaloCreek 不内置 Codex 执行能力，只负责启动、发送 prompt、读取 session 文件和展示状态。
+
+`git.exe` 用于 workspace 校验、Git 修改列表、Review 快照对比、文件恢复和文件补全候选。
+
+`TortoiseGitProc.exe` 用于打开外部 diff、commit 和 log 窗口。
+
+`wt.exe` 用于用户显式点击 `CLI` 时打开 Windows Terminal。当前没有配置项替换终端程序。
 
 ## 2. 启动与 Workspace
 
@@ -195,6 +134,10 @@ workspace 配置：
   "CodexExecutableName": "codex",
   "CodexLaunchArguments": [],
   "MaxSessionHistoryFiles": 100,
+  "MarkdownLineJumpCommands": {
+    "code": ["--goto", "{Path}:{Line}"],
+    "rider64": ["--line", "{Line}", "{Path}"]
+  },
   "ShortcutPhraseCategories": [
     {
       "Name": "自定义",
@@ -223,7 +166,12 @@ workspace 配置：
 {
   "CodexExecutableName": "codex",
   "CodexLaunchArguments": [],
-  "MaxSessionHistoryFiles": 100
+  "MaxSessionHistoryFiles": 100,
+  "MarkdownLineJumpCommands": {
+    "devenv": ["/edit", "{Path}", "/command", "Edit.GoTo {Line}"],
+    "code": ["--goto", "{Path}:{Line}"],
+    "rider64": ["--line", "{Line}", "{Path}"]
+  }
 }
 ```
 
@@ -231,13 +179,13 @@ workspace 配置：
 
 ### 3.3 Codex 启动配置
 
-`CodexExecutableName` 控制 HaloCreek 在 WSL tmux session 内启动的 Codex 可执行文件名。默认值是 `codex`。
+`CodexExecutableName` 控制 HaloCreek 在 psmux session 内启动的 Codex 可执行文件名。默认值是 `codex`。
 
 关联功能：
 
 - Prompt Editor 的 `Launch`。
-- Review 的 `Launch New`。
 - History 的 `Resume`。
+- Ongoing Sessions 的 `Restart`。
 
 `CodexLaunchArguments` 会追加到 Codex 可执行文件之后、具体 prompt 或 `resume <sessionId>` 之前。
 
@@ -252,17 +200,17 @@ workspace 配置：
 
 Prompt Editor 的 `Launch` 最终类似：
 
-```bash
+```powershell
 codex --model gpt-5-codex "<prompt>"
 ```
 
 History 的 `Resume` 最终类似：
 
-```bash
+```powershell
 codex --model gpt-5-codex resume <sessionId>
 ```
 
-这些命令在默认 WSL 发行版内执行，所以可执行文件和相关认证状态也必须存在于默认 WSL 环境中。依赖检查见 [1.2 检查项说明](#12-检查项说明)。
+这些命令在 Windows 侧 psmux session 中执行，所以可执行文件和相关认证状态必须存在于 Windows 环境中。
 
 ### 3.4 History 配置
 
@@ -273,6 +221,7 @@ codex --model gpt-5-codex resume <sessionId>
 - History 列表展示。
 - History 搜索。
 - History `Resume` 的可见候选范围。
+- Prompt 模板菜单中的 `Recent Initial Prompts` 候选范围。
 
 如果 Codex 历史很多，可以调小这个值以减少读取时间；如果需要回看更早的 session，可以调大这个值。
 
@@ -284,7 +233,30 @@ codex --model gpt-5-codex resume <sessionId>
 }
 ```
 
-### 3.5 快捷语配置
+### 3.5 Markdown 行号跳转配置
+
+`MarkdownLineJumpCommands` 控制 session 消息中本地文件链接带行号时如何打开编辑器。key 是可执行文件名，value 是参数模板数组。
+
+支持的占位符：
+
+- `{Path}`：解析后的本地文件路径。
+- `{Line}`：链接中的行号。
+
+内置默认值支持 Visual Studio、VS Code 和 JetBrains Rider：
+
+```json
+{
+  "MarkdownLineJumpCommands": {
+    "devenv": ["/edit", "{Path}", "/command", "Edit.GoTo {Line}"],
+    "code": ["--goto", "{Path}:{Line}"],
+    "rider64": ["--line", "{Line}", "{Path}"]
+  }
+}
+```
+
+合并规则是按 key 覆盖或追加，不会删除低优先级配置中未提到的命令。命令参数只允许使用 `{Path}` 和 `{Line}` 两个占位符；包含其他 `{...}` 占位符的条目会被忽略。
+
+### 3.6 快捷语配置
 
 `ShortcutPhraseCategories` 控制 `#` 补全里的静态快捷语。全局配置或 workspace 配置只要提供该字段，就会整体替换低优先级的快捷语列表，不做按类别或条目的深度合并。
 
@@ -302,15 +274,16 @@ codex --model gpt-5-codex resume <sessionId>
 - `Description`：条目说明。
 - `InsertText`：接受条目后插入 prompt 的文本。
 
-### 3.6 当前不可配置项
+### 3.7 当前不可配置项
 
 以下行为当前是内置实现，不通过 `config.json` 配置：
 
 - Modified 列表的右键动作集合和双击默认动作。
-- Review 自动刷新间隔，当前为 10 秒。
-- History 自动刷新间隔，当前为 10 秒。
-- ClipLocate 的候选文件大小上限，当前为 2 MB。
+- Snapshot 自动刷新间隔和文件系统监听 debounce。
+- Session keep-alive 探测频率，当前为 3 秒。
+- ClipLocate 的候选文件大小上限，当前为 2 MB；该能力当前没有业务 UI 入口消费。
 - 前台终端程序，当前固定调用 `wt.exe`。
+- 后台 session 管理程序，当前固定调用 `psmux.exe`。
 - 外部 diff 程序，当前固定调用 `TortoiseGitProc.exe`。
 
 这些项如果后续需要调整，应先在实现中增加明确的配置字段，再更新本文档。
