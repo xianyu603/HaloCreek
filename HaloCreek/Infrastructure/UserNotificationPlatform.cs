@@ -1,28 +1,38 @@
 using System;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Avalonia.Controls;
+using Avalonia.Threading;
 using CommunityToolkit.WinUI.Notifications;
 using HaloCreek.Logging;
-using Avalonia.Controls;
 
 namespace HaloCreek.Infrastructure
 {
     public sealed record UserNotificationRequest(
         string Title,
-        string Message);
+        string Message,
+        string? ActivationPayload = null);
+
+    public sealed record UserNotificationActivatedEventArgs(string? Payload);
 
     public sealed class UserNotificationPlatform
     {
         private const string LogCategory = "Notification";
         private const string AppUserModelId = "HaloCreek";
+        private const string ActivationPayloadArgument = "payload";
+        private static UserNotificationPlatform? _currentPlatform;
 
         private readonly Window _owner;
 
         public UserNotificationPlatform(Window owner)
         {
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+            _currentPlatform = this;
             EnsureNotificationsRegistered();
         }
+
+        public event EventHandler<UserNotificationActivatedEventArgs>? Activated;
 
         public Task SendAsync(UserNotificationRequest request)
         {
@@ -39,10 +49,18 @@ namespace HaloCreek.Infrastructure
             try
             {
                 FlashTaskbarIcon();
-                new ToastContentBuilder()
+                var builder = new ToastContentBuilder()
                     .AddText(request.Title)
-                    .AddText(request.Message)
-                    .Show();
+                    .AddText(request.Message);
+
+                if (!string.IsNullOrWhiteSpace(request.ActivationPayload))
+                {
+                    builder.AddArgument(
+                        ActivationPayloadArgument,
+                        request.ActivationPayload);
+                }
+
+                builder.Show();
                 Log.Info(LogCategory, "User notification sent.");
             }
             catch (Exception ex)
@@ -52,6 +70,48 @@ namespace HaloCreek.Infrastructure
             }
 
             return Task.CompletedTask;
+        }
+
+        private void ActivateOwner()
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(ActivateOwner);
+                return;
+            }
+
+            if (_owner.WindowState == WindowState.Minimized)
+            {
+                _owner.WindowState = WindowState.Normal;
+            }
+
+            if (!_owner.IsVisible)
+            {
+                _owner.Show();
+            }
+
+            _owner.Activate();
+
+            if (OperatingSystem.IsWindows())
+            {
+                var handle = _owner.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+                if (handle != IntPtr.Zero)
+                {
+                    SetForegroundWindow(handle);
+                }
+            }
+        }
+
+        private void PublishActivated(string? payload)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => PublishActivated(payload));
+                return;
+            }
+
+            ActivateOwner();
+            Activated?.Invoke(this, new UserNotificationActivatedEventArgs(payload));
         }
 
         private void FlashTaskbarIcon()
@@ -81,13 +141,32 @@ namespace HaloCreek.Infrastructure
             ToastNotificationManagerCompat.OnActivated += OnToastActivated;
         }
 
-        private static void OnToastActivated(ToastNotificationActivatedEventArgsCompat _)
+        private static void OnToastActivated(ToastNotificationActivatedEventArgsCompat args)
         {
-            // 点击toast行为在这里接
+            _currentPlatform?.PublishActivated(ReadActivationPayload(args.Argument));
+        }
+
+        private static string? ReadActivationPayload(string? arguments)
+        {
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                return null;
+            }
+
+            var expectedPrefix = ActivationPayloadArgument + "=";
+            if (!arguments.StartsWith(expectedPrefix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            return WebUtility.UrlDecode(arguments[expectedPrefix.Length..]);
         }
 
         [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetForegroundWindow(IntPtr windowHandle);
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool FlashWindowEx(ref FlashWindowInfo flashInfo);

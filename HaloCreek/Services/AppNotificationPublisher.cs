@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using HaloCreek.Models;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
@@ -34,6 +35,7 @@ namespace HaloCreek.Services
             _applicationWindowHasFocus = applicationWindowHasFocus
                 ?? throw new ArgumentNullException(nameof(applicationWindowHasFocus));
 
+            _userNotificationPlatform.Activated += OnNotificationActivated;
             ((INotifyCollectionChanged)_sessionLifecycleService.AllSessions).CollectionChanged +=
                 OnSessionsChanged;
             foreach (var session in _sessionLifecycleService.AllSessions)
@@ -50,6 +52,7 @@ namespace HaloCreek.Services
             }
 
             _isDisposed = true;
+            _userNotificationPlatform.Activated -= OnNotificationActivated;
             ((INotifyCollectionChanged)_sessionLifecycleService.AllSessions).CollectionChanged -=
                 OnSessionsChanged;
 
@@ -57,6 +60,26 @@ namespace HaloCreek.Services
             {
                 UntrackSession(session);
             }
+        }
+
+        private void OnNotificationActivated(
+            object? sender,
+            UserNotificationActivatedEventArgs e)
+        {
+            if (!Dispatcher.UIThread.CheckAccess())
+            {
+                Dispatcher.UIThread.Post(() => OnNotificationActivated(sender, e));
+                return;
+            }
+
+            if (_isDisposed
+                || string.IsNullOrWhiteSpace(e.Payload)
+                || !_trackedSessionsById.ContainsKey(e.Payload))
+            {
+                return;
+            }
+
+            _sessionLifecycleService.BringToFront(e.Payload);
         }
 
         private void OnSessionsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -162,9 +185,19 @@ namespace HaloCreek.Services
         {
             try
             {
+                var message = session.Messages.LastOrDefault()?.Message;
+                if (string.IsNullOrWhiteSpace(message))
+                {
+                    Log.Warning(
+                        LogCategory,
+                        $"Session completed notification skipped because no session message is available. SessionId={session.Id}");
+                    return;
+                }
+
                 await _userNotificationPlatform.SendAsync(new UserNotificationRequest(
-                    "Codex session completed",
-                    session.Title));
+                    session.Title,
+                    message,
+                    session.Id));
             }
             catch (Exception ex)
             {
