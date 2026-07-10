@@ -39,6 +39,10 @@ namespace HaloCreek.Views.Components
 
         public static IValueConverter TimestampText { get; } = new SessionMessageTimestampTextConverter();
 
+        public static IValueConverter IsUserMessage { get; } = new SessionMessageSenderBoolConverter(true);
+
+        public static IValueConverter IsNotUserMessage { get; } = new SessionMessageSenderBoolConverter(false);
+
         private sealed class SessionMessageBrushConverter : IValueConverter
         {
             private readonly IBrush _userBrush;
@@ -93,6 +97,37 @@ namespace HaloCreek.Views.Components
                     SessionMessageSender.Agent => "Agent",
                     _ => "Unknown",
                 };
+            }
+
+            public object ConvertBack(
+                object? value,
+                Type targetType,
+                object? parameter,
+                CultureInfo culture)
+            {
+                throw new NotSupportedException();
+            }
+        }
+
+        private sealed class SessionMessageSenderBoolConverter : IValueConverter
+        {
+            private readonly bool _userValue;
+
+            public SessionMessageSenderBoolConverter(bool userValue)
+            {
+                _userValue = userValue;
+            }
+
+            public object Convert(
+                object? value,
+                Type targetType,
+                object? parameter,
+                CultureInfo culture)
+            {
+                var isUser = value is SessionMessageSender sender
+                    && sender == SessionMessageSender.User;
+
+                return isUser == _userValue;
             }
 
             public object ConvertBack(

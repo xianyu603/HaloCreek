@@ -133,13 +133,23 @@
                                                        FontSize="12"
                                                        TextTrimming="CharacterEllipsis"/>
                                         </Grid>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding Message}"
+                                                   Foreground="#0F172A"
+                                                   FontSize="13"
+                                                   LineHeight="18"
+                                                   TextWrapping="Wrap"
+                                                   MinWidth="0"
+                                                   HorizontalAlignment="Stretch"
+                                                   IsVisible="{Binding Sender, Converter={x:Static views:SessionMessageDisplayConverters.IsUserMessage}}"/>
                                         <md:MarkdownRenderer Grid.Row="1"
                                                              MarkdownBuilder="{Binding Message, Converter={x:Static md:ValueConverters.ToObservableStringBuilder}}"
                                                              LinkCommand="{Binding OpenMarkdownLinkCommand, RelativeSource={RelativeSource AncestorType=views:SessionStateView}}"
                                                              CodeBlockColorTheme="LightPlus"
                                                              AttachedToVisualTree="MarkdownRenderer_AttachedToVisualTree"
                                                              MinWidth="0"
-                                                             HorizontalAlignment="Stretch"/>
+                                                             HorizontalAlignment="Stretch"
+                                                             IsVisible="{Binding Sender, Converter={x:Static views:SessionMessageDisplayConverters.IsNotUserMessage}}"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
