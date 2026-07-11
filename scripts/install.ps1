@@ -289,7 +289,7 @@ function Install-HaloCreek {
                 throw "Dependency installer is missing: $dependencyScript"
             }
 
-            Invoke-WithRetry -Description "Dependency installer" -MaxAttempts 3 -DelaySeconds 15 -Action {
+            Invoke-WithRetry -Description "Dependency installer" -MaxAttempts 5 -DelaySeconds 3 -Action {
                 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyScript
                 if ($LASTEXITCODE -ne 0) {
                     throw "Dependency installer failed with exit code $LASTEXITCODE."
