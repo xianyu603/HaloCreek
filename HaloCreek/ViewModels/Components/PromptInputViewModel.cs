@@ -9,7 +9,6 @@ using HaloCreek.Logging;
 using HaloCreek.Models;
 using HaloCreek.Services;
 using HaloCreek.Services.Completions;
-using HaloCreek.Services.PromptTemplates;
 using HaloCreek.Services.SessionHistory;
 using HaloCreek.Services.WorkspaceSnapshots;
 
@@ -48,7 +47,7 @@ namespace HaloCreek.ViewModels.Components
             _completionCoordinator = completionCoordinator
                 ?? throw new ArgumentNullException(nameof(completionCoordinator));
             TemplatePicker = new PromptTemplatePickerViewModel(
-                PromptTemplateStaticConfig.Items,
+                WorkspaceRuntime.Current.EffectiveConfig.PromptTemplateItems,
                 historySnapshots);
 
             LaunchCommand = new AsyncRelayCommand(LaunchAsync, HasPromptText);

@@ -111,7 +111,8 @@ namespace HaloCreek.Services
                 CoalesceMarkdownLineJumpCommands(
                     fileConfig.MarkdownLineJumpCommands,
                     baseConfig.MarkdownLineJumpCommands),
-                Coalesce(fileConfig.ShortcutPhraseCategories, baseConfig.ShortcutPhraseCategories));
+                Coalesce(fileConfig.ShortcutPhraseCategories, baseConfig.ShortcutPhraseCategories),
+                Coalesce(fileConfig.PromptTemplateItems, baseConfig.PromptTemplateItems));
         }
 
         private static string Coalesce(string? value, string fallback)
@@ -140,6 +141,13 @@ namespace HaloCreek.Services
         private static IReadOnlyList<ShortcutPhraseCategory> Coalesce(
             IReadOnlyList<ShortcutPhraseCategory>? values,
             IReadOnlyList<ShortcutPhraseCategory> fallback)
+        {
+            return values ?? fallback;
+        }
+
+        private static IReadOnlyList<PromptTemplateItem> Coalesce(
+            IReadOnlyList<PromptTemplateItem>? values,
+            IReadOnlyList<PromptTemplateItem> fallback)
         {
             return values ?? fallback;
         }
@@ -192,6 +200,8 @@ namespace HaloCreek.Services
             public Dictionary<string, List<string?>?>? MarkdownLineJumpCommands { get; init; }
 
             public List<ShortcutPhraseCategory>? ShortcutPhraseCategories { get; init; }
+
+            public List<PromptTemplateItem>? PromptTemplateItems { get; init; }
         }
     }
 }

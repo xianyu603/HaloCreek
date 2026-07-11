@@ -8,38 +8,38 @@ namespace HaloCreek.Services.PromptTemplates
         public static IReadOnlyList<PromptTemplateItem> Items { get; } =
         [
             new(
-                "实现功能",
-                "描述目标、范围、验收和验证方式。",
+                "Implement feature",
+                "Describe the goal, scope, acceptance criteria, and validation.",
                 """
-                实现下面的功能。
+                Implement the feature below.
 
-                目标：
+                Goal:
                 -
 
-                范围：
+                Scope:
                 -
 
-                验收标准：
+                Acceptance criteria:
                 -
 
-                完成后运行相关 build/test；如果没法跑，说明原因。
+                When done, run the relevant build/test; if you cannot run them, explain why.
                 """),
             new(
-                "修 Bug",
-                "说明现象、期望、复现和验证方式。",
+                "Fix bug",
+                "Describe the symptom, expected behavior, reproduction steps, and validation.",
                 """
-                修复下面的问题。
+                Fix the issue below.
 
-                现象：
+                Symptom:
                 -
 
-                期望：
+                Expected behavior:
                 -
 
-                复现步骤：
+                Reproduction steps:
                 -
 
-                完成后运行相关 build/test；如果没法跑，说明原因。
+                When done, run the relevant build/test; if you cannot run them, explain why.
                 """),
         ];
     }

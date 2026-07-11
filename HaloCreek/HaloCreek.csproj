@@ -28,6 +28,9 @@
           Link="scripts\install_deps.bat"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest" />
+    <None Include="OptionalConfig\*"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using HaloCreek.Services.Completions.ShortcutPhrases;
+using HaloCreek.Services.PromptTemplates;
 
 namespace HaloCreek.Models
 {
@@ -9,7 +10,8 @@ namespace HaloCreek.Models
         IReadOnlyList<string> CodexLaunchArguments,
         int MaxSessionHistoryFiles,
         IReadOnlyDictionary<string, IReadOnlyList<string>> MarkdownLineJumpCommands,
-        IReadOnlyList<ShortcutPhraseCategory> ShortcutPhraseCategories)
+        IReadOnlyList<ShortcutPhraseCategory> ShortcutPhraseCategories,
+        IReadOnlyList<PromptTemplateItem> PromptTemplateItems)
     {
         public static AppConfig DefaultForMvp1 { get; } = new(
             "codex",
@@ -21,6 +23,7 @@ namespace HaloCreek.Models
                 ["code"] = new[] { "--goto", "{Path}:{Line}" },
                 ["rider64"] = new[] { "--line", "{Line}", "{Path}" },
             },
-            ShortcutPhraseStaticConfig.Categories);
+            ShortcutPhraseStaticConfig.Categories,
+            PromptTemplateStaticConfig.Items);
     }
 }

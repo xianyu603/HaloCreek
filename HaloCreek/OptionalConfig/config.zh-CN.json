@@ -1,0 +1,123 @@
+{
+  "CodexExecutableName": "codex",
+  "CodexLaunchArguments": [],
+  "MaxSessionHistoryFiles": 100,
+  "MarkdownLineJumpCommands": {
+    "devenv": ["/edit", "{Path}", "/command", "Edit.GoTo {Line}"],
+    "code": ["--goto", "{Path}:{Line}"],
+    "rider64": ["--line", "{Line}", "{Path}"]
+  },
+  "ShortcutPhraseCategories": [
+    {
+      "Name": "模式",
+      "Aliases": ["mode", "m", "先"],
+      "Description": "决定这轮是否直接动手，以及先做哪类判断。",
+      "Items": [
+        {
+          "Title": "先口头汇报",
+          "Aliases": ["口头", "汇报", "plan"],
+          "Description": "先给结论或方案，不改文件。",
+          "InsertText": "先给结论或方案，不改文件。"
+        },
+        {
+          "Title": "直接实现",
+          "Aliases": ["实现", "do", "code"],
+          "Description": "按现有上下文直接完成修改。",
+          "InsertText": "直接实现这个需求，保持修改范围尽量小。"
+        },
+        {
+          "Title": "只做审查",
+          "Aliases": ["review", "审查", "检查"],
+          "Description": "按 review 口吻列问题，不改文件。",
+          "InsertText": "按 code review 口吻先列问题和风险，不做修改。"
+        },
+        {
+          "Title": "撰写方案",
+          "Aliases": [],
+          "Description": "写方案并落盘。",
+          "InsertText": "参考之前的信息，落盘一个方案到 docs/。"
+        },
+        {
+          "Title": "方案审阅",
+          "Aliases": [],
+          "Description": "审阅工作区方案。",
+          "InsertText": "审阅工作区方案，重点看有没有明显的矛盾或风险。"
+        }
+      ]
+    },
+    {
+      "Name": "范围",
+      "Aliases": ["scope", "s", "不"],
+      "Description": "限制可以修改的文件、行为和依赖边界。",
+      "Items": [
+        {
+          "Title": "不重构",
+          "Aliases": ["重构", "refactor"],
+          "Description": "保留既有结构，除非必要。",
+          "InsertText": "不要做无关重构；只有为完成本需求确实必要时才调整结构。"
+        },
+        {
+          "Title": "不改协议",
+          "Aliases": ["协议", "格式", "api", "schema"],
+          "Description": "保护公开行为、配置和数据格式。",
+          "InsertText": "不要改公开行为、配置格式或数据格式，除非需求明确要求。"
+        },
+        {
+          "Title": "保留已有改动",
+          "Aliases": ["用户改动", "dirty", "git"],
+          "Description": "不要回滚用户或其他会话的修改。",
+          "InsertText": "保留用户已有改动，不要回滚我没要求回滚的内容。"
+        }
+      ]
+    },
+    {
+      "Name": "完成",
+      "Aliases": ["finish", "done", "check", "verify", "f"],
+      "Description": "定义完成前的验证动作和最终交付方式。",
+      "Items": [
+        {
+          "Title": "跑相关检查",
+          "Aliases": ["测试", "编译", "build", "test"],
+          "Description": "完成后运行和改动相关的检查。",
+          "InsertText": "完成后运行相关 build。"
+        },
+        {
+          "Title": "不用编译",
+          "Aliases": ["不要编译", "no build"],
+          "Description": "明确跳过 build，但说明验证建议。",
+          "InsertText": "不用编译；改完说明影响范围和建议验证方式。"
+        },
+        {
+          "Title": "不提交",
+          "Aliases": ["commit", "no commit", "working tree"],
+          "Description": "停在工作区，等待人工 review。",
+          "InsertText": "停在 working tree，让我 review，不要 commit。"
+        },
+        {
+          "Title": "完成并提交",
+          "Aliases": ["commit", "提交", "git"],
+          "Description": "验证后创建一个 commit。",
+          "InsertText": "完成并验证后创建一个 commit，message 简洁说明变化。"
+        },
+        {
+          "Title": "完成后编译并启动应用",
+          "Aliases": ["启动", "运行", "app", "launch"],
+          "Description": "完成后 build，并打开应用窗口供人工检查。",
+          "InsertText": "完成后编译并启动应用，让我人工检查。"
+        }
+      ]
+    }
+  ],
+  "PromptTemplateItems": [
+    {
+      "Title": "实现功能",
+      "Description": "描述目标、范围、验收和验证方式。",
+      "InsertText": "实现下面的功能。\n\n目标：\n-\n\n范围：\n-\n\n验收标准：\n-\n\n完成后运行相关 build/test；如果没法跑，说明原因。"
+    },
+    {
+      "Title": "修 Bug",
+      "Description": "说明现象、期望、复现和验证方式。",
+      "InsertText": "修复下面的问题。\n\n现象：\n-\n\n期望：\n-\n\n复现步骤：\n-\n\n完成后运行相关 build/test；如果没法跑，说明原因。"
+    }
+  ]
+}

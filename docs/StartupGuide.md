@@ -152,6 +152,13 @@ workspace 配置：
         }
       ]
     }
+  ],
+  "PromptTemplateItems": [
+    {
+      "Title": "示例模板",
+      "Description": "插入示例模板文本。",
+      "InsertText": "示例模板正文"
+    }
   ]
 }
 ```
@@ -175,7 +182,7 @@ workspace 配置：
 }
 ```
 
-另外内置默认配置包含一组 `ShortcutPhraseCategories`。缺失字段会继承低优先级配置或默认值。`CodexExecutableName` 为空白时会被忽略；`MaxSessionHistoryFiles` 必须大于 0，否则会继承低优先级配置或默认值。
+另外内置默认配置包含一组英文 `ShortcutPhraseCategories` 和 `PromptTemplateItems`。发布包会包含 `OptionalConfig\config.zh-CN.json`，当前这个目录只放本地化用的可选配置；需要其他语言时，按同样方式新增对应 locale tag 的配置文件即可。需要中文默认快捷语和模板时，可以复制 `config.zh-CN.json` 的内容到全局或 workspace 配置文件。缺失字段会继承低优先级配置或默认值。`CodexExecutableName` 为空白时会被忽略；`MaxSessionHistoryFiles` 必须大于 0，否则会继承低优先级配置或默认值。
 
 ### 3.3 Codex 启动配置
 
@@ -274,7 +281,17 @@ codex --model gpt-5-codex resume <sessionId>
 - `Description`：条目说明。
 - `InsertText`：接受条目后插入 prompt 的文本。
 
-### 3.7 当前不可配置项
+### 3.7 Prompt 模板配置
+
+`PromptTemplateItems` 控制 Prompt 输入框右键菜单里的 `Templates` 内置模板。全局配置或 workspace 配置只要提供该字段，就会整体替换低优先级的模板列表，不做按条目的深度合并。`Recent Initial Prompts` 仍来自 Codex session history，不受该字段影响。
+
+模板字段：
+
+- `Title`：模板展示名称。
+- `Description`：模板说明和预览提示。
+- `InsertText`：点击模板后插入 prompt 的文本。
+
+### 3.8 当前不可配置项
 
 以下行为当前是内置实现，不通过 `config.json` 配置：
 
