@@ -121,11 +121,55 @@ function Test-ZipHash {
     }
 }
 
+function Invoke-WithRetry {
+    param(
+        [scriptblock]$Action,
+        [string]$Description,
+        [int]$MaxAttempts = 5,
+        [int]$DelaySeconds = 3
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            if ($attempt -gt 1) {
+                Write-Host "Retrying $Description ($attempt/$MaxAttempts)."
+            }
+
+            & $Action
+            return
+        }
+        catch {
+            if ($attempt -ge $MaxAttempts) {
+                throw
+            }
+
+            Write-Warning "$Description failed: $($_.Exception.Message)"
+            Write-Host "Waiting $DelaySeconds seconds before retry."
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+}
+
 function New-StartMenuShortcut {
     param([string]$TargetPath)
 
     $programsDir = [Environment]::GetFolderPath("Programs")
     $shortcutPath = Join-Path $programsDir "HaloCreek.lnk"
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $TargetPath
+    $shortcut.WorkingDirectory = Split-Path -Parent $TargetPath
+    $shortcut.Description = "HaloCreek"
+    $shortcut.Save()
+
+    $shortcutPath
+}
+
+function New-DesktopShortcut {
+    param([string]$TargetPath)
+
+    $desktopDir = [Environment]::GetFolderPath("Desktop")
+    $shortcutPath = Join-Path $desktopDir "HaloCreek.lnk"
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $TargetPath
@@ -144,10 +188,19 @@ function Remove-StartMenuShortcut {
     }
 }
 
+function Remove-DesktopShortcut {
+    $shortcutPath = Join-Path ([Environment]::GetFolderPath("Desktop")) "HaloCreek.lnk"
+
+    if (Test-Path -LiteralPath $shortcutPath) {
+        Remove-Item -LiteralPath $shortcutPath -Force
+    }
+}
+
 function Remove-HaloCreek {
     Write-Step "Uninstall HaloCreek"
 
     Remove-StartMenuShortcut
+    Remove-DesktopShortcut
 
     if (Test-Path -LiteralPath $InstallDir) {
         Remove-Item -LiteralPath $InstallDir -Recurse -Force
@@ -221,9 +274,12 @@ function Install-HaloCreek {
         $installedExe = Join-Path $InstallDir "HaloCreek.exe"
 
         if (-not $NoShortcut) {
-            Write-Step "Create Start Menu shortcut"
-            $shortcutPath = New-StartMenuShortcut $installedExe
-            Write-Host "Shortcut: $shortcutPath"
+            Write-Step "Create shortcuts"
+            $startMenuShortcutPath = New-StartMenuShortcut $installedExe
+            Write-Host "Start Menu shortcut: $startMenuShortcutPath"
+
+            $desktopShortcutPath = New-DesktopShortcut $installedExe
+            Write-Host "Desktop shortcut: $desktopShortcutPath"
         }
 
         if (-not $NoInstallDependencies) {
@@ -233,9 +289,11 @@ function Install-HaloCreek {
                 throw "Dependency installer is missing: $dependencyScript"
             }
 
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyScript
-            if ($LASTEXITCODE -ne 0) {
-                throw "Dependency installer failed with exit code $LASTEXITCODE."
+            Invoke-WithRetry -Description "Dependency installer" -MaxAttempts 3 -DelaySeconds 15 -Action {
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyScript
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Dependency installer failed with exit code $LASTEXITCODE."
+                }
             }
         }
 
