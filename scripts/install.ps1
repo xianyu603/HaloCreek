@@ -218,6 +218,34 @@ function Remove-HaloCreek {
     }
 }
 
+function Invoke-OfflineInstaller {
+    param([string]$InstallerPath)
+
+    $arguments = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $InstallerPath,
+        "-InstallDir", $InstallDir
+    )
+
+    if ($NoInstallDependencies) {
+        $arguments += "-NoInstallDependencies"
+    }
+
+    if ($NoShortcut) {
+        $arguments += "-NoShortcut"
+    }
+
+    if ($Launch) {
+        $arguments += "-Launch"
+    }
+
+    & powershell.exe @arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Offline installer failed with exit code $LASTEXITCODE."
+    }
+}
+
 function Install-HaloCreek {
     Set-NetworkDefaults
 
@@ -226,95 +254,39 @@ function Install-HaloCreek {
     $releaseVersion = $release.tag_name.TrimStart("v")
     Write-Host "Release: $($release.tag_name)"
 
-    $zipAsset = Select-Asset $release "^HaloCreek-.+-win-x64\.zip$" "Windows zip"
-    $checksumAsset = Select-Asset $release "^$([Regex]::Escape($zipAsset.name))\.sha256$" "checksum"
+    $offlinePackAsset = Select-Asset $release "^HaloCreek-.+-win-x64-offline\.zip$" "offline pack"
+    $checksumAsset = Select-Asset $release "^$([Regex]::Escape($offlinePackAsset.name))\.sha256$" "offline pack checksum"
 
     $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("HaloCreek-install-" + [Guid]::NewGuid().ToString("N"))
-    $extractDir = Join-Path $tempRoot "extract"
-    $zipPath = Join-Path $tempRoot $zipAsset.name
+    $extractDir = Join-Path $tempRoot "offline"
+    $offlinePackPath = Join-Path $tempRoot $offlinePackAsset.name
     $checksumPath = Join-Path $tempRoot $checksumAsset.name
-    $backupDir = $null
 
     New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
     New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
 
     try {
-        Write-Step "Download package"
-        Invoke-Download $zipAsset.browser_download_url $zipPath
+        Write-Step "Download offline pack"
+        Invoke-Download $offlinePackAsset.browser_download_url $offlinePackPath
         Invoke-Download $checksumAsset.browser_download_url $checksumPath
 
-        Write-Step "Verify SHA256"
-        $expectedHash = Get-ExpectedSha256 $checksumPath $zipAsset.name
-        Test-ZipHash $zipPath $expectedHash
+        Write-Step "Verify offline pack"
+        $expectedHash = Get-ExpectedSha256 $checksumPath $offlinePackAsset.name
+        Test-ZipHash $offlinePackPath $expectedHash
         Write-Host "SHA256: $expectedHash"
 
-        Write-Step "Extract package"
-        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
-        $exePath = Join-Path $extractDir "HaloCreek.exe"
-        if (-not (Test-Path -LiteralPath $exePath)) {
-            throw "Package does not contain HaloCreek.exe at the archive root."
+        Write-Step "Extract offline pack"
+        Expand-Archive -LiteralPath $offlinePackPath -DestinationPath $extractDir -Force
+        $offlineInstallerPath = Join-Path $extractDir "install_offline.ps1"
+        if (-not (Test-Path -LiteralPath $offlineInstallerPath)) {
+            throw "Offline pack does not contain install_offline.ps1 at the archive root."
         }
 
-        Write-Step "Install files"
-        $installParent = Split-Path -Parent $InstallDir
-        New-Item -ItemType Directory -Force -Path $installParent | Out-Null
-
-        if (Test-Path -LiteralPath $InstallDir) {
-            $backupDir = "$InstallDir.backup.$([DateTime]::UtcNow.ToString("yyyyMMddHHmmss"))"
-            Move-Item -LiteralPath $InstallDir -Destination $backupDir
-        }
-
-        New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-        Copy-Item -Path (Join-Path $extractDir "*") -Destination $InstallDir -Recurse -Force
-
-        if ($backupDir -and (Test-Path -LiteralPath $backupDir)) {
-            Remove-Item -LiteralPath $backupDir -Recurse -Force
-        }
-
-        $installedExe = Join-Path $InstallDir "HaloCreek.exe"
-
-        if (-not $NoShortcut) {
-            Write-Step "Create shortcuts"
-            $startMenuShortcutPath = New-StartMenuShortcut $installedExe
-            Write-Host "Start Menu shortcut: $startMenuShortcutPath"
-
-            $desktopShortcutPath = New-DesktopShortcut $installedExe
-            Write-Host "Desktop shortcut: $desktopShortcutPath"
-        }
-
-        if (-not $NoInstallDependencies) {
-            Write-Step "Install runtime dependencies"
-            $dependencyScript = Join-Path $InstallDir "scripts\install_deps.ps1"
-            if (-not (Test-Path -LiteralPath $dependencyScript)) {
-                throw "Dependency installer is missing: $dependencyScript"
-            }
-
-            Invoke-WithRetry -Description "Dependency installer" -MaxAttempts 5 -DelaySeconds 3 -Action {
-                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyScript
-                if ($LASTEXITCODE -ne 0) {
-                    throw "Dependency installer failed with exit code $LASTEXITCODE."
-                }
-            }
-        }
-
-        if ($Launch) {
-            Write-Step "Launch HaloCreek"
-            Start-Process -FilePath $installedExe
-        }
+        Write-Step "Run offline installer"
+        Invoke-OfflineInstaller $offlineInstallerPath
 
         Write-Host ""
         Write-Host "HaloCreek $releaseVersion installed to $InstallDir"
-    }
-    catch {
-        if ($backupDir -and (Test-Path -LiteralPath $backupDir)) {
-            if (Test-Path -LiteralPath $InstallDir) {
-                Remove-Item -LiteralPath $InstallDir -Recurse -Force -ErrorAction SilentlyContinue
-            }
-
-            Move-Item -LiteralPath $backupDir -Destination $InstallDir
-        }
-
-        throw
     }
     finally {
         if (Test-Path -LiteralPath $tempRoot) {

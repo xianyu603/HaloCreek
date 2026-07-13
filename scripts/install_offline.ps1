@@ -6,6 +6,8 @@ param(
 
     [string]$CodexInstallDir = (Join-Path $env:LOCALAPPDATA "Programs\OpenAI\Codex\offline"),
 
+    [switch]$NoInstallDependencies,
+
     [switch]$NoShortcut,
 
     [switch]$Launch,
@@ -705,6 +707,10 @@ if ($Uninstall) {
     exit 0
 }
 
+if ($DependenciesOnly -and $NoInstallDependencies) {
+    throw "DependenciesOnly and NoInstallDependencies cannot be used together."
+}
+
 Write-Host "HaloCreek offline installer"
 Write-Host "Offline pack root: $PSScriptRoot"
 
@@ -713,7 +719,9 @@ $manifest = Read-PackManifest
 Write-Step "Verify offline pack files"
 Test-PackHashes $manifest
 
-Install-OfflineDependencies $manifest
+if (-not $NoInstallDependencies) {
+    Install-OfflineDependencies $manifest
+}
 
 if (-not $DependenciesOnly) {
     Install-HaloCreekApp $manifest
