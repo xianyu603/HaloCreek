@@ -39,6 +39,25 @@ function Test-CommandAvailable {
     return $null -ne (Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+function Join-ProcessArguments {
+    param([string[]]$ArgumentList)
+
+    $arguments = foreach ($argument in @($ArgumentList)) {
+        if ($null -eq $argument) {
+            continue
+        }
+
+        if ($argument -notmatch '[\s"]') {
+            $argument
+            continue
+        }
+
+        '"' + $argument.Replace('"', '\"') + '"'
+    }
+
+    $arguments -join " "
+}
+
 function Invoke-ExternalCommand {
     param(
         [string]$FilePath,
@@ -48,8 +67,18 @@ function Invoke-ExternalCommand {
     )
 
     Write-Host $Description
-    & $FilePath @ArgumentList
-    $exitCode = $LASTEXITCODE
+    $startProcessArguments = @{
+        FilePath = $FilePath
+        Wait     = $true
+        PassThru = $true
+    }
+    $argumentLine = Join-ProcessArguments $ArgumentList
+    if (-not [string]::IsNullOrWhiteSpace($argumentLine)) {
+        $startProcessArguments.ArgumentList = $argumentLine
+    }
+
+    $process = Start-Process @startProcessArguments
+    $exitCode = $process.ExitCode
 
     if ($SuccessExitCodes -notcontains $exitCode) {
         throw "$Description failed with exit code $exitCode."
@@ -124,6 +153,50 @@ function Add-UserPathEntry {
     }
 
     Update-ProcessPath
+}
+
+function Wait-PathExists {
+    param(
+        [string]$LiteralPath,
+        [string]$DisplayName,
+        [int]$TimeoutSeconds = 120,
+        [int]$IntervalSeconds = 2
+    )
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ([DateTime]::UtcNow -le $deadline) {
+        if (Test-Path -LiteralPath $LiteralPath) {
+            return $true
+        }
+
+        Start-Sleep -Seconds $IntervalSeconds
+    }
+
+    Write-Warning "$DisplayName was not found before timeout: $LiteralPath"
+    return $false
+}
+
+function Wait-CommandAvailable {
+    param(
+        [string]$Name,
+        [int]$TimeoutSeconds = 180,
+        [int]$IntervalSeconds = 3
+    )
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    Write-Host "Waiting for $Name to become available on PATH."
+
+    while ([DateTime]::UtcNow -le $deadline) {
+        Update-ProcessPath
+        if (Test-CommandAvailable $Name) {
+            Write-Host "$Name is available on PATH."
+            return $true
+        }
+
+        Start-Sleep -Seconds $IntervalSeconds
+    }
+
+    return $false
 }
 
 function New-StartMenuShortcut {
@@ -389,11 +462,6 @@ function Expand-ToolArchive {
 function Install-Psmux {
     param([object]$Manifest)
 
-    if (Test-CommandAvailable "psmux.exe") {
-        Write-Host "psmux.exe is already available on PATH."
-        return
-    }
-
     $artifact = Get-PackArtifact $Manifest "psmux-package"
     $path = Resolve-PackPath $artifact
     $extension = [IO.Path]::GetExtension($path).ToLowerInvariant()
@@ -420,11 +488,6 @@ function Install-Psmux {
 
 function Install-CodexCli {
     param([object]$Manifest)
-
-    if (Test-CommandAvailable "codex.exe") {
-        Write-Host "Codex CLI is already available on PATH."
-        return
-    }
 
     $artifact = Get-PackArtifact $Manifest "codex-package"
     $path = Resolve-PackPath $artifact
@@ -500,11 +563,6 @@ function Install-CodexCli {
 function Install-GitForWindows {
     param([object]$Manifest)
 
-    if (Test-CommandAvailable "git.exe") {
-        Write-Host "Git for Windows is already available on PATH."
-        return
-    }
-
     $artifact = Get-PackArtifact $Manifest "git-installer"
     $path = Resolve-PackPath $artifact
     $arguments = @(
@@ -518,6 +576,7 @@ function Install-GitForWindows {
 
     Invoke-ExternalCommand $path $arguments "Installing Git for Windows from local installer."
     $gitCmdPath = Join-Path $env:ProgramFiles "Git\cmd"
+    Wait-PathExists (Join-Path $gitCmdPath "git.exe") "Git for Windows" | Out-Null
     if (Test-Path -LiteralPath (Join-Path $gitCmdPath "git.exe")) {
         Add-UserPathEntry $gitCmdPath
     }
@@ -528,15 +587,11 @@ function Install-GitForWindows {
 function Install-TortoiseGit {
     param([object]$Manifest)
 
-    if (Test-CommandAvailable "TortoiseGitProc.exe") {
-        Write-Host "TortoiseGitProc.exe is already available on PATH."
-        return
-    }
-
     $artifact = Get-PackArtifact $Manifest "tortoisegit-installer"
     $path = Resolve-PackPath $artifact
     Invoke-ExternalCommand "msiexec.exe" @("/i", $path, "/passive", "/norestart") "Installing TortoiseGit from local MSI." @(0, 3010)
     $tortoiseGitPath = Join-Path $env:ProgramFiles "TortoiseGit\bin"
+    Wait-PathExists (Join-Path $tortoiseGitPath "TortoiseGitProc.exe") "TortoiseGit" | Out-Null
     if (Test-Path -LiteralPath (Join-Path $tortoiseGitPath "TortoiseGitProc.exe")) {
         Add-UserPathEntry $tortoiseGitPath
     }
@@ -574,20 +629,40 @@ function Test-Dependency {
     return $passed
 }
 
+function Install-OfflineDependency {
+    param(
+        [string]$DisplayName,
+        [string]$CommandName,
+        [scriptblock]$Install
+    )
+
+    Update-ProcessPath
+    if (Test-CommandAvailable $CommandName) {
+        Write-Host "$DisplayName is already available on PATH: $CommandName"
+        return
+    }
+
+    & $Install
+
+    if (-not (Wait-CommandAvailable $CommandName)) {
+        throw "$DisplayName is still unavailable on PATH after installation: $CommandName"
+    }
+}
+
 function Install-OfflineDependencies {
     param([object]$Manifest)
 
     Write-Step "Install psmux"
-    Install-Psmux $Manifest
+    Install-OfflineDependency "psmux" "psmux.exe" { Install-Psmux $Manifest }
 
     Write-Step "Install Codex CLI"
-    Install-CodexCli $Manifest
+    Install-OfflineDependency "Codex CLI" "codex.exe" { Install-CodexCli $Manifest }
 
     Write-Step "Install Git for Windows"
-    Install-GitForWindows $Manifest
+    Install-OfflineDependency "Git for Windows" "git.exe" { Install-GitForWindows $Manifest }
 
     Write-Step "Install TortoiseGit"
-    Install-TortoiseGit $Manifest
+    Install-OfflineDependency "TortoiseGit" "TortoiseGitProc.exe" { Install-TortoiseGit $Manifest }
 
     Write-Step "Verify dependencies"
     Update-ProcessPath

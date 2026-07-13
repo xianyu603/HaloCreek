@@ -9,6 +9,7 @@ review VM有点过载 目前已经承载了Reviewed Unreviewed的业务语义和
 常量考虑走一个文件 避免分叉
 * 前台session exit的过程中快速切另一个前台会寄掉
 wt的检查 win 10默认没有wt 需要同步修改user guide
+离线包安装现在会跳过 PATH 上已存在的依赖，暂时无法用离线包更新这些依赖
 
 应用内没法更新codex 更新失败后 再次尝试拉起前台会闪退
 环境检查更新 现在能够适配code来diff和source tree来commit/log
