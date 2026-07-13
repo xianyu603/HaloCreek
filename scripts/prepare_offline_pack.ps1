@@ -17,6 +17,14 @@ param(
 
     [string]$TortoiseGitAssetPattern = "^TortoiseGit-.+-64bit\.msi$",
 
+    [string]$HaloCreekZipPath,
+
+    [string]$HaloCreekChecksumPath,
+
+    [string]$HaloCreekVersion,
+
+    [string]$HaloCreekSource,
+
     [string]$WorkDir,
 
     [switch]$KeepWorkDir
@@ -260,6 +268,15 @@ if ([string]::IsNullOrWhiteSpace($outputParent)) {
 
 New-Item -ItemType Directory -Force -Path $outputParent | Out-Null
 
+$useLocalHaloCreekPackage = -not [string]::IsNullOrWhiteSpace($HaloCreekZipPath) -or
+    -not [string]::IsNullOrWhiteSpace($HaloCreekChecksumPath)
+
+if ($useLocalHaloCreekPackage) {
+    if ([string]::IsNullOrWhiteSpace($HaloCreekZipPath) -or [string]::IsNullOrWhiteSpace($HaloCreekChecksumPath)) {
+        throw "HaloCreekZipPath and HaloCreekChecksumPath must be provided together."
+    }
+}
+
 $tempRoot = if ([string]::IsNullOrWhiteSpace($WorkDir)) {
     Join-Path ([IO.Path]::GetTempPath()) ("HaloCreek-offline-pack-" + [Guid]::NewGuid().ToString("N"))
 } else {
@@ -276,17 +293,43 @@ if (Test-Path -LiteralPath $packRoot) {
 New-PackDirectory $packRoot
 
 try {
-    Write-Step "Download HaloCreek release"
-    $haloRelease = Get-LatestGitHubRelease $Repository
-    $haloVersion = [string]$haloRelease.tag_name
-    $haloZipAsset = Select-ReleaseAsset $haloRelease "^HaloCreek-.+-win-x64\.zip$" "HaloCreek Windows zip"
-    $haloChecksumAsset = Select-ReleaseAsset $haloRelease "^$([Regex]::Escape($haloZipAsset.name))\.sha256$" "HaloCreek checksum"
-    $haloZipPath = Join-Path $packRoot ("app\" + $haloZipAsset.name)
-    $haloChecksumPath = Join-Path $packRoot ("app\" + $haloChecksumAsset.name)
-    Invoke-Download $haloZipAsset.browser_download_url $haloZipPath
-    Invoke-Download $haloChecksumAsset.browser_download_url $haloChecksumPath
-    Add-PackFile $artifacts "HaloCreek" "halocreek-zip" "https://github.com/$Repository/releases/latest" $haloVersion ("app/" + $haloZipAsset.name) $haloZipAsset.browser_download_url $haloZipPath
-    Add-PackFile $artifacts "HaloCreek checksum" "halocreek-sha256" "https://github.com/$Repository/releases/latest" $haloVersion ("app/" + $haloChecksumAsset.name) $haloChecksumAsset.browser_download_url $haloChecksumPath
+    if ($useLocalHaloCreekPackage) {
+        Write-Step "Add local HaloCreek package"
+        $haloZipSourcePath = Resolve-FullPath $HaloCreekZipPath
+        $haloChecksumSourcePath = Resolve-FullPath $HaloCreekChecksumPath
+        if (-not (Test-Path -LiteralPath $haloZipSourcePath -PathType Leaf)) {
+            throw "HaloCreek zip does not exist: $haloZipSourcePath"
+        }
+
+        if (-not (Test-Path -LiteralPath $haloChecksumSourcePath -PathType Leaf)) {
+            throw "HaloCreek checksum does not exist: $haloChecksumSourcePath"
+        }
+
+        $haloVersion = if ([string]::IsNullOrWhiteSpace($HaloCreekVersion)) { "" } else { $HaloCreekVersion }
+        $haloSource = if ([string]::IsNullOrWhiteSpace($HaloCreekSource)) { "" } else { $HaloCreekSource }
+        $haloZipName = Split-Path -Leaf $haloZipSourcePath
+        $haloChecksumName = Split-Path -Leaf $haloChecksumSourcePath
+        $haloZipPath = Join-Path $packRoot ("app\" + $haloZipName)
+        $haloChecksumPath = Join-Path $packRoot ("app\" + $haloChecksumName)
+
+        Copy-Item -LiteralPath $haloZipSourcePath -Destination $haloZipPath -Force
+        Copy-Item -LiteralPath $haloChecksumSourcePath -Destination $haloChecksumPath -Force
+
+        Add-PackFile $artifacts "HaloCreek" "halocreek-zip" $haloSource $haloVersion ("app/" + $haloZipName) "" $haloZipPath
+        Add-PackFile $artifacts "HaloCreek checksum" "halocreek-sha256" $haloSource $haloVersion ("app/" + $haloChecksumName) "" $haloChecksumPath
+    } else {
+        Write-Step "Download HaloCreek release"
+        $haloRelease = Get-LatestGitHubRelease $Repository
+        $haloVersion = [string]$haloRelease.tag_name
+        $haloZipAsset = Select-ReleaseAsset $haloRelease "^HaloCreek-.+-win-x64\.zip$" "HaloCreek Windows zip"
+        $haloChecksumAsset = Select-ReleaseAsset $haloRelease "^$([Regex]::Escape($haloZipAsset.name))\.sha256$" "HaloCreek checksum"
+        $haloZipPath = Join-Path $packRoot ("app\" + $haloZipAsset.name)
+        $haloChecksumPath = Join-Path $packRoot ("app\" + $haloChecksumAsset.name)
+        Invoke-Download $haloZipAsset.browser_download_url $haloZipPath
+        Invoke-Download $haloChecksumAsset.browser_download_url $haloChecksumPath
+        Add-PackFile $artifacts "HaloCreek" "halocreek-zip" "https://github.com/$Repository/releases/latest" $haloVersion ("app/" + $haloZipAsset.name) $haloZipAsset.browser_download_url $haloZipPath
+        Add-PackFile $artifacts "HaloCreek checksum" "halocreek-sha256" "https://github.com/$Repository/releases/latest" $haloVersion ("app/" + $haloChecksumAsset.name) $haloChecksumAsset.browser_download_url $haloChecksumPath
+    }
 
     Write-Step "Download psmux release"
     $psmuxRelease = Get-LatestGitHubRelease $PsmuxRepository

@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -30,18 +31,29 @@ jobs:
         id: release
         shell: pwsh
         run: |
+          $eventName = "${{ github.event_name }}"
           $tag = "${{ github.ref_name }}"
 
-          if ($tag -notmatch '^v\d+\.\d+(\.\d+)?$') {
-            throw "Release tag '$tag' is invalid. Use a tag like v0.1.0."
+          if ($eventName -eq "workflow_dispatch") {
+            $tag = "dry-run-${{ github.run_number }}"
+            $version = "0.0.0"
+            $isDryRun = "true"
+          } else {
+            if ($tag -notmatch '^v\d+\.\d+(\.\d+)?$') {
+              throw "Release tag '$tag' is invalid. Use a tag like v0.1.0."
+            }
+
+            $version = $tag.Substring(1)
+            $isDryRun = "false"
           }
 
-          $version = $tag.Substring(1)
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
+          "is_dry_run=$isDryRun" >> $env:GITHUB_OUTPUT
 
           "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
           "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+          "IS_DRY_RUN=$isDryRun" >> $env:GITHUB_ENV
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
@@ -87,16 +99,54 @@ jobs:
           "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
           "checksum_path=$checksumPath" >> $env:GITHUB_OUTPUT
 
-      - name: Upload workflow artifact
+      - name: Prepare offline package
+        id: offline_package
+        shell: pwsh
+        run: |
+          $offlineZipName = "HaloCreek-$env:RELEASE_VERSION-$env:RUNTIME_ID-offline.zip"
+          $offlineZipPath = Join-Path $env:RELEASE_DIR $offlineZipName
+          $offlineChecksumPath = "$offlineZipPath.sha256"
+          $releaseSource = if ($env:IS_DRY_RUN -eq "true") {
+            "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          } else {
+            "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$env:RELEASE_TAG"
+          }
+
+          .\scripts\prepare_offline_pack.ps1 `
+            -OutputPath $offlineZipPath `
+            -Repository $env:GITHUB_REPOSITORY `
+            -HaloCreekZipPath "${{ steps.package.outputs.zip_path }}" `
+            -HaloCreekChecksumPath "${{ steps.package.outputs.checksum_path }}" `
+            -HaloCreekVersion $env:RELEASE_TAG `
+            -HaloCreekSource $releaseSource
+
+          $offlineSizeBytes = (Get-Item -LiteralPath $offlineZipPath).Length
+          if ($offlineSizeBytes -ge 2GB) {
+            throw "Offline release asset is too large. Size=$offlineSizeBytes bytes, limit is less than 2 GiB."
+          }
+
+          $hash = (Get-FileHash -Algorithm SHA256 $offlineZipPath).Hash.ToLowerInvariant()
+          "$hash  $offlineZipName" | Set-Content -Encoding ascii $offlineChecksumPath
+
+          "zip_name=$offlineZipName" >> $env:GITHUB_OUTPUT
+          "zip_path=$offlineZipPath" >> $env:GITHUB_OUTPUT
+          "checksum_path=$offlineChecksumPath" >> $env:GITHUB_OUTPUT
+          "size_bytes=$offlineSizeBytes" >> $env:GITHUB_OUTPUT
+
+      - name: Upload dry-run artifacts
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v6
         with:
-          name: HaloCreek-${{ steps.release.outputs.version }}-${{ env.RUNTIME_ID }}
+          name: HaloCreek-release-dry-run-${{ github.run_number }}
           path: |
             ${{ steps.package.outputs.zip_path }}
             ${{ steps.package.outputs.checksum_path }}
-          retention-days: 30
+            ${{ steps.offline_package.outputs.zip_path }}
+            ${{ steps.offline_package.outputs.checksum_path }}
+          retention-days: 3
 
       - name: Create or update GitHub Release
+        if: github.event_name == 'push'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -104,8 +154,10 @@ jobs:
           $tag = "${{ steps.release.outputs.tag }}"
           $zipPath = "${{ steps.package.outputs.zip_path }}"
           $checksumPath = "${{ steps.package.outputs.checksum_path }}"
+          $offlineZipPath = "${{ steps.offline_package.outputs.zip_path }}"
+          $offlineChecksumPath = "${{ steps.offline_package.outputs.checksum_path }}"
 
-          $assets = @($zipPath, $checksumPath)
+          $assets = @($zipPath, $checksumPath, $offlineZipPath, $offlineChecksumPath)
 
           if (gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null) {
             gh release upload $tag $assets --repo $env:GITHUB_REPOSITORY --clobber
