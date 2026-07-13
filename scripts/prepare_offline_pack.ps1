@@ -25,6 +25,8 @@ param(
 
     [string]$HaloCreekSource,
 
+    [string]$GitHubToken = $env:GITHUB_TOKEN,
+
     [string]$WorkDir,
 
     [switch]$KeepWorkDir
@@ -57,6 +59,9 @@ function Invoke-GitHubApi {
         "Accept"               = "application/vnd.github+json"
         "User-Agent"           = "HaloCreek-Offline-Pack-Builder"
         "X-GitHub-Api-Version" = "2022-11-28"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($GitHubToken)) {
+        $headers["Authorization"] = "Bearer $GitHubToken"
     }
 
     try {

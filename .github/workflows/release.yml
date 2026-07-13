@@ -102,6 +102,8 @@ jobs:
       - name: Prepare offline package
         id: offline_package
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $offlineZipName = "HaloCreek-$env:RELEASE_VERSION-$env:RUNTIME_ID-offline.zip"
           $offlineZipPath = Join-Path $env:RELEASE_DIR $offlineZipName
