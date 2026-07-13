@@ -1,0 +1,2 @@
+Stay in Control While Coding with AI
+A local workflow shell for Codex CLI and human reviewed agent coding.

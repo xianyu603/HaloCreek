@@ -1,0 +1,9 @@
+新增一个'prepare offline pack'的脚本, 功能:
+	下载项目用到的所有依赖的最新版本(暂时不支持指定版本 尝尝咸淡). 按照一定规则组织到一个文件夹, 将离线安装脚本加到里面 然后pack, 将输出打成一个压缩包并输出至指定路径.
+
+新增离线安装简本
+	用以压缩包分发的一键安装.
+
+接github action. release action 执行prepare offline pack, 将离线含依赖包作为产物之一. 有没有办法推送到某个网盘?
+
+rolling(不确定做不做) 一周跑一次, 将HaloCreek最新Release和最新的依赖应用打成一个离线包.
