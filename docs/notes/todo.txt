@@ -16,3 +16,4 @@ view边框的问题, history尤其明显, 四个角感觉被啃了
 截图自动化迭代的skill
 $补全卡顿问题 考虑新增一个workspaceskillsnapshot
 输入框补全 在底下位置不够的时候(考虑以过半为判据), 挪到最顶上
+update还是会失败 诊断信息不足 如果简单改成进程退出保留pane的话 首先dead进不去了 即使可以 UI可能也要同时展示restart和opencli 有点麻烦后续在做
