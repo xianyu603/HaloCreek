@@ -12,6 +12,7 @@ namespace HaloCreek.Views.Components
     public partial class SessionStateView : UserControl
     {
         private const string LogCategory = "SessionStateView";
+        private const string AbsolutePathLinkPrefix = "/abs/path/";
         private const double ScrollEndThreshold = 2;
         private bool _scrollToEndQueued;
 
@@ -95,7 +96,7 @@ namespace HaloCreek.Views.Components
 
             try
             {
-                PlatformInfrastructure.OpenMarkdownLink(args.HRef);
+                PlatformInfrastructure.OpenMarkdownLink(NormalizeMarkdownLinkHref(args.HRef));
             }
             catch (Exception ex) when (ex is InvalidOperationException
                 or System.ComponentModel.Win32Exception
@@ -104,6 +105,17 @@ namespace HaloCreek.Views.Components
             {
                 Log.Error(LogCategory, ex, $"Failed to open markdown link. HRef={args.HRef.OriginalString}");
             }
+        }
+
+        private static Uri NormalizeMarkdownLinkHref(Uri href)
+        {
+            var target = href.OriginalString.Trim();
+            if (!target.StartsWith(AbsolutePathLinkPrefix, StringComparison.Ordinal))
+            {
+                return href;
+            }
+
+            return new Uri(target[AbsolutePathLinkPrefix.Length..], UriKind.RelativeOrAbsolute);
         }
 
         private sealed class MarkdownLinkCommand : ICommand
