@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="using:HaloCreek.Behaviors"
              xmlns:model="using:HaloCreek.Models"
              xmlns:vm="using:HaloCreek.ViewModels.Tabs"
              x:DataType="vm:ReviewViewModel"
@@ -35,9 +36,9 @@
         </Style>
 
         <Style Selector="ListBox.reviewFileList ListBoxItem">
-            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="MinHeight" Value="32"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -70,9 +71,8 @@
                              Classes="reviewFileList"
                              ItemsSource="{Binding Changes}"
                              SelectedItem="{Binding SelectedChange, Mode=TwoWay}">
-                        <ListBox.ContextMenu>
-                            <ContextMenu Opened="ModifiedRootContextMenu_OnOpened"
-                                         ItemsSource="{Binding WorkspaceRootActions}">
+                        <behaviors:ExplorerContextMenuBehavior.RootContextMenu>
+                            <ContextMenu ItemsSource="{Binding WorkspaceRootActions}">
                                 <ContextMenu.Styles>
                                     <Style Selector="MenuItem">
                                         <Setter Property="Header" Value="{Binding Label}"/>
@@ -80,32 +80,30 @@
                                     </Style>
                                 </ContextMenu.Styles>
                             </ContextMenu>
-                        </ListBox.ContextMenu>
+                        </behaviors:ExplorerContextMenuBehavior.RootContextMenu>
+                        <behaviors:ExplorerContextMenuBehavior.ItemContextMenu>
+                            <ContextMenu Opened="ModifiedChangeContextMenu_OnOpened">
+                                <ContextMenu.Styles>
+                                    <Style Selector="MenuItem">
+                                        <Setter Property="Header" Value="{Binding Label}"/>
+                                        <Setter Property="Command" Value="{Binding Command}"/>
+                                    </Style>
+                                </ContextMenu.Styles>
+                            </ContextMenu>
+                        </behaviors:ExplorerContextMenuBehavior.ItemContextMenu>
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="model:GitChangeInfo"
                                           x:CompileBindings="False">
-                                <Grid MinHeight="34"
-                                      RowDefinitions="1,*"
+                                <Grid MinHeight="32"
                                       Background="Transparent"
                                       DoubleTapped="ModifiedChange_OnDoubleTapped">
-                                    <Grid.ContextMenu>
-                                        <ContextMenu Opened="ModifiedChangeContextMenu_OnOpened">
-                                            <ContextMenu.Styles>
-                                                <Style Selector="MenuItem">
-                                                    <Setter Property="Header" Value="{Binding Label}"/>
-                                                    <Setter Property="Command" Value="{Binding Command}"/>
-                                                </Style>
-                                            </ContextMenu.Styles>
-                                        </ContextMenu>
-                                    </Grid.ContextMenu>
-                                    <Border Grid.Row="0"
-                                            Background="#E2E8F0"/>
-                                    <Border Grid.Row="1"
-                                            Padding="10,0"
+                                    <Border Padding="10,0"
                                             Background="Transparent">
-                                        <Grid ColumnDefinitions="24,*"
+                                        <Grid ColumnDefinitions="24,Auto"
+                                              HorizontalAlignment="Left"
                                               ColumnSpacing="8">
                                             <TextBlock Grid.Column="0"
+                                                       behaviors:ExplorerContextMenuBehavior.IsItemContentHitTarget="True"
                                                        Text="{Binding ChangeTypeText}"
                                                        VerticalAlignment="Center"
                                                        HorizontalAlignment="Center"
@@ -113,8 +111,10 @@
                                                        Foreground="#334155"
                                                        FontSize="12"/>
                                             <TextBlock Grid.Column="1"
+                                                       behaviors:ExplorerContextMenuBehavior.IsItemContentHitTarget="True"
                                                        Text="{Binding DisplayPath}"
                                                        VerticalAlignment="Center"
+                                                       HorizontalAlignment="Left"
                                                        TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"
                                                        Foreground="#334155"
@@ -146,7 +146,7 @@
                         <ListBox Classes="reviewFileList"
                                  ItemsSource="{Binding UnreviewedFiles}"
                                  SelectedItem="{Binding SelectedUnreviewedFile, Mode=TwoWay}">
-                            <ListBox.ContextMenu>
+                            <behaviors:ExplorerContextMenuBehavior.RootContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="All Reviewed"
                                               Command="{Binding MarkAllReviewedCommand}"/>
@@ -155,31 +155,29 @@
                                     <MenuItem Header="Refresh"
                                               Command="{Binding RefreshCommand}"/>
                                 </ContextMenu>
-                            </ListBox.ContextMenu>
+                            </behaviors:ExplorerContextMenuBehavior.RootContextMenu>
+                            <behaviors:ExplorerContextMenuBehavior.ItemContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Diff Against Reviewed"
+                                              Click="DiffUnreviewedAgainstReviewedMenuItem_OnClick"/>
+                                    <MenuItem Header="Revert to Reviewed"
+                                              Click="RevertUnreviewedToReviewedMenuItem_OnClick"/>
+                                    <MenuItem Header="Mark Reviewed"
+                                              Click="AddReviewedMenuItem_OnClick"/>
+                                </ContextMenu>
+                            </behaviors:ExplorerContextMenuBehavior.ItemContextMenu>
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="model:ReviewFilePath"
                                               x:CompileBindings="False">
-                                    <Grid MinHeight="34"
-                                          RowDefinitions="1,*"
+                                    <Grid MinHeight="32"
                                           Background="Transparent"
                                           DoubleTapped="UnreviewedFile_OnDoubleTapped">
-                                        <Grid.ContextMenu>
-                                            <ContextMenu>
-                                                <MenuItem Header="Diff Against Reviewed"
-                                                          Click="DiffUnreviewedAgainstReviewedMenuItem_OnClick"/>
-                                                <MenuItem Header="Revert to Reviewed"
-                                                          Click="RevertUnreviewedToReviewedMenuItem_OnClick"/>
-                                                <MenuItem Header="Mark Reviewed"
-                                                          Click="AddReviewedMenuItem_OnClick"/>
-                                            </ContextMenu>
-                                        </Grid.ContextMenu>
-                                        <Border Grid.Row="0"
-                                                Background="#E2E8F0"/>
-                                        <Border Grid.Row="1"
-                                                Padding="10,0"
+                                        <Border Padding="10,0"
                                                 Background="Transparent">
                                             <TextBlock Text="{Binding DisplayPath}"
+                                                       behaviors:ExplorerContextMenuBehavior.IsItemContentHitTarget="True"
                                                        VerticalAlignment="Center"
+                                                       HorizontalAlignment="Left"
                                                        TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"
                                                        Foreground="#334155"
@@ -198,38 +196,36 @@
                         <ListBox Classes="reviewFileList"
                                  ItemsSource="{Binding ReviewedFiles}"
                                  SelectedItem="{Binding SelectedReviewedFile, Mode=TwoWay}">
-                            <ListBox.ContextMenu>
+                            <behaviors:ExplorerContextMenuBehavior.RootContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="All Unreviewed"
                                               Command="{Binding MarkAllUnreviewedCommand}"/>
                                     <MenuItem Header="Refresh"
                                               Command="{Binding RefreshCommand}"/>
                                 </ContextMenu>
-                            </ListBox.ContextMenu>
+                            </behaviors:ExplorerContextMenuBehavior.RootContextMenu>
+                            <behaviors:ExplorerContextMenuBehavior.ItemContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Diff Against HEAD"
+                                              Click="DiffReviewedAgainstHeadMenuItem_OnClick"/>
+                                    <MenuItem Header="Diff Against Working Tree"
+                                              Click="DiffReviewedAgainstWorkingTreeMenuItem_OnClick"/>
+                                    <MenuItem Header="Mark Unreviewed"
+                                              Click="MarkUnreviewedMenuItem_OnClick"/>
+                                </ContextMenu>
+                            </behaviors:ExplorerContextMenuBehavior.ItemContextMenu>
                             <ListBox.ItemTemplate>
                                 <DataTemplate DataType="model:ReviewFilePath"
                                               x:CompileBindings="False">
-                                    <Grid MinHeight="34"
-                                          RowDefinitions="1,*"
+                                    <Grid MinHeight="32"
                                           Background="Transparent"
                                           DoubleTapped="ReviewedFile_OnDoubleTapped">
-                                        <Grid.ContextMenu>
-                                            <ContextMenu>
-                                                <MenuItem Header="Diff Against HEAD"
-                                                          Click="DiffReviewedAgainstHeadMenuItem_OnClick"/>
-                                                <MenuItem Header="Diff Against Working Tree"
-                                                          Click="DiffReviewedAgainstWorkingTreeMenuItem_OnClick"/>
-                                                <MenuItem Header="Mark Unreviewed"
-                                                          Click="MarkUnreviewedMenuItem_OnClick"/>
-                                            </ContextMenu>
-                                        </Grid.ContextMenu>
-                                        <Border Grid.Row="0"
-                                                Background="#E2E8F0"/>
-                                        <Border Grid.Row="1"
-                                                Padding="10,0"
+                                        <Border Padding="10,0"
                                                 Background="Transparent">
                                             <TextBlock Text="{Binding DisplayPath}"
+                                                       behaviors:ExplorerContextMenuBehavior.IsItemContentHitTarget="True"
                                                        VerticalAlignment="Center"
+                                                       HorizontalAlignment="Left"
                                                        TextWrapping="NoWrap"
                                                        TextTrimming="CharacterEllipsis"
                                                        Foreground="#334155"

@@ -16,8 +16,8 @@ namespace HaloCreek.ViewModels.Tabs
         private readonly ExternalActionService _externalActionService;
         private readonly TransientEventService _transientEventService;
         private IReadOnlyList<GitChangeInfo> _changes = Array.Empty<GitChangeInfo>();
-        private IReadOnlyList<RelayCommand> _configuredActionCommands = Array.Empty<RelayCommand>();
-        private IReadOnlyList<IGitFileAction> _selectedFilePathActions = Array.Empty<IGitFileAction>();
+        private IReadOnlyList<GitSelectedPathActionDescriptor> _selectedFilePathActionDescriptors =
+            Array.Empty<GitSelectedPathActionDescriptor>();
         private IReadOnlyList<IGitFileAction> _workspaceRootActions = Array.Empty<IGitFileAction>();
         private GitChangeInfo? _selectedChange;
         private GitSelectedPathActionDescriptor _doubleClickAction = null!;
@@ -54,23 +54,10 @@ namespace HaloCreek.ViewModels.Tabs
         public GitChangeInfo? SelectedChange
         {
             get => _selectedChange;
-            set
-            {
-                if (SetProperty(ref _selectedChange, value))
-                {
-                    NotifyConfiguredActionCanExecuteChanged();
-                    OpenSelectedChangeCommand.NotifyCanExecuteChanged();
-                }
-            }
+            set => SetProperty(ref _selectedChange, value);
         }
 
         public ICommand RefreshCommand { get; }
-
-        public IReadOnlyList<IGitFileAction> SelectedFilePathActions
-        {
-            get => _selectedFilePathActions;
-            private set => SetProperty(ref _selectedFilePathActions, value);
-        }
 
         public IReadOnlyList<IGitFileAction> WorkspaceRootActions
         {
@@ -79,6 +66,12 @@ namespace HaloCreek.ViewModels.Tabs
         }
 
         public IRelayCommand<GitChangeInfo> OpenSelectedChangeCommand { get; }
+
+        public IReadOnlyList<IGitFileAction> GetFilePathActions(GitChangeInfo change)
+        {
+            ArgumentNullException.ThrowIfNull(change);
+            return BuildSelectedFilePathActions(_selectedFilePathActionDescriptors, change);
+        }
 
         public void Dispose()
         {
@@ -107,35 +100,29 @@ namespace HaloCreek.ViewModels.Tabs
         private void LoadActionConfig()
         {
             _doubleClickAction = _externalActionService.GetGitSelectedPathDoubleClickAction();
-            var selectedFilePathActions = BuildSelectedFilePathActions(
-                _externalActionService.GetGitSelectedPathActions());
+            _selectedFilePathActionDescriptors = _externalActionService
+                .GetGitSelectedPathActions()
+                .ToArray();
             var workspaceRootActions = BuildWorkspaceRootActions(
                 _externalActionService.GetGitWorkspaceRootActions());
-            _configuredActionCommands = selectedFilePathActions
-                .Concat(workspaceRootActions)
-                .Select(action => action.Command)
-                .OfType<RelayCommand>()
-                .ToArray();
-            SelectedFilePathActions = selectedFilePathActions;
             WorkspaceRootActions = new IGitFileAction[]
                 {
                     new GitFileAction("Refresh", RefreshCommand),
                 }
                 .Concat(workspaceRootActions)
                 .ToArray();
-            NotifyConfiguredActionCanExecuteChanged();
-            OpenSelectedChangeCommand.NotifyCanExecuteChanged();
         }
 
         private IReadOnlyList<IGitFileAction> BuildSelectedFilePathActions(
-            IEnumerable<GitSelectedPathActionDescriptor> actions)
+            IEnumerable<GitSelectedPathActionDescriptor> actions,
+            GitChangeInfo change)
         {
             return actions
                 .Select(action => new GitFileAction(
                     action.Title,
                     new RelayCommand(
-                        () => RunGitSelectedPathAction(action, SelectedChange),
-                        () => !string.IsNullOrWhiteSpace(SelectedChange?.RelativePath))))
+                        () => RunGitSelectedPathAction(action, change),
+                        () => !string.IsNullOrWhiteSpace(change.RelativePath))))
                 .ToArray();
         }
 
@@ -148,14 +135,6 @@ namespace HaloCreek.ViewModels.Tabs
                     new RelayCommand(
                         () => RunGitWorkspaceRootAction(action))))
                 .ToArray();
-        }
-
-        private void NotifyConfiguredActionCanExecuteChanged()
-        {
-            foreach (var command in _configuredActionCommands)
-            {
-                command.NotifyCanExecuteChanged();
-            }
         }
 
         private bool CanOpenSelectedChange(GitChangeInfo? change)

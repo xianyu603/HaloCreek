@@ -15,14 +15,6 @@ namespace HaloCreek.Views.Tabs
             InitializeComponent();
         }
 
-        private void ModifiedRootContextMenu_OnOpened(object? sender, RoutedEventArgs e)
-        {
-            if (DataContext is ReviewViewModel viewModel)
-            {
-                viewModel.ModifiedGit.SelectedChange = null;
-            }
-        }
-
         private void ModifiedChangeContextMenu_OnOpened(object? sender, RoutedEventArgs e)
         {
             if (sender is not ContextMenu menu
@@ -32,8 +24,7 @@ namespace HaloCreek.Views.Tabs
                 return;
             }
 
-            viewModel.ModifiedGit.SelectedChange = change;
-            menu.ItemsSource = viewModel.ModifiedGit.SelectedFilePathActions;
+            menu.ItemsSource = viewModel.ModifiedGit.GetFilePathActions(change);
         }
 
         private void ModifiedChange_OnDoubleTapped(object? sender, TappedEventArgs e)
@@ -75,7 +66,6 @@ namespace HaloCreek.Views.Tabs
 
             if (viewModel.AddReviewedCommand.CanExecute(file))
             {
-                viewModel.SelectedUnreviewedFile = file;
                 viewModel.AddReviewedCommand.Execute(file);
                 e.Handled = true;
             }
@@ -91,7 +81,6 @@ namespace HaloCreek.Views.Tabs
 
             if (viewModel.DiffUnreviewedAgainstReviewedCommand.CanExecute(file))
             {
-                viewModel.SelectedUnreviewedFile = file;
                 viewModel.DiffUnreviewedAgainstReviewedCommand.Execute(file);
                 e.Handled = true;
             }
@@ -107,7 +96,6 @@ namespace HaloCreek.Views.Tabs
 
             if (viewModel.RevertToReviewedCommand.CanExecute(file))
             {
-                viewModel.SelectedUnreviewedFile = file;
                 viewModel.RevertToReviewedCommand.Execute(file);
                 e.Handled = true;
             }
@@ -139,7 +127,6 @@ namespace HaloCreek.Views.Tabs
 
             if (viewModel.MarkUnreviewedCommand.CanExecute(file))
             {
-                viewModel.SelectedReviewedFile = file;
                 viewModel.MarkUnreviewedCommand.Execute(file);
                 e.Handled = true;
             }
@@ -155,7 +142,6 @@ namespace HaloCreek.Views.Tabs
 
             if (viewModel.DiffReviewedAgainstWorkingTreeCommand.CanExecute(file))
             {
-                viewModel.SelectedReviewedFile = file;
                 viewModel.DiffReviewedAgainstWorkingTreeCommand.Execute(file);
                 e.Handled = true;
             }
@@ -171,7 +157,6 @@ namespace HaloCreek.Views.Tabs
 
             if (viewModel.DiffReviewedAgainstHeadCommand.CanExecute(file))
             {
-                viewModel.SelectedReviewedFile = file;
                 viewModel.DiffReviewedAgainstHeadCommand.Execute(file);
                 e.Handled = true;
             }
