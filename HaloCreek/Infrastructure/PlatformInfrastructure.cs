@@ -611,7 +611,9 @@ namespace HaloCreek.Infrastructure
         {
             ArgumentNullException.ThrowIfNull(href);
 
-            var target = href.OriginalString.Trim();
+            var target = href.IsAbsoluteUri && href.IsFile
+                ? href.LocalPath
+                : href.OriginalString.Trim();
             ArgumentException.ThrowIfNullOrWhiteSpace(target);
             Log.Info(LogCategory, $"Opening markdown link. Target={target}");
 
@@ -650,7 +652,7 @@ namespace HaloCreek.Infrastructure
 
             using var fileProcess = Process.Start(new ProcessStartInfo
             {
-                FileName = new Uri(Path.GetFullPath(shellTarget)).AbsoluteUri,
+                FileName = Path.GetFullPath(shellTarget),
                 UseShellExecute = true,
             });
         }
