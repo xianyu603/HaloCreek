@@ -20,5 +20,3 @@ view边框的问题, history尤其明显, 四个角感觉被啃了
 截图自动化迭代的skill
 $补全卡顿问题 考虑新增一个workspaceskillsnapshot
 输入框补全 在底下位置不够的时候(考虑以过半为判据), 挪到最顶上
-session state view变更 用户输入走plan text而非md(md解析用户输入经常有bug..)
-session state view 似乎在md解析的过程中不能稳定翻到最下
