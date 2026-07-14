@@ -1,8 +1,4 @@
-环境准备:
-一个海马云电脑 预先clone HaloCreek仓库 准备好梯子 安装一下VSCode
-
-1. 分别一键安装codex desktop和HaloCreek 对比从桌面到发出第一条你好的时间
-2. Review 一下HaloCreek代码 对比codex desktop和HaloCreek的消息查看体验(文件的按行跳转)
-3. 全局悬浮Prompt
-4. Prompt补全
-5. 右键重抽
+短素材:
+在空电脑上安装
+发送消息(总结一下这个仓库的内容, 并梳理一下版本变更历史)，阅读汇报
+review和追问，日常开发的过程中录制，在reply已经有了的情况下搞. 可以obs录10min 感觉合适了留下来
