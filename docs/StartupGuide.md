@@ -23,6 +23,8 @@ scripts\install_deps.bat
 
 Git 和 TortoiseGit 安装器可能显示安装 UI。脚本在安装后会刷新当前进程的 PATH，并在结束前再次验证依赖；如果验证仍失败，请人工检查对应工具是否把可执行文件目录写入了用户或系统 PATH。
 
+离线包由 `scripts\prepare_offline_pack.ps1` 生成。离线包会同时收集 Microsoft Visual C++ Redistributable x64，并在安装 TortoiseGit 前先安装该运行库。`install_offline.ps1` 运行时会在离线包根目录创建 `diagnostics` 目录，保存安装 transcript、环境快照、安装器日志和失败摘要，便于远程诊断 MSI 安装失败。
+
 ### 1.2 手动检查项
 
 如果不使用安装脚本，可以手动确认：

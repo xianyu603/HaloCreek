@@ -28,11 +28,111 @@ $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 $OutputEncoding = $Utf8NoBom
 chcp.com 65001 | Out-Null
 
+$DiagnosticsDir = Join-Path $PSScriptRoot "diagnostics"
+$InstallRunId = [DateTime]::Now.ToString("yyyyMMdd-HHmmss")
+$InstallTranscriptPath = Join-Path $DiagnosticsDir "$InstallRunId-install-transcript.log"
+$TranscriptStarted = $false
+
 function Write-Step {
     param([string]$Message)
 
     Write-Host ""
     Write-Host "==> $Message"
+}
+
+function Initialize-Diagnostics {
+    New-Item -ItemType Directory -Force -Path $DiagnosticsDir | Out-Null
+    try {
+        Start-Transcript -LiteralPath $InstallTranscriptPath -Force | Out-Null
+        $script:TranscriptStarted = $true
+    }
+    catch {
+        Write-Warning "Failed to start installer transcript: $($_.Exception.Message)"
+    }
+
+    Write-Host "Diagnostics directory: $DiagnosticsDir"
+    Write-Host "Installer transcript: $InstallTranscriptPath"
+}
+
+function Stop-Diagnostics {
+    if ($script:TranscriptStarted) {
+        try {
+            Stop-Transcript | Out-Null
+        }
+        catch {
+            Write-Warning "Failed to stop installer transcript: $($_.Exception.Message)"
+        }
+    }
+}
+
+function New-DiagnosticLogPath {
+    param(
+        [string]$Name,
+        [string]$Extension = "log"
+    )
+
+    New-Item -ItemType Directory -Force -Path $DiagnosticsDir | Out-Null
+    $safeName = ($Name -replace '[^A-Za-z0-9._-]+', "-").Trim("-")
+    if ([string]::IsNullOrWhiteSpace($safeName)) {
+        $safeName = "diagnostic"
+    }
+
+    Join-Path $DiagnosticsDir "$InstallRunId-$safeName.$Extension"
+}
+
+function Test-IsAdministrator {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal $identity
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Write-DiagnosticsSnapshot {
+    param([object]$Manifest)
+
+    $path = New-DiagnosticLogPath "environment" "txt"
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("HaloCreek offline installer diagnostics")
+    $lines.Add("RunId: $InstallRunId")
+    $lines.Add("Timestamp: $([DateTime]::Now.ToString("o"))")
+    $lines.Add("ScriptRoot: $PSScriptRoot")
+    $lines.Add("CurrentDirectory: $((Get-Location).Path)")
+    $lines.Add("UserName: $env:USERNAME")
+    $lines.Add("UserDomain: $env:USERDOMAIN")
+    $lines.Add("ComputerName: $env:COMPUTERNAME")
+    $lines.Add("IsAdministrator: $(Test-IsAdministrator)")
+    $lines.Add("PowerShellVersion: $($PSVersionTable.PSVersion)")
+    $lines.Add("ProcessArchitecture: $env:PROCESSOR_ARCHITECTURE")
+    $lines.Add("OSArchitecture: $env:PROCESSOR_ARCHITEW6432")
+    $lines.Add("ProgramFiles: $env:ProgramFiles")
+    $lines.Add("LocalAppData: $env:LOCALAPPDATA")
+    $lines.Add("Temp: $env:TEMP")
+    $lines.Add("")
+    $lines.Add("PATH:")
+    $lines.Add($env:Path)
+    $lines.Add("")
+    $lines.Add("Manifest artifacts:")
+    foreach ($artifact in @($Manifest.artifacts)) {
+        $lines.Add("kind=$($artifact.kind) name=$($artifact.name) version=$($artifact.version) path=$($artifact.path) sha256=$($artifact.sha256) sizeBytes=$($artifact.sizeBytes)")
+    }
+
+    $commands = @("psmux.exe", "codex.exe", "git.exe", "TortoiseGitProc.exe")
+    foreach ($command in $commands) {
+        $lines.Add("")
+        $lines.Add("where.exe ${command}:")
+        try {
+            $whereOutput = (& where.exe $command 2>&1 | Out-String).Trim()
+            if ([string]::IsNullOrWhiteSpace($whereOutput)) {
+                $whereOutput = "(no output)"
+            }
+            $lines.Add($whereOutput)
+        }
+        catch {
+            $lines.Add($_.Exception.Message)
+        }
+    }
+
+    [IO.File]::WriteAllLines($path, $lines, $Utf8NoBom)
+    Write-Host "Environment diagnostics: $path"
 }
 
 function Test-CommandAvailable {
@@ -65,10 +165,15 @@ function Invoke-ExternalCommand {
         [string]$FilePath,
         [string[]]$ArgumentList,
         [string]$Description,
-        [int[]]$SuccessExitCodes = @(0)
+        [int[]]$SuccessExitCodes = @(0),
+        [string]$LogPath
     )
 
     Write-Host $Description
+    if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
+        Write-Host "Installer log: $LogPath"
+    }
+
     $startProcessArguments = @{
         FilePath = $FilePath
         Wait     = $true
@@ -83,7 +188,8 @@ function Invoke-ExternalCommand {
     $exitCode = $process.ExitCode
 
     if ($SuccessExitCodes -notcontains $exitCode) {
-        throw "$Description failed with exit code $exitCode."
+        $logMessage = if ([string]::IsNullOrWhiteSpace($LogPath)) { "" } else { " See log: $LogPath" }
+        throw "$Description failed with exit code $exitCode.$logMessage"
     }
 
     if ($exitCode -eq 3010) {
@@ -474,7 +580,8 @@ function Install-Psmux {
     }
 
     if ($extension -eq ".msi") {
-        Invoke-ExternalCommand "msiexec.exe" @("/i", $path, "/passive", "/norestart") "Installing psmux from local MSI." @(0, 3010)
+        $logPath = New-DiagnosticLogPath "psmux-msi"
+        Invoke-ExternalCommand -FilePath "msiexec.exe" -ArgumentList @("/i", $path, "/passive", "/norestart", "/L*V", $logPath) -Description "Installing psmux from local MSI." -SuccessExitCodes @(0, 3010) -LogPath $logPath
         Update-ProcessPath
         return
     }
@@ -486,6 +593,15 @@ function Install-Psmux {
     }
 
     throw "Unsupported psmux package extension: $extension"
+}
+
+function Install-VcRedistX64 {
+    param([object]$Manifest)
+
+    $artifact = Get-PackArtifact $Manifest "vc-redist-x64-installer"
+    $path = Resolve-PackPath $artifact
+    $logPath = New-DiagnosticLogPath "vc-redist-x64"
+    Invoke-ExternalCommand -FilePath $path -ArgumentList @("/install", "/passive", "/norestart", "/log", $logPath) -Description "Installing Microsoft Visual C++ Redistributable x64 from local installer." -SuccessExitCodes @(0, 3010, 1638) -LogPath $logPath
 }
 
 function Install-CodexCli {
@@ -567,16 +683,18 @@ function Install-GitForWindows {
 
     $artifact = Get-PackArtifact $Manifest "git-installer"
     $path = Resolve-PackPath $artifact
+    $logPath = New-DiagnosticLogPath "git-for-windows"
     $arguments = @(
         "/VERYSILENT",
         "/NORESTART",
         "/NOCANCEL",
         "/SP-",
         "/CLOSEAPPLICATIONS",
-        "/RESTARTAPPLICATIONS"
+        "/RESTARTAPPLICATIONS",
+        "/LOG=$logPath"
     )
 
-    Invoke-ExternalCommand $path $arguments "Installing Git for Windows from local installer."
+    Invoke-ExternalCommand -FilePath $path -ArgumentList $arguments -Description "Installing Git for Windows from local installer." -SuccessExitCodes @(0) -LogPath $logPath
     $gitCmdPath = Join-Path $env:ProgramFiles "Git\cmd"
     Wait-PathExists (Join-Path $gitCmdPath "git.exe") "Git for Windows" | Out-Null
     if (Test-Path -LiteralPath (Join-Path $gitCmdPath "git.exe")) {
@@ -591,7 +709,8 @@ function Install-TortoiseGit {
 
     $artifact = Get-PackArtifact $Manifest "tortoisegit-installer"
     $path = Resolve-PackPath $artifact
-    Invoke-ExternalCommand "msiexec.exe" @("/i", $path, "/passive", "/norestart") "Installing TortoiseGit from local MSI." @(0, 3010)
+    $logPath = New-DiagnosticLogPath "tortoisegit-msi"
+    Invoke-ExternalCommand -FilePath "msiexec.exe" -ArgumentList @("/i", $path, "/passive", "/norestart", "/L*V", $logPath) -Description "Installing TortoiseGit from local MSI." -SuccessExitCodes @(0, 3010) -LogPath $logPath
     $tortoiseGitPath = Join-Path $env:ProgramFiles "TortoiseGit\bin"
     Wait-PathExists (Join-Path $tortoiseGitPath "TortoiseGitProc.exe") "TortoiseGit" | Out-Null
     if (Test-Path -LiteralPath (Join-Path $tortoiseGitPath "TortoiseGitProc.exe")) {
@@ -663,6 +782,9 @@ function Install-OfflineDependencies {
     Write-Step "Install Git for Windows"
     Install-OfflineDependency "Git for Windows" "git.exe" { Install-GitForWindows $Manifest }
 
+    Write-Step "Install Microsoft Visual C++ Redistributable x64"
+    Install-VcRedistX64 $Manifest
+
     Write-Step "Install TortoiseGit"
     Install-OfflineDependency "TortoiseGit" "TortoiseGitProc.exe" { Install-TortoiseGit $Manifest }
 
@@ -702,31 +824,63 @@ function Remove-HaloCreek {
     }
 }
 
-if ($Uninstall) {
-    Remove-HaloCreek
-    exit 0
+Initialize-Diagnostics
+$exitCode = 0
+
+try {
+    if ($Uninstall) {
+        Remove-HaloCreek
+    }
+    else {
+        if ($DependenciesOnly -and $NoInstallDependencies) {
+            throw "DependenciesOnly and NoInstallDependencies cannot be used together."
+        }
+
+        Write-Host "HaloCreek offline installer"
+        Write-Host "Offline pack root: $PSScriptRoot"
+
+        $manifest = Read-PackManifest
+        Write-DiagnosticsSnapshot $manifest
+
+        Write-Step "Verify offline pack files"
+        Test-PackHashes $manifest
+
+        if (-not $NoInstallDependencies) {
+            Install-OfflineDependencies $manifest
+        }
+
+        if (-not $DependenciesOnly) {
+            Install-HaloCreekApp $manifest
+        }
+
+        Write-Host ""
+        Write-Host "HaloCreek offline installation completed."
+    }
+}
+catch {
+    $exitCode = 1
+    $errorPath = New-DiagnosticLogPath "error" "txt"
+    $errorText = @(
+        "HaloCreek offline installation failed.",
+        "RunId: $InstallRunId",
+        "Timestamp: $([DateTime]::Now.ToString("o"))",
+        "Message: $($_.Exception.Message)",
+        "",
+        "Script stack trace:",
+        $_.ScriptStackTrace,
+        "",
+        "Full error:",
+        ($_ | Out-String)
+    )
+    [IO.File]::WriteAllLines($errorPath, $errorText, $Utf8NoBom)
+    Write-Host ""
+    Write-Host "HaloCreek offline installation failed."
+    Write-Host "Error: $($_.Exception.Message)"
+    Write-Host "Error diagnostics: $errorPath"
+    Write-Host "Diagnostics directory: $DiagnosticsDir"
+}
+finally {
+    Stop-Diagnostics
 }
 
-if ($DependenciesOnly -and $NoInstallDependencies) {
-    throw "DependenciesOnly and NoInstallDependencies cannot be used together."
-}
-
-Write-Host "HaloCreek offline installer"
-Write-Host "Offline pack root: $PSScriptRoot"
-
-$manifest = Read-PackManifest
-
-Write-Step "Verify offline pack files"
-Test-PackHashes $manifest
-
-if (-not $NoInstallDependencies) {
-    Install-OfflineDependencies $manifest
-}
-
-if (-not $DependenciesOnly) {
-    Install-HaloCreekApp $manifest
-}
-
-Write-Host ""
-Write-Host "HaloCreek offline installation completed."
-exit 0
+exit $exitCode

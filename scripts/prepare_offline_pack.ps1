@@ -17,6 +17,8 @@ param(
 
     [string]$TortoiseGitAssetPattern = "^TortoiseGit-.+-64bit\.msi$",
 
+    [string]$VcRedistX64DownloadUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+
     [string]$HaloCreekZipPath,
 
     [string]$HaloCreekChecksumPath,
@@ -193,6 +195,7 @@ function New-PackDirectory {
     New-Item -ItemType Directory -Force -Path (Join-Path $Root "dependencies\psmux") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $Root "dependencies\codex") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $Root "dependencies\git") | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $Root "dependencies\vcredist") | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $Root "dependencies\tortoisegit") | Out-Null
 }
 
@@ -359,6 +362,11 @@ try {
     $gitPath = Join-Path $packRoot ("dependencies\git\" + $gitAsset.name)
     Invoke-Download $gitAsset.browser_download_url $gitPath
     Add-PackFile $artifacts "Git for Windows" "git-installer" "https://github.com/git-for-windows/git/releases/latest" $gitVersion ("dependencies/git/" + $gitAsset.name) $gitAsset.browser_download_url $gitPath
+
+    Write-Step "Download Microsoft Visual C++ Redistributable x64"
+    $vcRedistPath = Join-Path $packRoot "dependencies\vcredist\vc_redist.x64.exe"
+    Invoke-Download $VcRedistX64DownloadUrl $vcRedistPath
+    Add-PackFile $artifacts "Microsoft Visual C++ Redistributable x64" "vc-redist-x64-installer" $VcRedistX64DownloadUrl "latest" "dependencies/vcredist/vc_redist.x64.exe" $VcRedistX64DownloadUrl $vcRedistPath
 
     Write-Step "Download TortoiseGit"
     $tortoiseInstaller = Resolve-TortoiseGitInstaller $TortoiseGitDownloadPage $TortoiseGitAssetPattern
