@@ -4,14 +4,10 @@ resume 切回来 或者每次新起session都先自动置于前台
 考虑下要不要提示词为空允许启动session
 当前不支持运行时 reload config 之后再说加不加的
 日志面板只在前台监听日志变化
-review VM有点过载 目前已经承载了Reviewed Unreviewed的业务语义和视图切换语义 加批注之后可能收不太住
 文件归属有点乱 git VM现在已经不是tab而是组件了 另外似乎不应该将VM按UI组织
 常量考虑走一个文件 避免分叉
-* 前台session exit的过程中快速切另一个前台会寄掉
-wt的检查 win 10默认没有wt 需要同步修改user guide
 离线包安装现在会跳过 PATH 上已存在的依赖，暂时无法用离线包更新这些依赖
 
-应用内没法更新codex 更新失败后 再次尝试拉起前台会闪退
 环境检查更新 现在能够适配code来diff和source tree来commit/log
 
 review加点提示信息，方便先捡软柿子review

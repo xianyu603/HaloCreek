@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using HaloCreek.Infrastructure;
 using HaloCreek.Models;
+using HaloCreek.Services.CodexSessions;
 
 namespace HaloCreek.Services.SessionHistory
 {
@@ -157,44 +158,35 @@ namespace HaloCreek.Services.SessionHistory
             var lastReply = string.Empty;
             var foundSessionMeta = false;
 
-            foreach (var line in PlatformInfrastructure.ReadTextFileLinesWithWriteSharing(sessionFilePath))
+            foreach (var line in CodexSessionJsonlReader.ReadLines(sessionFilePath))
             {
-                if (string.IsNullOrWhiteSpace(line))
+                if (line.TryRead(CodexSessionLineSchemas.Timestamped, out var timestamped))
                 {
-                    continue;
+                    lastUpdatedAt = timestamped.Timestamp!.Value;
                 }
 
-                using var document = JsonDocument.Parse(line);
-                var root = document.RootElement;
-
-                if (TryGetTimestamp(root, out var recordTimestamp))
-                {
-                    lastUpdatedAt = recordTimestamp;
-                }
-
-                if (TryReadEventUserMessage(root, out var eventUserPrompt))
+                if (line.TryRead(CodexSessionLineSchemas.UserMessage, out var userMessage)
+                    && !IsEnvironmentContextMessage(userMessage.Payload.Message))
                 {
                     // If this source renders poorly, switch to response_item role=user instead.
-                    initialPrompt ??= eventUserPrompt;
-                    lastPrompt = eventUserPrompt;
+                    initialPrompt ??= userMessage.Payload.Message;
+                    lastPrompt = userMessage.Payload.Message;
                 }
 
-                if (TryReadAssistantReply(root, out var assistantReply))
+                if (line.TryRead(CodexSessionLineSchemas.AgentMessage, out var agentMessage))
                 {
-                    lastReply = assistantReply;
+                    lastReply = agentMessage.Payload.Message;
                 }
 
-                if (!IsRecordType(root, "session_meta"))
+                if (!line.TryRead(CodexSessionLineSchemas.SessionMeta, out var sessionMeta))
                 {
                     continue;
                 }
 
                 foundSessionMeta = true;
-                var payload = GetRequiredObject(root, "payload");
-
-                id = GetRequiredString(payload, "id");
-                sessionWorkspacePath = GetRequiredString(payload, "cwd");
-                createdAt = GetRequiredTimestamp(payload, "timestamp");
+                id = sessionMeta.Payload.Id;
+                sessionWorkspacePath = sessionMeta.Payload.Cwd;
+                createdAt = sessionMeta.Payload.Timestamp;
             }
 
             if (!foundSessionMeta)
@@ -233,164 +225,11 @@ namespace HaloCreek.Services.SessionHistory
                 sessionFilePath);
         }
 
-        private static bool TryReadEventUserMessage(JsonElement root, out string message)
-        {
-            message = string.Empty;
-
-            if (!IsRecordType(root, "event_msg")
-                || !TryGetObject(root, "payload", out var payload)
-                || !IsPayloadType(payload, "user_message")
-                || !TryGetNonEmptyString(payload, "message", out message)
-                || IsEnvironmentContextMessage(message))
-            {
-                message = string.Empty;
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool TryReadAssistantReply(JsonElement root, out string message)
-        {
-            message = string.Empty;
-
-            if (!IsRecordType(root, "event_msg")
-                || !TryGetObject(root, "payload", out var payload)
-                || !IsPayloadType(payload, "agent_message")
-                || !TryGetNonEmptyString(payload, "message", out message))
-            {
-                message = string.Empty;
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool IsPayloadType(JsonElement payload, string expectedType)
-        {
-            return TryGetString(payload, "type", out var type)
-                && string.Equals(type, expectedType, StringComparison.Ordinal);
-        }
-
         private static bool IsEnvironmentContextMessage(string message)
         {
             var trimmedMessage = message.TrimStart();
             return trimmedMessage.StartsWith("<environment_context>", StringComparison.Ordinal)
                 && trimmedMessage.Contains("</environment_context>", StringComparison.Ordinal);
-        }
-
-        private static bool IsRecordType(JsonElement root, string expectedType)
-        {
-            return root.TryGetProperty("type", out var typeElement)
-                && typeElement.ValueKind == JsonValueKind.String
-                && string.Equals(typeElement.GetString(), expectedType, StringComparison.Ordinal);
-        }
-
-        private static JsonElement GetRequiredObject(JsonElement element, string propertyName)
-        {
-            if (!element.TryGetProperty(propertyName, out var property)
-                || property.ValueKind != JsonValueKind.Object)
-            {
-                throw new InvalidDataException($"{propertyName} is missing.");
-            }
-
-            return property;
-        }
-
-        private static bool TryGetObject(
-            JsonElement element,
-            string propertyName,
-            out JsonElement property)
-        {
-            if (element.TryGetProperty(propertyName, out property)
-                && property.ValueKind == JsonValueKind.Object)
-            {
-                return true;
-            }
-
-            property = default;
-            return false;
-        }
-
-        private static string GetRequiredString(JsonElement element, string propertyName)
-        {
-            if (!element.TryGetProperty(propertyName, out var property)
-                || property.ValueKind != JsonValueKind.String)
-            {
-                throw new InvalidDataException($"{propertyName} is missing.");
-            }
-
-            var value = property.GetString();
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new InvalidDataException($"{propertyName} is empty.");
-            }
-
-            return value;
-        }
-
-        private static bool TryGetNonEmptyString(
-            JsonElement element,
-            string propertyName,
-            out string value)
-        {
-            if (TryGetString(element, propertyName, out value)
-                && !string.IsNullOrWhiteSpace(value))
-            {
-                return true;
-            }
-
-            value = string.Empty;
-            return false;
-        }
-
-        private static bool TryGetString(
-            JsonElement element,
-            string propertyName,
-            out string value)
-        {
-            value = string.Empty;
-
-            if (!element.TryGetProperty(propertyName, out var property)
-                || property.ValueKind != JsonValueKind.String)
-            {
-                return false;
-            }
-
-            value = property.GetString() ?? string.Empty;
-            return true;
-        }
-
-        private static DateTimeOffset GetRequiredTimestamp(JsonElement element, string propertyName)
-        {
-            if (!TryGetTimestamp(element, propertyName, out var timestamp))
-            {
-                throw new InvalidDataException($"{propertyName} is missing.");
-            }
-
-            return timestamp;
-        }
-
-        private static bool TryGetTimestamp(JsonElement element, out DateTimeOffset timestamp)
-        {
-            return TryGetTimestamp(element, "timestamp", out timestamp);
-        }
-
-        private static bool TryGetTimestamp(
-            JsonElement element,
-            string propertyName,
-            out DateTimeOffset timestamp)
-        {
-            timestamp = default;
-
-            if (!element.TryGetProperty(propertyName, out var property)
-                || property.ValueKind != JsonValueKind.String)
-            {
-                return false;
-            }
-
-            var value = property.GetString();
-            return DateTimeOffset.TryParse(value, out timestamp);
         }
 
         private static StringComparer GetFilePathComparer()
