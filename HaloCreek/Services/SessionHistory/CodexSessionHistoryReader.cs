@@ -189,30 +189,11 @@ namespace HaloCreek.Services.SessionHistory
                 createdAt = sessionMeta.Payload.Timestamp;
             }
 
-            if (!foundSessionMeta)
-            {
-                throw new InvalidDataException("Session metadata is missing.");
-            }
-
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                throw new InvalidDataException("Session id is missing.");
-            }
-
-            if (string.IsNullOrWhiteSpace(sessionWorkspacePath))
-            {
-                throw new InvalidDataException("Session workspace path is missing.");
-            }
-
-            if (createdAt is null)
-            {
-                throw new InvalidDataException("Session created timestamp is missing.");
-            }
-
-            if (lastUpdatedAt is null)
-            {
-                throw new InvalidDataException("Session last updated timestamp is missing.");
-            }
+            if (!foundSessionMeta) throw new InvalidDataException("Session metadata is missing.");
+            if (string.IsNullOrWhiteSpace(id)) throw new InvalidDataException("Session id is missing.");
+            if (string.IsNullOrWhiteSpace(sessionWorkspacePath)) throw new InvalidDataException("Session workspace path is missing.");
+            if (createdAt is null) throw new InvalidDataException("Session created timestamp is missing.");
+            if (lastUpdatedAt is null) throw new InvalidDataException("Session last updated timestamp is missing.");
 
             return new HistorySessionInfo(
                 id,
