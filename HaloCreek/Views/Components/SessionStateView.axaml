@@ -81,6 +81,7 @@
                     BorderThickness="0,1,0,1">
                 <ScrollViewer x:Name="MessagesScrollViewer"
                               SizeChanged="MessagesScrollViewer_SizeChanged"
+                              ScrollChanged="MessagesScrollViewer_ScrollChanged"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
                               Padding="16,10,20,0">

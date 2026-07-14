@@ -1,12 +1,10 @@
 using System;
-using System.ComponentModel;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using HaloCreek.Infrastructure;
 using HaloCreek.Logging;
-using HaloCreek.Models;
 using LiveMarkdown.Avalonia;
 
 namespace HaloCreek.Views.Components
@@ -14,7 +12,7 @@ namespace HaloCreek.Views.Components
     public partial class SessionStateView : UserControl
     {
         private const string LogCategory = "SessionStateView";
-        private OngoingSession? _session;
+        private const double ScrollEndThreshold = 2;
         private bool _scrollToEndQueued;
 
         public ICommand OpenMarkdownLinkCommand { get; } = new MarkdownLinkCommand();
@@ -27,18 +25,7 @@ namespace HaloCreek.Views.Components
         protected override void OnDataContextChanged(EventArgs e)
         {
             base.OnDataContextChanged(e);
-
-            if (_session is not null)
-            {
-                _session.PropertyChanged -= Session_PropertyChanged;
-            }
-
-            _session = DataContext as OngoingSession;
-            if (_session is not null)
-            {
-                _session.PropertyChanged += Session_PropertyChanged;
-                QueueScrollToEnd();
-            }
+            QueueScrollToEnd();
         }
 
         private void MessagesScrollViewer_SizeChanged(object? sender, SizeChangedEventArgs e)
@@ -50,12 +37,25 @@ namespace HaloCreek.Views.Components
             MessagesItemsControl.Width = Math.Max(0, contentWidth);
         }
 
-        private void Session_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        private void MessagesScrollViewer_ScrollChanged(object? sender, ScrollChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(OngoingSession.Messages))
+            var previousOffsetY = MessagesScrollViewer.Offset.Y - e.OffsetDelta.Y;
+            var previousViewportHeight = MessagesScrollViewer.Viewport.Height - e.ViewportDelta.Y;
+            var previousExtentHeight = MessagesScrollViewer.Extent.Height - e.ExtentDelta.Y;
+
+            if ((e.ExtentDelta.Y > 0 || e.ViewportDelta.Y != 0)
+                && IsScrolledToEnd(previousOffsetY, previousViewportHeight, previousExtentHeight))
             {
                 QueueScrollToEnd();
             }
+        }
+
+        private static bool IsScrolledToEnd(
+            double offsetY,
+            double viewportHeight,
+            double extentHeight)
+        {
+            return offsetY + viewportHeight >= extentHeight - ScrollEndThreshold;
         }
 
         private void QueueScrollToEnd()
