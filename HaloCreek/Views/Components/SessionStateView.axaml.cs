@@ -110,12 +110,21 @@ namespace HaloCreek.Views.Components
         private static Uri NormalizeMarkdownLinkHref(Uri href)
         {
             var target = href.OriginalString.Trim();
-            if (!target.StartsWith(AbsolutePathLinkPrefix, StringComparison.Ordinal))
+            if (target.StartsWith(AbsolutePathLinkPrefix, StringComparison.Ordinal))
             {
-                return href;
+                return new Uri(target[AbsolutePathLinkPrefix.Length..], UriKind.RelativeOrAbsolute);
             }
 
-            return new Uri(target[AbsolutePathLinkPrefix.Length..], UriKind.RelativeOrAbsolute);
+            if (target.Length >= 4
+                && target[0] == '/'
+                && char.IsAsciiLetter(target[1])
+                && target[2] == ':'
+                && target[3] is '/' or '\\')
+            {
+                return new Uri(target[1..], UriKind.RelativeOrAbsolute);
+            }
+
+            return href;
         }
 
         private sealed class MarkdownLinkCommand : ICommand
