@@ -1,5 +1,9 @@
 @echo off
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
+
+if defined HALOCREEK_TERMINAL_TITLE (
+    title !HALOCREEK_TERMINAL_TITLE!
+)
 
 if "%~1"=="" (
     echo Usage: %~nx0 [-t] ^<session^>

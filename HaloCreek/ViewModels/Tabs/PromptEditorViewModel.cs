@@ -93,7 +93,7 @@ namespace HaloCreek.ViewModels.Tabs
             await Task.Run(() =>
             {
                 _terminalService.LaunchFrontClient(
-                    _tmuxService.GetFrontClientStartupCommand(session.Id));
+                    _tmuxService.GetFrontClientStartupCommand(session.Id, session.Title));
             });
 
             Log.Info("PromptEditor", "CLI entry completed.");

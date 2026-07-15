@@ -1,6 +1,6 @@
 # HaloCreek Feature Guide
 
-HaloCreek 是一个面向 Windows + Codex CLI 的本地桌面工作流壳层，它把 workspace 选择、prompt 启动、session 恢复、应用内 session 状态、Git 修改、Review 状态和日志集中到一个轻量入口里。0.3 版本后，Codex session 默认在后台 psmux session 中运行；只有用户显式点击 `CLI` 时才打开 Windows Terminal。
+HaloCreek 是一个面向 Windows + Codex CLI 的本地桌面工作流壳层，它把 workspace 选择、prompt 启动、session 恢复、应用内 session 状态、Git 修改、Review 状态和日志集中到一个轻量入口里。0.3 版本后，Codex session 默认在后台 psmux session 中运行；只有用户显式点击 `CLI` 时才打开前台命令窗口。
 
 启动、依赖安装、workspace 规则和配置说明见 [Startup Guide](StartupGuide.md)。
 
@@ -37,13 +37,13 @@ Prompt Editor 用来编辑 prompt、启动新的 Codex session、向当前应用
 - `Launch`：用当前 prompt 启动新的 Codex session。快捷键是 `Ctrl+Enter`。
 - `SendToFront`：把当前 prompt 发送到当前应用内前台 session。快捷键是 `Alt+Enter`。
 - ongoing session 双击：把该 session 切为应用内前台 session。
-- ongoing session 的 `CLI`：显式打开 Windows Terminal，并 attach 到该 session 的 psmux CLI。
+- ongoing session 的 `CLI`：显式打开前台命令窗口，并 attach 到该 session 的 psmux CLI。
 - ongoing session 的 `Restart`：仅在 session 被判定为 `Dead` 时显示，用原始 launch prompt 或 Codex session id 重新启动 session。
 - ongoing session 的 `Exit`：结束对应 psmux session，并从列表移除。
 
-`Launch` 的执行流程是：在当前 workspace 下创建后台 psmux session，运行 `codex <配置参数> <prompt>`，然后把新 session 设为应用内前台 session。0.3 起不会自动打开 Windows Terminal。
+`Launch` 的执行流程是：在当前 workspace 下创建后台 psmux session，运行 `codex <配置参数> <prompt>`，然后把新 session 设为应用内前台 session。0.3 起不会自动打开前台命令窗口。
 
-ongoing session 的标题来自首次 prompt 的前 20 个字符。应用内 `Front` 只表示 HaloCreek 当前关注和发送消息的 session，不代表 Windows Terminal 当前 attach 的 session。用户手动在 psmux/终端里切换 session 时，应用内 front 不会随之同步。
+ongoing session 的标题来自首次 prompt 的前 20 个字符。应用内 `Front` 只表示 HaloCreek 当前关注和发送消息的 session，不代表当前打开的命令窗口 attach 的 session。用户手动在 psmux/终端里切换 session 时，应用内 front 不会随之同步。
 
 状态含义：
 

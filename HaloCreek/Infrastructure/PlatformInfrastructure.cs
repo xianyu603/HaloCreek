@@ -1022,182 +1022,84 @@ namespace HaloCreek.Infrastructure
             }
         }
 
-        public Process? LaunchWslTerminalCommand(
-            string workspacePath,
-            string executableName,
-            IEnumerable<string> arguments)
+        public Process? LaunchTerminal(TerminalCommandSpec command)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(workspacePath);
-            ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
-            ArgumentNullException.ThrowIfNull(arguments);
+            ArgumentNullException.ThrowIfNull(command);
 
-            var wslWorkspacePath = ConvertToWslPath(workspacePath);
-            var shellCommand = BuildShellCommand(executableName, arguments);
-
-            return StartWindowsTerminalWsl(null, wslWorkspacePath, shellCommand);
-        }
-
-        public string ConvertPathToWsl(string path)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(path);
-
-            return ConvertToWslPath(path);
-        }
-
-        public string BuildWslShellCommand(
-            string executableName,
-            IEnumerable<string> arguments)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
-            ArgumentNullException.ThrowIfNull(arguments);
-
-            return BuildShellCommand(executableName, arguments);
-        }
-
-        public string QuoteWslShellArgument(string value)
-        {
-            ArgumentNullException.ThrowIfNull(value);
-
-            return QuoteBashArgument(value);
-        }
-
-        public bool TryRunWslCommand(
-            string executableName,
-            IEnumerable<string> arguments,
-            out string output)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(executableName);
-            ArgumentNullException.ThrowIfNull(arguments);
-
-            return TryRunWslShellCommand(
-                BuildShellCommand(executableName, arguments),
-                out output);
-        }
-
-        // TODO 这个类的命名需要整理
-        public Process? LaunchTerminal(TerminalLaunchRequest request)
-        {
-            ArgumentNullException.ThrowIfNull(request);
-            ArgumentNullException.ThrowIfNull(request.Command);
-
-            if (request.Command is TerminalWindowsCommandSpec windowsCommand)
+            if (command is not TerminalWindowsCommandSpec windowsCommand)
             {
-                return StartWindowsTerminal(
-                    request.WindowIdentity,
-                    ConvertPathToWindows(windowsCommand.WorkingDirectory),
-                    windowsCommand.Executable,
-                    windowsCommand.Arguments);
+                throw new NotSupportedException(
+                    "Unsupported terminal command type: " + command.GetType().FullName);
             }
 
-            var command = MaterializeWslTerminalCommand(request.Command);
-            ArgumentException.ThrowIfNullOrWhiteSpace(command.WorkingDirectory);
-            ArgumentException.ThrowIfNullOrWhiteSpace(command.Executable);
-
-            return StartWindowsTerminalWsl(
-                request.WindowIdentity,
-                ConvertToWslPath(command.WorkingDirectory),
-                BuildShellCommand(command.Executable, command.Arguments));
+            return StartForegroundProcess(
+                ConvertPathToWindows(windowsCommand.WorkingDirectory),
+                windowsCommand.WindowTitle,
+                windowsCommand.Executable,
+                windowsCommand.Arguments);
         }
 
-        private static TerminalExecutableCommandSpec MaterializeWslTerminalCommand(TerminalCommandSpec command)
-        {
-            return command switch
-            {
-                TerminalExecutableCommandSpec executableCommand => executableCommand,
-                TerminalWslScriptCommandSpec scriptCommand => WriteWslScriptCommand(scriptCommand),
-                _ => throw new NotSupportedException(
-                    "Unsupported terminal command type: " + command.GetType().FullName)
-            };
-        }
-
-        private static TerminalExecutableCommandSpec WriteWslScriptCommand(
-            TerminalWslScriptCommandSpec command)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(command.WorkingDirectory);
-            ArgumentException.ThrowIfNullOrWhiteSpace(command.FileNameHint);
-            ArgumentException.ThrowIfNullOrWhiteSpace(command.ScriptText);
-
-            var fileName = SanitizeFileNameSegment(command.FileNameHint);
-            if (fileName.Length == 0)
-            {
-                fileName = "script";
-            }
-            if (!fileName.EndsWith(".sh", StringComparison.OrdinalIgnoreCase))
-            {
-                fileName += ".sh";
-            }
-
-            var scriptPath = WriteTempFile(fileName, command.ScriptText);
-
-            return new TerminalExecutableCommandSpec(
-                command.WorkingDirectory,
-                "bash",
-                new[] { ConvertToWslPath(scriptPath) });
-        }
-
-        private static Process? StartWindowsTerminalWsl(
-            string? windowIdentity,
-            string? wslWorkspacePath,
-            string? shellCommand)
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "wt.exe",
-                UseShellExecute = false
-            };
-
-            if (!string.IsNullOrWhiteSpace(windowIdentity))
-            {
-                startInfo.ArgumentList.Add("--window");
-                startInfo.ArgumentList.Add(windowIdentity);
-            }
-
-            if (!string.IsNullOrWhiteSpace(wslWorkspacePath)
-                && shellCommand is not null)
-            {
-                startInfo.ArgumentList.Add("wsl.exe");
-                startInfo.ArgumentList.Add("--cd");
-                startInfo.ArgumentList.Add(wslWorkspacePath);
-                startInfo.ArgumentList.Add("--exec");
-                startInfo.ArgumentList.Add("bash");
-                startInfo.ArgumentList.Add("-ic");
-                startInfo.ArgumentList.Add(shellCommand);
-            }
-
-            return Process.Start(startInfo);
-        }
-
-        private static Process? StartWindowsTerminal(
-            string? windowIdentity,
+        private static Process? StartForegroundProcess(
             string workingDirectory,
+            string windowTitle,
             string executable,
             IEnumerable<string> arguments)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
+            ArgumentException.ThrowIfNullOrWhiteSpace(windowTitle);
             ArgumentException.ThrowIfNullOrWhiteSpace(executable);
             ArgumentNullException.ThrowIfNull(arguments);
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = "wt.exe",
+                FileName = executable,
+                WorkingDirectory = workingDirectory,
                 UseShellExecute = false
             };
+            startInfo.Environment["HALOCREEK_TERMINAL_TITLE"] = SanitizeConsoleWindowTitle(windowTitle);
 
-            if (!string.IsNullOrWhiteSpace(windowIdentity))
-            {
-                startInfo.ArgumentList.Add("--window");
-                startInfo.ArgumentList.Add(windowIdentity);
-            }
-
-            startInfo.ArgumentList.Add("--startingDirectory");
-            startInfo.ArgumentList.Add(workingDirectory);
-            startInfo.ArgumentList.Add(executable);
             foreach (var argument in arguments)
             {
                 startInfo.ArgumentList.Add(argument);
             }
 
             return Process.Start(startInfo);
+        }
+
+        private static string SanitizeConsoleWindowTitle(string title)
+        {
+            var builder = new StringBuilder(title.Length);
+            var previousWasWhitespace = false;
+            foreach (var character in title.Trim())
+            {
+                var outputCharacter = char.IsControl(character)
+                    || character is '&' or '|' or '<' or '>' or '^' or '%' or '!' or '"'
+                        ? ' '
+                        : character;
+                if (char.IsWhiteSpace(outputCharacter))
+                {
+                    if (!previousWasWhitespace)
+                    {
+                        builder.Append(' ');
+                    }
+
+                    previousWasWhitespace = true;
+                    continue;
+                }
+
+                builder.Append(outputCharacter);
+                previousWasWhitespace = false;
+            }
+
+            var sanitizedTitle = builder.ToString().Trim();
+            if (sanitizedTitle.Length == 0)
+            {
+                return "HaloCreek Session";
+            }
+
+            return sanitizedTitle.Length <= 120
+                ? sanitizedTitle
+                : sanitizedTitle[..120].TrimEnd();
         }
 
         private static IReadOnlyList<string> GetWslDistributionNames()
@@ -1364,14 +1266,6 @@ namespace HaloCreek.Infrastructure
             return end == path.Length ? path : path[..end];
         }
 
-        private static string BuildShellCommand(string executableName, IEnumerable<string> arguments)
-        {
-            return string.Join(
-                " ",
-                new[] { QuoteBashArgument(executableName) }
-                    .Concat(arguments.Select(QuoteBashArgument)));
-        }
-
         private static string SanitizeFileNameSegment(string value)
         {
             var builder = new StringBuilder(value.Length);
@@ -1390,43 +1284,6 @@ namespace HaloCreek.Infrastructure
             }
 
             return segment.Length <= 120 ? segment : segment[..120];
-        }
-
-        private static string QuoteBashArgument(string value)
-        {
-            if (value.Length == 0)
-            {
-                return "''";
-            }
-
-            return "'" + value.Replace("'", "'\\''") + "'";
-        }
-
-        private static string ConvertToWslPath(string path)
-        {
-            if (path.StartsWith('/'))
-            {
-                return path;
-            }
-
-            var root = Path.GetPathRoot(path);
-            if (string.IsNullOrEmpty(root) || root.Length < 2 || root[1] != ':')
-            {
-                return path.Replace('\\', '/');
-            }
-
-            var builder = new StringBuilder();
-            builder.Append("/mnt/");
-            builder.Append(char.ToLowerInvariant(root[0]));
-
-            var relativePath = path[root.Length..].TrimStart('\\', '/');
-            if (relativePath.Length > 0)
-            {
-                builder.Append('/');
-                builder.Append(relativePath.Replace('\\', '/'));
-            }
-
-            return builder.ToString();
         }
     }
 }

@@ -1,6 +1,6 @@
 # HaloCreek Startup Guide
 
-HaloCreek 是一个面向 Windows + Codex CLI 的本地桌面工作流壳层。当前版本启动后必须有一个有效的 Git 仓库根目录作为 workspace；Codex session 通过 Windows 侧 `codex.exe` 在后台 psmux session 中运行；只有用户显式点击 `CLI` 时才通过 Windows Terminal 打开交互窗口；Diff 和部分 Git 操作依赖 TortoiseGit。
+HaloCreek 是一个面向 Windows + Codex CLI 的本地桌面工作流壳层。当前版本启动后必须有一个有效的 Git 仓库根目录作为 workspace；Codex session 通过 Windows 侧 `codex.exe` 在后台 psmux session 中运行；只有用户显式点击 `CLI` 时才打开前台命令窗口；Diff 和部分 Git 操作依赖 TortoiseGit。
 
 功能操作说明见 [Feature Guide](FeatureGuide.md)。
 
@@ -54,8 +54,6 @@ where.exe TortoiseGitProc.exe
 `git.exe` 用于 workspace 校验、Git 修改列表、Review 快照对比、文件恢复和文件补全候选。
 
 `TortoiseGitProc.exe` 用于打开外部 diff、commit 和 log 窗口。
-
-`wt.exe` 用于用户显式点击 `CLI` 时打开 Windows Terminal。当前没有配置项替换终端程序。
 
 ## 2. 启动与 Workspace
 
@@ -301,7 +299,7 @@ codex --model gpt-5-codex resume <sessionId>
 - Snapshot 自动刷新间隔和文件系统监听 debounce。
 - Session keep-alive 探测频率，当前为 3 秒。
 - ClipLocate 的候选文件大小上限，当前为 2 MB；该能力当前没有业务 UI 入口消费。
-- 前台终端程序，当前固定调用 `wt.exe`。
+- `CLI` 前台窗口启动方式，当前固定为直接启动对应 attach 命令。
 - 后台 session 管理程序，当前固定调用 `psmux.exe`。
 - 外部 diff 程序，当前固定调用 `TortoiseGitProc.exe`。
 

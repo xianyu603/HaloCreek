@@ -83,10 +83,12 @@ namespace HaloCreek.Services
             });
         }
 
-        // TODO Open CLI now always launches a wt tab; FrontClient naming should be revisited separately.
-        public TerminalCommandSpec GetFrontClientStartupCommand(string initialIdentifier)
+        public TerminalCommandSpec GetFrontClientStartupCommand(
+            string initialIdentifier,
+            string sessionTitle)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(initialIdentifier);
+            ArgumentException.ThrowIfNullOrWhiteSpace(sessionTitle);
 
             string workspacePath;
             lock (_ownedSessionsLock)
@@ -109,6 +111,7 @@ namespace HaloCreek.Services
 
             return new TerminalWindowsCommandSpec(
                 workspacePath,
+                "HaloCreek - " + sessionTitle.Trim(),
                 "cmd.exe",
                 new[] { "/d", "/c", "call", attachScriptPath, "-t", initialIdentifier });
         }
