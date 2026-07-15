@@ -73,7 +73,7 @@ namespace HaloCreek.Services
                 {
                     DiffToolKind.TortoiseGit => (
                         TortoiseGitProcExecutableName,
-                        new[] { "/command:diff", $"/path:{rightPath}", $"/path2:{leftPath}" }),
+                        new[] { "/command", "diff", "/path", rightPath, "/path2", leftPath }),
                     DiffToolKind.VsCode => (
                         "cmd.exe",
                         new[] { "/c", VsCodeExecutableName, "--diff", leftPath, rightPath }),
@@ -250,7 +250,7 @@ namespace HaloCreek.Services
                     "OpenDiff",
                     "OpenDiff",
                     TortoiseGitProcExecutableName,
-                    new[] { "/command:diff", "/path:{SelectedPath}" }),
+                    new[] { "/command", "diff", "/path", "{SelectedPath}" }),
                 DiffToolKind.VsCode => new GitFileBrowserAction(
                     "OpenDiff",
                     "OpenDiff",
@@ -360,12 +360,12 @@ namespace HaloCreek.Services
                     "Commit",
                     "Commit",
                     ExternalActionService.TortoiseGitProcExecutableName,
-                    new[] { "/command:commit", "/path:{WorkspaceRoot}" }),
+                    new[] { "/command", "commit", "/path", "{WorkspaceRoot}" }),
                 new GitFileBrowserAction(
                     "ShowLog",
                     "Show Log",
                     ExternalActionService.TortoiseGitProcExecutableName,
-                    new[] { "/command:log", "/path:{WorkspaceRoot}" }),
+                    new[] { "/command", "log", "/path", "{WorkspaceRoot}" }),
             };
         }
 
