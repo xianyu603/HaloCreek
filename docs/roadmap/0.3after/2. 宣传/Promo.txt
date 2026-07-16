@@ -1,52 +1,22 @@
 Stay in Control While Coding with AI
 Workflow shell for better coding experience powered by codex cli.
 
-123 录一个素材裁成三段
-prompt: 总结这个仓库的内容和版本历程，列举出关键文件或有趣的方法实现
-
 1. Launch an agent task in seconds.
 输入prompt并发送
+send-msg-single.gif
 
-2. A quieter agent conversion
+2. A quieter agent conversation
 滚动展示消息记录
+cleaner-conversation.gif
 
 3. Reach your agent from anywhere
 消息点到代码 然后在vs里看代码的时候悬浮框追问
+back-and-forth.gif
 
 4. Review, follow up, and commit in one workflow
 review-commit.gif
 
 5. Build Better Prompts, Faster
-Fix the issue below.
-
-Symptom:
-- In Prompt Editor, completion sometimes keeps an outdated selection after typing quickly.
-- When I type @PromptInput, then quickly change the query and press Down + Enter, the inserted file can belong to the previous query.
-
-Expected behavior:
-- Completion results should always match the current token query.
-- Stale async results must not replace the visible menu for the current query.
-- Keyboard selection should stay stable while fresh results are loading.
-
-Reproduction steps:
-- Open Prompt Editor.
-- Type @PromptInput, then quickly continue editing the query.
-- Press Down + Enter before all async file results finish.
-- Check whether the inserted path matches the current query.
-
-Relevant files:
-- HaloCreek/ViewModels/Components/PromptInputViewModel.cs
-- HaloCreek/Services/Completions/CompletionCoordinator.cs
-- HaloCreek/Services/Completions/Files/FileCompletionSource.cs
-- HaloCreek/Views/Components/PromptInputView.axaml.cs
-
-Use $halocreek-build-review when validating.
-
-Implement this request directly, keeping the change as small as practical.
-Do not perform unrelated refactoring; adjust structure only when it is necessary for this request.
-Run the relevant build after finishing.
-Leave the changes in the working tree for my review. Do not commit.
-
-prompt编辑过程录制
+prompt-input.gif
 
 Setup now
