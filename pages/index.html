@@ -53,6 +53,53 @@
       color: #2563eb;
     }
 
+    .downloads {
+      display: none;
+      margin-top: 28px;
+      padding-top: 24px;
+      border-top: 1px solid #d8dee8;
+    }
+
+    .downloads.is-visible {
+      display: block;
+    }
+
+    .downloads h2 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .downloads p {
+      margin-bottom: 14px;
+    }
+
+    .download-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .primary-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .file-name {
+      color: #4b5563;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
     @media (prefers-color-scheme: dark) {
       :root {
         background: #111418;
@@ -66,6 +113,14 @@
       pre {
         border-color: #303946;
       }
+
+      .downloads {
+        border-top-color: #303946;
+      }
+
+      .file-name {
+        color: #b8c0cc;
+      }
     }
   </style>
 </head>
@@ -74,7 +129,40 @@
     <h1>HaloCreek</h1>
     <p>Install the latest Windows release from GitHub Releases, including runtime dependencies.</p>
     <pre><code>irm https://xianyu603.github.io/HaloCreek/install.ps1 | iex</code></pre>
+    <section id="downloads" class="downloads" aria-labelledby="downloads-title">
+      <h2 id="downloads-title">China mirror</h2>
+      <p id="downloads-summary"></p>
+      <div class="download-actions">
+        <a id="yun123-link" class="primary-link" href="#">Open 123 Cloud</a>
+        <span id="downloads-file" class="file-name"></span>
+      </div>
+    </section>
     <p><a href="./install.ps1">View installer script</a></p>
   </main>
+  <script>
+    async function loadDownloads() {
+      const response = await fetch("./downloads.json", { cache: "no-store" });
+      if (!response.ok) {
+        return;
+      }
+
+      const downloads = await response.json();
+      if (!downloads.yun123ShareUrl) {
+        return;
+      }
+
+      const section = document.getElementById("downloads");
+      const summary = document.getElementById("downloads-summary");
+      const link = document.getElementById("yun123-link");
+      const file = document.getElementById("downloads-file");
+
+      summary.textContent = `Offline package mirror for ${downloads.releaseTag}.`;
+      link.href = downloads.yun123ShareUrl;
+      file.textContent = downloads.offlineZipName || "";
+      section.classList.add("is-visible");
+    }
+
+    loadDownloads().catch(() => {});
+  </script>
 </body>
 </html>
