@@ -101,7 +101,8 @@ namespace HaloCreek.Views.Components
 
         private void CompletionPopup_OnPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
         {
-            if (e.Property == IsVisibleProperty && CompletionPopup.IsVisible)
+            if ((e.Property == IsVisibleProperty || e.Property == BoundsProperty)
+                && CompletionPopup.IsVisible)
             {
                 UpdateCompletionPopupPosition();
             }
@@ -255,8 +256,13 @@ namespace HaloCreek.Views.Components
                 return;
             }
 
+            var caretTop = transform.Value.Transform(new Point(caretRect.X, caretRect.Y)).Y;
             var caretBottom = transform.Value.Transform(new Point(caretRect.X, caretRect.Y + caretRect.Height)).Y;
-            var desiredTop = caretBottom + CompletionMenuCaretGap;
+            var topBelowCaret = caretBottom + CompletionMenuCaretGap;
+            var topAboveCaret = caretTop - CompletionMenuCaretGap - menuHeight;
+            var desiredTop = topBelowCaret + menuHeight <= Bounds.Height - CompletionMenuBottomPadding
+                ? topBelowCaret
+                : topAboveCaret;
             CompletionPopup.Margin = new Thickness(
                 CompletionMenuLeft,
                 Math.Clamp(desiredTop, 0, fallbackTop),
