@@ -297,15 +297,15 @@ jobs:
           $pattern = "(?s)\r?\n?$([regex]::Escape($markerStart)).*?$([regex]::Escape($markerEnd))\r?\n?"
           $body = [regex]::Replace($body, $pattern, "").TrimEnd()
 
-          $block = @"
-$markerStart
-## 123 云盘国内下载
-
-- 离线安装包：$env:YUN123_SHARE_URL
-- 包名：$env:OFFLINE_ZIP_NAME
-- 校验文件：$env:OFFLINE_CHECKSUM_NAME
-$markerEnd
-"@
+          $block = @(
+            $markerStart
+            "## 123 云盘国内下载"
+            ""
+            "- 离线安装包：$env:YUN123_SHARE_URL"
+            "- 包名：$env:OFFLINE_ZIP_NAME"
+            "- 校验文件：$env:OFFLINE_CHECKSUM_NAME"
+            $markerEnd
+          ) -join [Environment]::NewLine
 
           $newBody = if ([string]::IsNullOrWhiteSpace($body)) {
             $block
