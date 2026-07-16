@@ -20,7 +20,11 @@ param(
 
     [int]$ShareExpire = 0,
 
-    [string]$SharePassword = ""
+    [string]$SharePassword = "",
+
+    [switch]$NoProxy,
+
+    [string]$MetadataOutputPath
 )
 
 Set-StrictMode -Version Latest
@@ -71,7 +75,9 @@ function Invoke-123Api {
 
         [object]$Body,
 
-        [hashtable]$Query
+        [hashtable]$Query,
+
+        [int[]]$RetryableCodes = @()
     )
 
     $uriBuilder = [UriBuilder]::new(($ApiBase.TrimEnd("/") + "/" + $Path.TrimStart("/")))
@@ -93,6 +99,9 @@ function Invoke-123Api {
         Method  = $Method
         Uri     = $uriBuilder.Uri.AbsoluteUri
         Headers = $headers
+    }
+    if ($NoProxy) {
+        $invokeArgs["NoProxy"] = $true
     }
 
     if ($PSBoundParameters.ContainsKey("Body") -and $null -ne $Body) {
@@ -116,10 +125,44 @@ function Invoke-123Api {
         $code = if ($null -eq $response) { "<null>" } else { $response.code }
         $message = if ($null -eq $response) { "<null>" } else { $response.message }
         $traceID = if ($null -eq $response) { "" } else { $response."x-traceID" }
+        if ($null -ne $response -and [int]$response.code -in $RetryableCodes) {
+            return $response
+        }
+
         throw "123 Cloud API returned an error. Method=$Method Path=$Path Code=$code Message=$message TraceID=$traceID"
     }
 
     $response.data
+}
+
+function Invoke-123UploadComplete {
+    param(
+        [string]$AccessToken,
+        [string]$PreuploadID,
+        [string]$FileName,
+        [int]$MaxAttempts = 120
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        $completeResult = Invoke-123Api `
+            -Method POST `
+            -Path "/upload/v2/file/upload_complete" `
+            -AccessToken $AccessToken `
+            -Body @{
+                preuploadID = $PreuploadID
+            } `
+            -RetryableCodes @(20103)
+
+        if ($completeResult.PSObject.Properties["code"] -and [int]$completeResult.code -eq 20103) {
+            Write-Host "123 Cloud is verifying $FileName. Retry $attempt/$MaxAttempts."
+            Start-Sleep -Seconds 1
+            continue
+        }
+
+        return $completeResult
+    }
+
+    throw "123 Cloud upload did not complete because the file is still verifying. File=$FileName Attempts=$MaxAttempts"
 }
 
 function Get-123AccessToken {
@@ -251,7 +294,17 @@ function Invoke-123Multipart {
     $headers["Authorization"] = "Bearer $AccessToken"
 
     try {
-        $response = Invoke-RestMethod -Method POST -Uri $Uri -Headers $headers -Form $Form
+        $invokeArgs = @{
+            Method  = "POST"
+            Uri     = $Uri
+            Headers = $headers
+            Form    = $Form
+        }
+        if ($NoProxy) {
+            $invokeArgs["NoProxy"] = $true
+        }
+
+        $response = Invoke-RestMethod @invokeArgs
     }
     catch {
         $details = if ($_.ErrorDetails -and -not [string]::IsNullOrWhiteSpace($_.ErrorDetails.Message)) {
@@ -371,13 +424,10 @@ function Send-123File {
     }
 
     Write-Step "Complete upload for $($item.Name)"
-    $completeData = Invoke-123Api `
-        -Method POST `
-        -Path "/upload/v2/file/upload_complete" `
+    $completeData = Invoke-123UploadComplete `
         -AccessToken $AccessToken `
-        -Body @{
-            preuploadID = $createData.preuploadID
-        }
+        -PreuploadID $createData.preuploadID `
+        -FileName $item.Name
 
     if (-not $completeData.completed) {
         throw "123 Cloud upload did not complete. File=$($item.Name)"
@@ -459,6 +509,28 @@ $shareUrl = New-123Share `
     -SharePassword $SharePassword
 
 Write-Host "123 Cloud share URL: $shareUrl"
+
+$metadata = [ordered]@{
+    schemaVersion       = 1
+    releaseTag          = $ReleaseTag
+    packageName         = $packageItem.Name
+    checksumName        = $checksumItem.Name
+    shareUrl            = $shareUrl
+    folderId            = $releaseFolderID
+    packageFileId       = $packageFileID
+    checksumFileId      = $checksumFileID
+    generatedAtUtc      = [DateTime]::UtcNow.ToString("o")
+}
+
+if (-not [string]::IsNullOrWhiteSpace($MetadataOutputPath)) {
+    $metadataOutputParent = Split-Path -Parent $MetadataOutputPath
+    if (-not [string]::IsNullOrWhiteSpace($metadataOutputParent)) {
+        New-Item -ItemType Directory -Force -Path $metadataOutputParent | Out-Null
+    }
+
+    $metadataJson = $metadata | ConvertTo-Json -Depth 4
+    [IO.File]::WriteAllText($MetadataOutputPath, $metadataJson + [Environment]::NewLine, $Utf8NoBom)
+}
 
 if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_OUTPUT)) {
     "folder_id=$releaseFolderID" >> $env:GITHUB_OUTPUT
