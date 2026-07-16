@@ -77,13 +77,32 @@ function Invoke-GitHubApi {
 function Invoke-Download {
     param(
         [string]$Uri,
-        [string]$Path
+        [string]$Path,
+        [int]$MaxAttempts = 3
     )
 
     $webClient = New-Object Net.WebClient
     $webClient.Headers.Add("User-Agent", "HaloCreek-Offline-Pack-Builder")
     try {
-        $webClient.DownloadFile($Uri, $Path)
+        for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+            try {
+                $webClient.DownloadFile($Uri, $Path)
+                return
+            }
+            catch {
+                $message = $_.Exception.Message
+                if ($_.Exception.InnerException) {
+                    $message = "$message InnerException=$($_.Exception.InnerException.Message)"
+                }
+
+                if ($attempt -ge $MaxAttempts) {
+                    throw "Download failed. Uri=$Uri Path=$Path Attempts=$attempt Error=$message"
+                }
+
+                Write-Warning "Download failed. Attempt=$attempt Uri=$Uri Error=$message"
+                Start-Sleep -Seconds (5 * $attempt)
+            }
+        }
     }
     finally {
         $webClient.Dispose()
@@ -91,12 +110,32 @@ function Invoke-Download {
 }
 
 function Invoke-DownloadString {
-    param([string]$Uri)
+    param(
+        [string]$Uri,
+        [int]$MaxAttempts = 3
+    )
 
     $webClient = New-Object Net.WebClient
     $webClient.Headers.Add("User-Agent", "HaloCreek-Offline-Pack-Builder")
     try {
-        $webClient.DownloadString($Uri)
+        for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+            try {
+                return $webClient.DownloadString($Uri)
+            }
+            catch {
+                $message = $_.Exception.Message
+                if ($_.Exception.InnerException) {
+                    $message = "$message InnerException=$($_.Exception.InnerException.Message)"
+                }
+
+                if ($attempt -ge $MaxAttempts) {
+                    throw "Download string failed. Uri=$Uri Attempts=$attempt Error=$message"
+                }
+
+                Write-Warning "Download string failed. Attempt=$attempt Uri=$Uri Error=$message"
+                Start-Sleep -Seconds (5 * $attempt)
+            }
+        }
     }
     finally {
         $webClient.Dispose()
