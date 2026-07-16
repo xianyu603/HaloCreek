@@ -193,6 +193,8 @@
     }
 
     pre {
+      width: 100%;
+      max-width: 100%;
       margin: 0;
       padding: 16px 18px;
       overflow-x: auto;
@@ -202,6 +204,11 @@
       color: #f9fafb;
       font-size: 15px;
       line-height: 1.5;
+    }
+
+    pre code {
+      display: block;
+      min-width: max-content;
     }
 
     .section {
@@ -243,6 +250,7 @@
     }
 
     .install-panel {
+      min-width: 0;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--surface);
@@ -262,57 +270,19 @@
     }
 
     .install-panel-body {
+      min-width: 0;
       display: grid;
       gap: 18px;
       padding: 20px;
     }
 
+    .install-panel-body > * {
+      min-width: 0;
+    }
+
     .install-panel pre {
       border-color: #263244;
       background: #111827;
-    }
-
-    .downloads {
-      display: none;
-      padding-top: 18px;
-      border-top: 1px solid var(--line);
-    }
-
-    .downloads.is-visible {
-      display: block;
-    }
-
-    .downloads h3 {
-      margin: 0 0 8px;
-      font-size: 18px;
-      line-height: 1.3;
-      letter-spacing: 0;
-    }
-
-    .downloads p {
-      margin: 0 0 14px;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.5;
-    }
-
-    .download-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .primary-link {
-      display: inline-flex;
-      align-items: center;
-      min-height: 40px;
-      padding: 0 14px;
-      border-radius: 8px;
-      background: var(--blue);
-      color: #ffffff;
-      font-weight: 700;
-      text-decoration: none;
     }
 
     .file-name {
@@ -503,9 +473,6 @@
         background: linear-gradient(180deg, rgba(17, 24, 39, 0), #111418);
       }
 
-      .primary-link {
-        color: #111418;
-      }
     }
   </style>
 </head>
@@ -557,14 +524,6 @@
             <span class="snippet-label">China direct mirror</span>
             <pre><code>irm https://xianyu603.github.io/HaloCreek/install_cn.ps1 | iex</code></pre>
           </div>
-          <section id="downloads" class="downloads" aria-labelledby="downloads-title">
-            <h3 id="downloads-title">China mirror</h3>
-            <p id="downloads-summary"></p>
-            <div class="download-actions">
-              <a id="yun123-link" class="primary-link" href="#">Open 123 Cloud</a>
-              <span id="downloads-file" class="file-name"></span>
-            </div>
-          </section>
           <p class="file-name"><a href="./install.ps1">View installer script</a> &middot; <a href="./install_cn.ps1">View China installer script</a></p>
         </div>
       </aside>
@@ -632,35 +591,9 @@
       <div class="footer-links">
         <a href="https://github.com/xianyu603/HaloCreek">GitHub</a>
         <a href="https://github.com/xianyu603/HaloCreek/releases/latest">Latest Release</a>
-        <a href="mailto:cuikai603@163.com">Contact Author</a>
+        <span>Contact: cuikai603@163.com</span>
       </div>
     </div>
   </footer>
-
-  <script>
-    async function loadDownloads() {
-      const response = await fetch("./downloads.json", { cache: "no-store" });
-      if (!response.ok) {
-        return;
-      }
-
-      const downloads = await response.json();
-      if (!downloads.yun123ShareUrl) {
-        return;
-      }
-
-      const section = document.getElementById("downloads");
-      const summary = document.getElementById("downloads-summary");
-      const link = document.getElementById("yun123-link");
-      const file = document.getElementById("downloads-file");
-
-      summary.textContent = `Offline package mirror for ${downloads.releaseTag}.`;
-      link.href = downloads.yun123ShareUrl;
-      file.textContent = downloads.offlineZipName || "";
-      section.classList.add("is-visible");
-    }
-
-    loadDownloads().catch(() => {});
-  </script>
 </body>
 </html>
