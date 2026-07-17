@@ -1,0 +1,20 @@
+Codex 很强，但我发现真正卡住我的，常常不是 AI 写不出来，而是协作过程里的切换成本。
+
+我总是在不同窗口之间来回跳：多个 session 容易混淆，偶尔还会把消息发错；review 和 commit 要切到 Git 工具或资源管理器；看代码要回 Rider / VS Code；想追问时，又得按半天 Alt+Tab 找回对应的窗口。
+
+AI 写代码越来越快，但和 AI 协作时的这些小摩擦，反而成了每天都在消耗注意力的地方。
+
+所以我做了 HaloCreek：一个面向个人 Agent 编程工作流的轻量桌面工作台。它不替代 IDE，也不接管 Codex CLI，而是把常用入口收拢到一起，让 human-in-the-loop 的过程更顺手。
+
+- 在一个入口管理 workspace、prompt、session 和历史记录
+- 用快捷键从任意位置唤起当前 session，继续和 agent 对话
+- 复用预制 prompt，不用每次手打“完成后启动应用”这类固定指令
+- 在一个窗口里查看变更、review、追问、准备 commit
+- 记录“我已经看过什么”，更容易对比 AI 后续又改了什么
+- 一行命令安装；发布页国内访问速度更友好
+
+它的目标很简单：在我还想握着方向盘的时候，让方向盘握起来更舒服。
+
+GitHub:https://github.com/xianyu603/HaloCreek
+安装页: https://xianyu603.github.io/HaloCreek/
+国内一键安装指令: irm https://xianyu603.github.io/HaloCreek/install_cn.ps1 | iex
