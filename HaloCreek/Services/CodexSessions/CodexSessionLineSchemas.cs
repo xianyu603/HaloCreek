@@ -36,16 +36,12 @@ namespace HaloCreek.Services.CodexSessions
         public static readonly CodexSessionLineSchema<CodexCompletedItemMessageLine> CompletedUserMessage = new(
             RecordType: "event_msg",
             PayloadType: "item_completed",
-            IsMatch: line =>
-                string.Equals(line.Payload.Item?.Type, "UserMessage", StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(line.Payload.Item.Message));
+            IsMatch: line => IsCompletedItemMessage(line, "UserMessage"));
 
         public static readonly CodexSessionLineSchema<CodexCompletedItemMessageLine> CompletedAgentMessage = new(
             RecordType: "event_msg",
             PayloadType: "item_completed",
-            IsMatch: line =>
-                string.Equals(line.Payload.Item?.Type, "AgentMessage", StringComparison.Ordinal)
-                && !string.IsNullOrWhiteSpace(line.Payload.Item.Message));
+            IsMatch: line => IsCompletedItemMessage(line, "AgentMessage"));
 
         public static readonly CodexSessionLineSchema<CodexTaskStateLine> TaskStarted = new(
             RecordType: "event_msg",
@@ -67,6 +63,16 @@ namespace HaloCreek.Services.CodexSessions
         {
             ThrowIfEmpty(line.Payload.Id, "Session id is missing.");
             ThrowIfEmpty(line.Payload.Cwd, "Session workspace path is missing.");
+        }
+
+        private static bool IsCompletedItemMessage(
+            CodexCompletedItemMessageLine line,
+            string itemType)
+        {
+            var item = line.Payload.Item;
+            return item is not null
+                && string.Equals(item.Type, itemType, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(item.Message);
         }
 
         private static void ThrowIfEmpty(string value, string message)
