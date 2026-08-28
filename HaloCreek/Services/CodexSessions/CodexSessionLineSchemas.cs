@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace HaloCreek.Services.CodexSessions
@@ -30,6 +32,20 @@ namespace HaloCreek.Services.CodexSessions
             RecordType: "event_msg",
             PayloadType: "agent_message",
             IsMatch: line => !string.IsNullOrWhiteSpace(line.Payload.Message));
+
+        public static readonly CodexSessionLineSchema<CodexCompletedItemMessageLine> CompletedUserMessage = new(
+            RecordType: "event_msg",
+            PayloadType: "item_completed",
+            IsMatch: line =>
+                string.Equals(line.Payload.Item?.Type, "UserMessage", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(line.Payload.Item.Message));
+
+        public static readonly CodexSessionLineSchema<CodexCompletedItemMessageLine> CompletedAgentMessage = new(
+            RecordType: "event_msg",
+            PayloadType: "item_completed",
+            IsMatch: line =>
+                string.Equals(line.Payload.Item?.Type, "AgentMessage", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(line.Payload.Item.Message));
 
         public static readonly CodexSessionLineSchema<CodexTaskStateLine> TaskStarted = new(
             RecordType: "event_msg",
@@ -117,6 +133,46 @@ namespace HaloCreek.Services.CodexSessions
 
         [JsonPropertyName("phase")]
         public string? Phase { get; init; }
+    }
+
+    internal sealed class CodexCompletedItemMessageLine
+    {
+        [JsonPropertyName("timestamp")]
+        public required DateTimeOffset Timestamp { get; init; }
+
+        [JsonPropertyName("payload")]
+        public required CodexCompletedItemMessagePayload Payload { get; init; }
+    }
+
+    internal sealed class CodexCompletedItemMessagePayload
+    {
+        [JsonPropertyName("item")]
+        public CodexCompletedItemMessageItem? Item { get; init; }
+    }
+
+    internal sealed class CodexCompletedItemMessageItem
+    {
+        [JsonPropertyName("type")]
+        public string? Type { get; init; }
+
+        [JsonPropertyName("content")]
+        public IReadOnlyList<CodexCompletedItemMessageContent>? Content { get; init; }
+
+        [JsonPropertyName("phase")]
+        public string? Phase { get; init; }
+
+        public string Message => string.Join(
+            "\n",
+            Content?
+                .Select(content => content.Text)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+            ?? Array.Empty<string>());
+    }
+
+    internal sealed class CodexCompletedItemMessageContent
+    {
+        [JsonPropertyName("text")]
+        public string? Text { get; init; }
     }
 
     internal sealed class CodexTaskStateLine

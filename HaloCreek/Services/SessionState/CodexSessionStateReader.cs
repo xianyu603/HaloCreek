@@ -75,6 +75,16 @@ namespace HaloCreek.Services.SessionState
                     continue;
                 }
 
+                if (line.TryRead(CodexSessionLineSchemas.CompletedUserMessage, out var completedUserMessage))
+                {
+                    messages.Add(new SessionMessage(
+                        completedUserMessage.Timestamp,
+                        SessionMessageSender.User,
+                        completedUserMessage.Payload.Item!.Message,
+                        SessionMessagePhase.Unknown));
+                    continue;
+                }
+
                 if (line.TryRead(CodexSessionLineSchemas.AgentMessage, out var agentMessage))
                 {
                     messages.Add(new SessionMessage(
@@ -82,6 +92,16 @@ namespace HaloCreek.Services.SessionState
                         SessionMessageSender.Agent,
                         agentMessage.Payload.Message,
                         ReadMessagePhase(agentMessage.Payload.Phase)));
+                    continue;
+                }
+
+                if (line.TryRead(CodexSessionLineSchemas.CompletedAgentMessage, out var completedAgentMessage))
+                {
+                    messages.Add(new SessionMessage(
+                        completedAgentMessage.Timestamp,
+                        SessionMessageSender.Agent,
+                        completedAgentMessage.Payload.Item!.Message,
+                        ReadMessagePhase(completedAgentMessage.Payload.Item.Phase)));
                     continue;
                 }
 

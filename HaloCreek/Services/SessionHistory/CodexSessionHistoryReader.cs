@@ -173,9 +173,21 @@ namespace HaloCreek.Services.SessionHistory
                     lastPrompt = userMessage.Payload.Message;
                 }
 
+                if (line.TryRead(CodexSessionLineSchemas.CompletedUserMessage, out var completedUserMessage)
+                    && !IsEnvironmentContextMessage(completedUserMessage.Payload.Item!.Message))
+                {
+                    initialPrompt ??= completedUserMessage.Payload.Item.Message;
+                    lastPrompt = completedUserMessage.Payload.Item.Message;
+                }
+
                 if (line.TryRead(CodexSessionLineSchemas.AgentMessage, out var agentMessage))
                 {
                     lastReply = agentMessage.Payload.Message;
+                }
+
+                if (line.TryRead(CodexSessionLineSchemas.CompletedAgentMessage, out var completedAgentMessage))
+                {
+                    lastReply = completedAgentMessage.Payload.Item!.Message;
                 }
 
                 if (!line.TryRead(CodexSessionLineSchemas.SessionMeta, out var sessionMeta))
